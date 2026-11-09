@@ -1,0 +1,17 @@
+[
+  {
+    "id": 401628001,
+    "season": 2026,
+    "week": 11,
+    "seasonType": "regular",
+    "startDate": "2026-11-07T20:00:00.000Z",
+    "homeTeam": "Ohio State",
+    "awayTeam": "Michigan",
+    "homeId": 194,
+    "awayId": 130,
+    "neutralSite": false,
+    "venue": "Ohio Stadium",
+    "homeConference": "Big Ten",
+    "awayConference": "Big Ten"
+  }
+]

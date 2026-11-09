@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --void: #07080c;
+  --ink: #0c1018;
+  --plate: #141a24;
+  --paper: #f4f6fb;
+  --mute: #8e97a8;
+  --lime: #d6ff3f;
+  --signal: #3af2ff;
+  --flare: #ff4bd8;
+  --heat: #ff5c39;
+  --ice: #3af2ff;
+}
+
+html,
+body {
+  background: var(--void);
+  color: var(--paper);
+}
+
+body {
+  background-image:
+    radial-gradient(900px 480px at -8% -18%, rgba(214, 255, 63, 0.12), transparent 55%),
+    radial-gradient(720px 460px at 108% -12%, rgba(58, 242, 255, 0.11), transparent 52%),
+    radial-gradient(680px 420px at 70% 115%, rgba(255, 75, 216, 0.09), transparent 48%),
+    linear-gradient(180deg, var(--ink) 0%, var(--void) 38%);
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(244, 246, 251, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244, 246, 251, 0.035) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 10%, transparent 68%);
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: var(--lime);
+  color: var(--void);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--void);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2c3848;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lime);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.plate {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%),
+    linear-gradient(180deg, rgba(20, 26, 36, 0.96), rgba(12, 16, 24, 0.94));
+  border: 1px solid rgba(244, 246, 251, 0.08);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.plate::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(214, 255, 63, 0.85),
+    rgba(58, 242, 255, 0.8),
+    rgba(255, 75, 216, 0.75),
+    transparent
+  );
+  pointer-events: none;
+}
+
+a.plate:hover {
+  border-color: rgba(214, 255, 63, 0.38);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.45), 0 0 32px rgba(214, 255, 63, 0.06);
+  transform: translateY(-2px);
+}
+
+:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
+.kicker {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--lime);
+}
+
+.kicker-signal {
+  color: var(--signal);
+}
+
+.kicker-flare {
+  color: var(--flare);
+}
+
+.text-signal {
+  color: var(--signal);
+}
+
+.text-flare {
+  color: var(--flare);
+}
+
+.bg-signal {
+  background-color: var(--signal);
+}
+
+.bg-flare {
+  background-color: var(--flare);
+}
+
+.border-signal {
+  border-color: var(--signal);
+}
+
+.border-flare {
+  border-color: var(--flare);
+}
+
+.display {
+  font-family: var(--font-display), Impact, sans-serif;
+  font-weight: 600;
+  line-height: 0.84;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.field-input {
+  width: 100%;
+  border-radius: 2px;
+  border: 1px solid rgba(244, 246, 251, 0.12);
+  background: var(--void);
+  padding: 0.7rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--paper);
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.field-input:focus {
+  border-color: var(--lime);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 2px;
+  background: var(--lime);
+  padding: 0.7rem 1.15rem;
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--void);
+  transition: filter 150ms ease, transform 150ms ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+}

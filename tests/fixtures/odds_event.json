@@ -1,0 +1,44 @@
+{
+  "id": "evt-nfl-1",
+  "sport_key": "americanfootball_nfl",
+  "commence_time": "2026-11-08T18:25:00Z",
+  "home_team": "Kansas City Chiefs",
+  "away_team": "Buffalo Bills",
+  "bookmakers": [
+    {
+      "key": "draftkings",
+      "title": "DraftKings",
+      "markets": [
+        {
+          "key": "player_anytime_td",
+          "last_update": "2026-11-06T18:00:00Z",
+          "outcomes": [
+            {
+              "name": "Yes",
+              "description": "Rashee Rice",
+              "price": 180
+            }
+          ]
+        },
+        {
+          "key": "player_receptions",
+          "last_update": "2026-11-06T18:00:00Z",
+          "outcomes": [
+            {
+              "name": "Over",
+              "description": "Amon-Ra St. Brown",
+              "price": -120,
+              "point": 7.5
+            },
+            {
+              "name": "Under",
+              "description": "Amon-Ra St. Brown",
+              "price": 100,
+              "point": 7.5
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

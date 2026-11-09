@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Caliber API
+  version: 0.1.0
+  description: Odds-aware calibrated probability engine for NFL and FBS. Research forecasts only.
+paths:
+  /v1/slate:
+    get:
+      parameters:
+        - in: query
+          name: date
+        - in: query
+          name: league
+      responses:
+        "200":
+          description: Games, starts, status, model freshness
+  /v1/games/{id}:
+    get:
+      responses:
+        "200":
+          description: Matchup, injuries, weather, totals, feature contributions
+  /v1/props:
+    get:
+      parameters:
+        - in: query
+          name: market
+        - in: query
+          name: min_odds
+        - in: query
+          name: min_ev
+      responses:
+        "200":
+          description: Price-ranked market outcomes
+  /v1/players/{id}/forecast:
+    get:
+      parameters:
+        - in: query
+          name: game_id
+          required: true
+      responses:
+        "200":
+          description: Stat distributions, usage, injury scenarios
+  /v1/simulations:
+    post:
+      responses:
+        "200":
+          description: Create research run
+  /v1/simulations/{run_id}:
+    get:
+      responses:
+        "200":
+          description: Draw summary, uncertainty, provenance
+  /v1/parlays/evaluate:
+    post:
+      responses:
+        "200":
+          description: Joint probability vs book quote
+  /v1/model-health:
+    get:
+      responses:
+        "200":
+          description: Calibration, freshness, coverage, drift, CLV
+  /v1/recommendations/history:
+    get:
+      responses:
+        "200":
+          description: Immutable prediction ledger

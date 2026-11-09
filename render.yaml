@@ -1,0 +1,113 @@
+# Caliber cloud stack — API + Postgres + scheduled worker chores.
+# In Render: New → Blueprint → connect this repo → apply.
+# Then set ODDS_API_KEY / CFBD_API_KEY / WEB_ORIGIN in the dashboard.
+#
+# Netlify hosts the website separately and points API_URL at caliber-api.
+
+databases:
+  - name: caliber-db
+    plan: free
+    databaseName: caliber
+    user: caliber
+
+services:
+  - type: web
+    name: caliber-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /docs
+    dockerCommand: sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caliber-db
+          property: connectionString
+      - key: PARQUET_DIR
+        value: /data/parquet
+      - key: WEB_ORIGIN
+        sync: false
+      - key: ODDS_API_KEY
+        sync: false
+      - key: CFBD_API_KEY
+        sync: false
+      - key: ODDS_CREDIT_BUDGET_PER_DAY
+        value: "2000"
+      - key: DISCLAIMER
+        value: Research forecast only. Not betting advice. No wagering, no automated placement.
+      - key: PYTHONPATH
+        value: /app/packages/core:/app/services/api:/app/services/worker
+
+  # Fresh prices through the day (respects Odds API budget).
+  - type: cron
+    name: caliber-odds-refresh
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "20 */3 * * *"
+    dockerCommand: python -m worker.main ingest-odds-live
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caliber-db
+          property: connectionString
+      - key: PARQUET_DIR
+        value: /data/parquet
+      - key: ODDS_API_KEY
+        sync: false
+      - key: CFBD_API_KEY
+        sync: false
+      - key: ODDS_CREDIT_BUDGET_PER_DAY
+        value: "2000"
+      - key: PYTHONPATH
+        value: /app/packages/core:/app/services/api:/app/services/worker
+
+  # Scoreboard → freeze → settle → desk takes (skip CFBD boxes by default to save quota).
+  - type: cron
+    name: caliber-ops-cycle
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "5 */4 * * *"
+    dockerCommand: python -m worker.main cfb-atd-ops-cycle --skip-boxes
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caliber-db
+          property: connectionString
+      - key: PARQUET_DIR
+        value: /data/parquet
+      - key: ODDS_API_KEY
+        sync: false
+      - key: CFBD_API_KEY
+        sync: false
+      - key: PYTHONPATH
+        value: /app/packages/core:/app/services/api:/app/services/worker
+
+  # ESPN scoreboard more often so finals settle faster.
+  - type: cron
+    name: caliber-scoreboard
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "*/30 * * * *"
+    dockerCommand: python -m worker.main ingest-scoreboard
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caliber-db
+          property: connectionString
+      - key: PYTHONPATH
+        value: /app/packages/core:/app/services/api:/app/services/worker

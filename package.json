@@ -1,0 +1,12 @@
+{
+  "name": "caliber",
+  "private": true,
+  "description": "Caliber monorepo — NFL and FBS calibrated probability engine",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "web": "npm run dev -w web",
+    "web:build": "npm run build -w web"
+  }
+}

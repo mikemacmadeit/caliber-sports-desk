@@ -1,0 +1,27 @@
+{
+  "units": {
+    "yards": "yd",
+    "wind": "m/s",
+    "temperature": "Celsius",
+    "precipitation": "mm",
+    "altitude": "m",
+    "timestamps": "UTC",
+    "american_odds": "integer American",
+    "probability": "unit interval [0,1]",
+    "ev": "expected return per $1 staked (hypothetical)"
+  },
+  "leagues": ["nfl", "fbs"],
+  "markets_v1": ["anytime_td", "receptions", "receiving_yards", "rushing_yards"],
+  "markets_ats_research": ["point_spread"],
+  "provenance_fields": [
+    "provider",
+    "provider_record_id",
+    "observed_at",
+    "effective_at",
+    "ingested_at",
+    "revision",
+    "quality_status"
+  ],
+  "point_in_time_rule": "Never treat ingested_at or future revisions as historically available. Joins use observed_at <= as_of.",
+  "identity_rule": "Never silently join same-name players. Ambiguous matches require manual review."
+}

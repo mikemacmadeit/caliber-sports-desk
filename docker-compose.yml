@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: caliber
+      POSTGRES_PASSWORD: caliber
+      POSTGRES_DB: caliber
+    ports:
+      - "5432:5432"
+    volumes:
+      - caliber_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caliber"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://caliber:caliber@db:5432/caliber
+      WEB_ORIGIN: http://localhost:3000
+      PARQUET_DIR: /data/parquet
+      PYTHONPATH: /app/packages/core:/app/services/api:/app/services/worker
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - caliber_data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "worker.main", "cfb-atd-ops-cycle", "--skip-boxes"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://caliber:caliber@db:5432/caliber
+      PARQUET_DIR: /data/parquet
+      PYTHONPATH: /app/packages/core:/app/services/api:/app/services/worker
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - caliber_data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - jobs
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    environment:
+      API_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  caliber_pg:
+  caliber_data:
