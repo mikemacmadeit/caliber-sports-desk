@@ -61,6 +61,7 @@ def ensure_schema(engine: Engine) -> None:
     if not pending:
         return
     with engine.begin() as conn:
-        conn.exec_driver_sql("PRAGMA busy_timeout=2500")
+        if engine.dialect.name == "sqlite":
+            conn.exec_driver_sql("PRAGMA busy_timeout=2500")
         for table, column, ddl in pending:
             conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
