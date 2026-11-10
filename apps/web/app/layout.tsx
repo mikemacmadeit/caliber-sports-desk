@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Barlow_Condensed, JetBrains_Mono, Outfit } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import "./globals.css";
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${display.variable} ${sans.variable} ${mono.variable} font-sans antialiased`}>
-        <AppShell>{children}</AppShell>
+        <Suspense fallback={<main className="px-5 py-8 lg:px-10 lg:py-10">{children}</main>}>
+          <AppShell>{children}</AppShell>
+        </Suspense>
       </body>
     </html>
   );

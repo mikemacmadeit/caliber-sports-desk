@@ -1,25 +1,15 @@
 # Caliber website on Netlify. API + worker live on Render (see render.yaml).
 #
-# Netlify UI:
-#   Base directory: apps/web
-#   Build command:  npm run build
-#   Publish:        (Next plugin handles it)
-#
 # Required env vars in Netlify:
 #   API_URL=https://YOUR-caliber-api.onrender.com
 #   NEXT_PUBLIC_API_URL=https://YOUR-caliber-api.onrender.com
 
 [build]
-  base = "apps/web"
-  command = "npm run build"
-  publish = ".next"
+  command = "npm run build -w web"
+  # Do not set publish — @netlify/plugin-nextjs owns it on Linux cloud builds.
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NODE_VERSION = "22"
-
-# Optional: preview + production use the same API unless you override.
-# [context.production.environment]
-#   API_URL = "https://caliber-api.onrender.com"
