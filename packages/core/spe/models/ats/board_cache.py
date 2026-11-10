@@ -71,6 +71,11 @@ def refresh_board(session: Session, path: Path | None = None) -> dict[str, Any]:
     from spe.models.ats.predict import predict_upcoming_ats
 
     payload = predict_upcoming_ats(session, include_simulation=False)
+    # Never clobber a usable board with an empty rebuild (common on cold cloud DBs).
+    existing = read_board(path)
+    new_rows = payload.get("rows") or []
+    if existing and (existing.get("rows") or []) and not new_rows:
+        return existing
     write_board(payload, path)
     return payload
 
@@ -78,9 +83,9 @@ def refresh_board(session: Session, path: Path | None = None) -> dict[str, Any]:
 def load_board(session: Session, path: Path | None = None) -> dict[str, Any]:
     """Return a saved board. Rebuild in the background once it is older than the TTL."""
     cached = read_board(path)
-    if cached and is_fresh(cached):
+    if cached and (cached.get("rows") or []) and is_fresh(cached):
         return cached
-    if cached:
+    if cached and (cached.get("rows") or []):
         _refresh_in_background(path)
         return cached
     return refresh_board(session, path)
