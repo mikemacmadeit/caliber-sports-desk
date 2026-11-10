@@ -1,0 +1,77 @@
+{
+  "league_id": "fbs",
+  "version": "m6_hist_gbm_v1",
+  "family": "hist_gbm",
+  "market_id": "anytime_td",
+  "train_end": "2026-11-06T05:30:00+00:00",
+  "frozen_at": "2026-11-07T02:55:46.848242+00:00",
+  "play_enabled": false,
+  "promoted": false,
+  "research_only": true,
+  "does_not_replace_served_m6_shrink": true,
+  "served_m6_path": "data\\parquet\\models\\player_td\\fbs_m6_player_td.json",
+  "model_path": "data\\parquet\\models\\player_td\\fbs_m6_hist_gbm_v1.joblib",
+  "model_sha256": "4aee8613847af674f66a3dedf55e9475eeb3e013debe4a321131592a63748bfc",
+  "feature_schema": [
+    "prior_td_rate",
+    "roll3_td_rate",
+    "workload_delta",
+    "prior_carry_share",
+    "own_off_epa",
+    "opp_adj_def",
+    "team_rz_td",
+    "team_points_per_opp",
+    "usage_x_defense",
+    "is_home",
+    "prior_targets",
+    "prior_carries"
+  ],
+  "candidate_features": [
+    "prior_td_rate",
+    "roll3_td_rate",
+    "workload_delta",
+    "prior_carry_share",
+    "own_off_epa",
+    "opp_adj_def",
+    "team_rz_td",
+    "team_points_per_opp",
+    "usage_x_defense",
+    "is_home",
+    "prior_targets",
+    "prior_carries"
+  ],
+  "training_config": {
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "max_iter": 120,
+    "l2_regularization": 0.1,
+    "early_stopping": true,
+    "validation_fraction": 0.1,
+    "random_state": 7
+  },
+  "calibration": {
+    "platt_a": 0.08402343206631094,
+    "platt_b": 1.0863013521032308,
+    "method": "platt_global_train_only"
+  },
+  "train_n": 152380,
+  "test_n": 5856,
+  "shadow_metrics": {
+    "n": 5856.0,
+    "brier": 0.1699974028330894,
+    "mean_p": 0.2689148706163668,
+    "base_rate": 0.24726775956284153
+  },
+  "frame_meta": {
+    "universe": "involved",
+    "rows": 158236,
+    "players": 14748,
+    "td_rate": 0.25963750347582093,
+    "feature_pipeline": "atd_features_v1"
+  },
+  "notes": [
+    "research_serialized_hist_gbm",
+    "served_shrink_m6_untouched",
+    "native_nan_support"
+  ]
+}

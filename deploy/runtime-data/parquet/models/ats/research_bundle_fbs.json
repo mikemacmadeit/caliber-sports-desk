@@ -1,0 +1,34 @@
+{
+  "league_id": "fbs",
+  "pipeline_version": "ats-research-pipeline-nflverse_L_v1",
+  "cohort_version": "ats_clean_prospective_v1",
+  "model_version_id": "ats-ridge-fbs-20240815:ats_clean_prospective_v1:nflverse_L_v1",
+  "margin_artifact_path": "data\\parquet\\models\\ats\\model_fbs.json",
+  "margin_artifact_sha256": "2ee7c0ad9ce1df9aa1a16162f8b139da978337a05b8b09ff6f7425aad2378d07",
+  "margin_model_version_id": "ats-ridge-fbs-20240815",
+  "calibrator_path": null,
+  "calibrator_sha256": null,
+  "calibrator_status": "missing",
+  "training_cutoff_utc": "2024-09-01T00:00:00+00:00",
+  "spread_contract": "nflverse_L_v1",
+  "feature_schema_version": "ats_FEATURE_COLS_v1",
+  "scoring_code_version": "ats_score_predictions_v2_handicap",
+  "cover_probs_enabled": false,
+  "play_enabled": false,
+  "research_only": true,
+  "holdout_label": "examined_research_holdout",
+  "superseded_claims": [
+    {
+      "claim": "NFL holdout cover Brier \u2248 0.1568 vs market \u2248 0.246",
+      "status": "superseded",
+      "reason": "Computed under inverted nflverse spread-sign convention",
+      "replacement": "data/research/ats_audit/spread_contract_recompute.json",
+      "corrected_brier_approx": 0.2505
+    }
+  ],
+  "loaded_at": "2026-11-10T14:31:30.190366+00:00",
+  "notes": [
+    "Loaded production ridge margin weights; legacy on-disk Platt suppressed in memory",
+    "No research calibrator installed; cover probs suppressed"
+  ]
+}

@@ -33,6 +33,10 @@ apps/web/tsconfig.tsbuildinfo
 infra/alembic/versions/__pycache__/
 research/.ipynb_checkpoints/
 parquet/
+# Allow the slim runtime bundle that Render bakes into the API image.
+!deploy/
+!deploy/runtime-data/
+!deploy/runtime-data/**
 storage/
 
 # Local Netlify folder

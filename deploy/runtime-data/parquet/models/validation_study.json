@@ -1,0 +1,2602 @@
+{
+  "generated_at": "2026-11-07T00:39:59.272606+00:00",
+  "play_enabled": false,
+  "promoted": false,
+  "promotion_policy": "One league-market can be promoted on its own. Promotion requires a prospective season that was not used to choose features, distributions, or position splits. 2023-2025 are examined. No model is promoted from this study.",
+  "windows": {
+    "train": "games before 1 August of the calibration season",
+    "calibration": "the season before the test season, Platt only",
+    "examined": [
+      2023,
+      2024,
+      2025
+    ],
+    "prospective_shadow": [
+      2026
+    ]
+  },
+  "sportsbook": {
+    "settled_sportsbook_outcomes": 0,
+    "stored_market_comparisons": 0,
+    "market_comparison": "unavailable",
+    "research_lines_are_market_comparisons": false,
+    "note": "Declared 4.5, 49.5, and 39.5 lines are research lines. They are not sportsbook prices."
+  },
+  "leagues": [
+    {
+      "league_id": "nfl",
+      "eligibility": {
+        "skill_stat_rows": 62252,
+        "current_involved_skill_rows": 54875,
+        "added_recorded_zeros": 7377,
+        "added_absent_expected_active": 19071,
+        "added_absent_uncertain": 2014,
+        "excluded_confirmed_inactive": 2584,
+        "excluded_inactive_with_stat_row": 0,
+        "excluded_unknown_absent": 55426,
+        "confirmed_active_pregame": 0,
+        "by_availability": {
+          "confirmed_inactive": 2584,
+          "uncertain": 4442,
+          "expected_active": 68823,
+          "unknown": 65498
+        },
+        "corrected_skill_rows": 83337,
+        "roster_source": "prior_week_only",
+        "same_week_roster_status_used": false,
+        "snap_counts_used": false,
+        "postgame_participation_rows_not_used": 252996
+      },
+      "involved_rows": 55195,
+      "corrected_rows": 83337,
+      "zero_impact": [
+        {
+          "market": "anytime_td",
+          "season": 2025,
+          "involved_only": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 41573,
+            "n_calibrate": 5458,
+            "n_test": 5513,
+            "metrics": {
+              "n": 5513.0,
+              "brier": 0.16082912213852577,
+              "log_loss": 0.49955677264082804,
+              "ece": 0.01695671706562981,
+              "mae": 0.38498406143797853
+            }
+          },
+          "corrected": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 63645,
+            "n_calibrate": 8031,
+            "n_test": 8111,
+            "metrics": {
+              "n": 8111.0,
+              "brier": 0.11565933403774445,
+              "log_loss": 0.38463670543294415,
+              "ece": 0.01015669526241798,
+              "mae": 0.2797893309831448
+            }
+          }
+        },
+        {
+          "market": "anytime_td",
+          "season": 2026,
+          "involved_only": {
+            "season": 2026,
+            "role": "prospective_shadow",
+            "n_train": 47031,
+            "n_calibrate": 5513,
+            "n_test": 2331,
+            "metrics": {
+              "n": 2331.0,
+              "brier": 0.16146944266252747,
+              "log_loss": 0.5013369100771355,
+              "ece": 0.014688472146077148,
+              "mae": 0.3861520469182326
+            }
+          },
+          "corrected": {
+            "season": 2026,
+            "role": "prospective_shadow",
+            "n_train": 71676,
+            "n_calibrate": 8111,
+            "n_test": 3550,
+            "metrics": {
+              "n": 3550.0,
+              "brier": 0.11262880412735121,
+              "log_loss": 0.3764357382801577,
+              "ece": 0.010685969696886973,
+              "mae": 0.27727272125728536
+            }
+          }
+        },
+        {
+          "market": "receptions",
+          "season": 2025,
+          "involved_only": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 37235,
+            "n_calibrate": 4844,
+            "n_test": 4903,
+            "metrics": {
+              "n": 4903.0,
+              "brier": 0.11739687957462806,
+              "log_loss": 0.38413061967971157,
+              "ece": 0.034001827060047854,
+              "mae": 1.6044130302738433
+            }
+          },
+          "corrected": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 54466,
+            "n_calibrate": 6898,
+            "n_test": 6987,
+            "metrics": {
+              "n": 6987.0,
+              "brier": 0.08497305950726218,
+              "log_loss": 0.2912542053901225,
+              "ece": 0.01814208500726936,
+              "mae": 1.4898192444672342
+            }
+          }
+        },
+        {
+          "market": "receptions",
+          "season": 2026,
+          "involved_only": {
+            "season": 2026,
+            "role": "prospective_shadow",
+            "n_train": 42079,
+            "n_calibrate": 4903,
+            "n_test": 2083,
+            "metrics": {
+              "n": 2083.0,
+              "brier": 0.12707869039150801,
+              "log_loss": 0.40863025569202327,
+              "ece": 0.03137077929091686,
+              "mae": 1.6418221659430972
+            }
+          },
+          "corrected": {
+            "season": 2026,
+            "role": "prospective_shadow",
+            "n_train": 61364,
+            "n_calibrate": 6987,
+            "n_test": 3066,
+            "metrics": {
+              "n": 3066.0,
+              "brier": 0.09093560736146962,
+              "log_loss": 0.3065108576832103,
+              "ece": 0.017248751970067273,
+              "mae": 1.5151831482458784
+            }
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "season": 2025,
+          "involved_only": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 37235,
+            "n_calibrate": 4844,
+            "n_test": 4903,
+            "metrics": {
+              "n": 4903.0,
+              "brier": 0.12866262581663046,
+              "log_loss": 0.4129444972548983,
+              "ece": 0.031070723518421915,
+              "mae": 21.21220431033139
+            }
+          },
+          "corrected": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 54466,
+            "n_calibrate": 6898,
+            "n_test": 6987,
+            "metrics": {
+              "n": 6987.0,
+              "brier": 0.09443687103726846,
+              "log_loss": 0.3190910278887599,
+              "ece": 0.024751668991346523,
+              "mae": 18.59012883136893
+            }
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "season": 2026,
+          "involved_only": {
+            "season": 2026,
+            "role": "prospective_shadow",
+            "n_train": 42079,
+            "n_calibrate": 4903,
+            "n_test": 2083,
+            "metrics": {
+              "n": 2083.0,
+              "brier": 0.1392447203494759,
+              "log_loss": 0.4396970957823524,
+              "ece": 0.040639691492007655,
+              "mae": 21.708363985419812
+            }
+          },
+          "corrected": {
+            "season": 2026,
+            "role": "prospective_shadow",
+            "n_train": 61364,
+            "n_calibrate": 6987,
+            "n_test": 3066,
+            "metrics": {
+              "n": 3066.0,
+              "brier": 0.10104659981214172,
+              "log_loss": 0.3366413970806003,
+              "ece": 0.02462638737365667,
+              "mae": 18.988103365114025
+            }
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "season": 2025,
+          "involved_only": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 16045,
+            "n_calibrate": 2096,
+            "n_test": 2093,
+            "metrics": {
+              "n": 2093.0,
+              "brier": 0.17593266598479274,
+              "log_loss": 0.5272129755449538,
+              "ece": 0.06116168036494957,
+              "mae": 21.956071731765995
+            }
+          },
+          "corrected": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 26391,
+            "n_calibrate": 3180,
+            "n_test": 3160,
+            "metrics": {
+              "n": 3160.0,
+              "brier": 0.12869581543712177,
+              "log_loss": 0.4102087959257827,
+              "ece": 0.047795139734732046,
+              "mae": 18.16717765742664
+            }
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "season": 2026,
+          "involved_only": {
+            "season": 2026,
+            "role": "prospective_shadow",
+            "n_train": 18141,
+            "n_calibrate": 2093,
+            "n_test": 870,
+            "metrics": {
+              "n": 870.0,
+              "brier": 0.16426547788808887,
+              "log_loss": 0.4986604367447138,
+              "ece": 0.07102448695898372,
+              "mae": 21.215453893231597
+            }
+          },
+          "corrected": {
+            "season": 2026,
+            "role": "prospective_shadow",
+            "n_train": 29571,
+            "n_calibrate": 3160,
+            "n_test": 1362,
+            "metrics": {
+              "n": 1362.0,
+              "brier": 0.11792609361268801,
+              "log_loss": 0.3801785502641375,
+              "ece": 0.057721498282590405,
+              "mae": 17.777286154019286
+            }
+          }
+        }
+      ],
+      "position_specific": [
+        {
+          "market": "rushing_yards",
+          "position": "shared",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 19895,
+          "n_calibrate": 3285,
+          "n_test": 3211,
+          "metrics": {
+            "n": 3211.0,
+            "brier": 0.13834292765851514,
+            "log_loss": 0.43345015714718904,
+            "ece": 0.06292078511395703,
+            "mae": 18.072716495313575
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "shared",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 23180,
+          "n_calibrate": 3211,
+          "n_test": 3180,
+          "metrics": {
+            "n": 3180.0,
+            "brier": 0.13137603978427523,
+            "log_loss": 0.4176867735468853,
+            "ece": 0.042107807200162266,
+            "mae": 19.029800000743055
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "shared",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 26391,
+          "n_calibrate": 3180,
+          "n_test": 3160,
+          "metrics": {
+            "n": 3160.0,
+            "brier": 0.12869581543712177,
+            "log_loss": 0.4102087959257827,
+            "ece": 0.047795139734732046,
+            "mae": 18.16717765742664
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "shared",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 29571,
+          "n_calibrate": 3160,
+          "n_test": 1362,
+          "metrics": {
+            "n": 1362.0,
+            "brier": 0.11792609361268801,
+            "log_loss": 0.3801785502641375,
+            "ece": 0.057721498282590405,
+            "mae": 17.777286154019286
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 6946,
+          "n_calibrate": 1116,
+          "n_test": 1117,
+          "metrics": {
+            "n": 1117.0,
+            "brier": 0.05805382670834398,
+            "log_loss": 0.21571330598234628,
+            "ece": 0.021777047459307468,
+            "mae": 9.644918061117407
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 8062,
+          "n_calibrate": 1117,
+          "n_test": 1133,
+          "metrics": {
+            "n": 1133.0,
+            "brier": 0.07212039340382481,
+            "log_loss": 0.2719505493207774,
+            "ece": 0.026241898809265883,
+            "mae": 11.304305775211368
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 9179,
+          "n_calibrate": 1133,
+          "n_test": 1124,
+          "metrics": {
+            "n": 1124.0,
+            "brier": 0.10053360676256583,
+            "log_loss": 1.3889267829617453,
+            "ece": 0.1005328078291815,
+            "mae": 10.72793193226681
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 10312,
+          "n_calibrate": 1124,
+          "n_test": 484,
+          "metrics": {
+            "n": 484.0,
+            "brier": 0.04190718447940032,
+            "log_loss": 0.16818067522465183,
+            "ece": 0.03412444126947318,
+            "mae": 10.756984854869414
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 12949,
+          "n_calibrate": 2169,
+          "n_test": 2094,
+          "metrics": {
+            "n": 2094.0,
+            "brier": 0.17579860180741216,
+            "log_loss": 0.5242878986466395,
+            "ece": 0.08348037318694883,
+            "mae": 22.260300814257473
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 15118,
+          "n_calibrate": 2094,
+          "n_test": 2047,
+          "metrics": {
+            "n": 2047.0,
+            "brier": 0.16218508489051367,
+            "log_loss": 0.49480508133227774,
+            "ece": 0.029984725796391158,
+            "mae": 23.305356061904014
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 17212,
+          "n_calibrate": 2047,
+          "n_test": 2036,
+          "metrics": {
+            "n": 2036.0,
+            "brier": 0.16018951016768657,
+            "log_loss": 0.49052152578490726,
+            "ece": 0.05456551056378211,
+            "mae": 22.27115653375702
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 19259,
+          "n_calibrate": 2036,
+          "n_test": 878,
+          "metrics": {
+            "n": 878.0,
+            "brier": 0.1547589568234986,
+            "log_loss": 0.47432397393473225,
+            "ece": 0.060410196214638966,
+            "mae": 21.47417722481725
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "shared",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 40674,
+          "n_calibrate": 6899,
+          "n_test": 6893,
+          "metrics": {
+            "n": 6893.0,
+            "brier": 0.09746265299859724,
+            "log_loss": 0.32901974020016966,
+            "ece": 0.012748564591298505,
+            "mae": 19.17934149617071
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "shared",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 47573,
+          "n_calibrate": 6893,
+          "n_test": 6898,
+          "metrics": {
+            "n": 6898.0,
+            "brier": 0.10395057315447384,
+            "log_loss": 0.34806998829671415,
+            "ece": 0.025733006391549258,
+            "mae": 19.375990384083845
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "shared",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 54466,
+          "n_calibrate": 6898,
+          "n_test": 6987,
+          "metrics": {
+            "n": 6987.0,
+            "brier": 0.09443687103726846,
+            "log_loss": 0.3190910278887599,
+            "ece": 0.024751668991346523,
+            "mae": 18.59012883136893
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "shared",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 61364,
+          "n_calibrate": 6987,
+          "n_test": 3066,
+          "metrics": {
+            "n": 3066.0,
+            "brier": 0.10104659981214172,
+            "log_loss": 0.3366413970806003,
+            "ece": 0.02462638737365667,
+            "mae": 18.988103365114025
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 17646,
+          "n_calibrate": 2966,
+          "n_test": 3072,
+          "metrics": {
+            "n": 3072.0,
+            "brier": 0.14977766948236892,
+            "log_loss": 0.46691575282104597,
+            "ece": 0.03188178751619968,
+            "mae": 25.87640108213795
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 20612,
+          "n_calibrate": 3072,
+          "n_test": 3072,
+          "metrics": {
+            "n": 3072.0,
+            "brier": 0.15612208898283478,
+            "log_loss": 0.48530169898907616,
+            "ece": 0.03058478750115334,
+            "mae": 26.086603394302802
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 23684,
+          "n_calibrate": 3072,
+          "n_test": 3118,
+          "metrics": {
+            "n": 3118.0,
+            "brier": 0.1403068358476343,
+            "log_loss": 0.4433752374162435,
+            "ece": 0.03988756975015149,
+            "mae": 24.9519207220718
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 26756,
+          "n_calibrate": 3118,
+          "n_test": 1342,
+          "metrics": {
+            "n": 1342.0,
+            "brier": 0.15136426228949773,
+            "log_loss": 0.4702880066708042,
+            "ece": 0.042435589714509794,
+            "mae": 25.807424248918917
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 10079,
+          "n_calibrate": 1764,
+          "n_test": 1727,
+          "metrics": {
+            "n": 1727.0,
+            "brier": 0.08104517036015485,
+            "log_loss": 0.2884497418779306,
+            "ece": 0.023057316092680004,
+            "mae": 16.391470404791956
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 11843,
+          "n_calibrate": 1727,
+          "n_test": 1779,
+          "metrics": {
+            "n": 1779.0,
+            "brier": 0.08880095580536357,
+            "log_loss": 0.30534125602270684,
+            "ece": 0.018320337025977757,
+            "mae": 16.315654876777664
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 13570,
+          "n_calibrate": 1779,
+          "n_test": 1833,
+          "metrics": {
+            "n": 1833.0,
+            "brier": 0.08362149129559733,
+            "log_loss": 0.29095359394510334,
+            "ece": 0.016906554828446135,
+            "mae": 16.12397992577537
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 15349,
+          "n_calibrate": 1833,
+          "n_test": 846,
+          "metrics": {
+            "n": 846.0,
+            "brier": 0.08434364885888515,
+            "log_loss": 0.2921665806043396,
+            "ece": 0.015785239726518602,
+            "mae": 15.917225515490992
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "shared",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 47620,
+          "n_calibrate": 8015,
+          "n_test": 8010,
+          "metrics": {
+            "n": 8010.0,
+            "brier": 0.11155378443608004,
+            "log_loss": 0.37304869155946085,
+            "ece": 0.00683301580640477,
+            "mae": 0.27548813489556156
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "shared",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 55635,
+          "n_calibrate": 8010,
+          "n_test": 8031,
+          "metrics": {
+            "n": 8031.0,
+            "brier": 0.11795168633776235,
+            "log_loss": 0.39244395818280736,
+            "ece": 0.011935397756670563,
+            "mae": 0.28445763759665593
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "shared",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 63645,
+          "n_calibrate": 8031,
+          "n_test": 8111,
+          "metrics": {
+            "n": 8111.0,
+            "brier": 0.11565933403774445,
+            "log_loss": 0.38463670543294415,
+            "ece": 0.01015669526241798,
+            "mae": 0.2797893309831448
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "shared",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 71676,
+          "n_calibrate": 8111,
+          "n_test": 3550,
+          "metrics": {
+            "n": 3550.0,
+            "brier": 0.11262880412735121,
+            "log_loss": 0.3764357382801577,
+            "ece": 0.010685969696886973,
+            "mae": 0.27727272125728536
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 6946,
+          "n_calibrate": 1116,
+          "n_test": 1117,
+          "metrics": {
+            "n": 1117.0,
+            "brier": 0.07474403775148108,
+            "log_loss": 0.2865376283825319,
+            "ece": 0.04381211103839318,
+            "mae": 0.1705586890505063
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 8062,
+          "n_calibrate": 1117,
+          "n_test": 1133,
+          "metrics": {
+            "n": 1133.0,
+            "brier": 0.07365507964167167,
+            "log_loss": 0.2700781587831372,
+            "ece": 0.024708985725108164,
+            "mae": 0.17663682595018212
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 9179,
+          "n_calibrate": 1133,
+          "n_test": 1124,
+          "metrics": {
+            "n": 1124.0,
+            "brier": 0.0717462286370607,
+            "log_loss": 0.2678902549361251,
+            "ece": 0.017021539880772592,
+            "mae": 0.17960352715327343
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 10312,
+          "n_calibrate": 1124,
+          "n_test": 484,
+          "metrics": {
+            "n": 484.0,
+            "brier": 0.06905080443275864,
+            "log_loss": 0.25911196026907124,
+            "ece": 0.020888965881133866,
+            "mae": 0.18018460885890428
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 12949,
+          "n_calibrate": 2169,
+          "n_test": 2094,
+          "metrics": {
+            "n": 2094.0,
+            "brier": 0.13349377929656045,
+            "log_loss": 0.4260329829638798,
+            "ece": 0.019097970194357203,
+            "mae": 0.3450897725790099
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 15118,
+          "n_calibrate": 2094,
+          "n_test": 2047,
+          "metrics": {
+            "n": 2047.0,
+            "brier": 0.15040473496020035,
+            "log_loss": 0.47542577796832536,
+            "ece": 0.039643126969513734,
+            "mae": 0.3643183339846142
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 17212,
+          "n_calibrate": 2047,
+          "n_test": 2036,
+          "metrics": {
+            "n": 2036.0,
+            "brier": 0.14489279941472633,
+            "log_loss": 0.45817127192468615,
+            "ece": 0.024392532303572783,
+            "mae": 0.3650297753838849
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 19259,
+          "n_calibrate": 2036,
+          "n_test": 878,
+          "metrics": {
+            "n": 878.0,
+            "brier": 0.13997538776332652,
+            "log_loss": 0.4418341776089505,
+            "ece": 0.041221636837270516,
+            "mae": 0.3566090888317706
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 17646,
+          "n_calibrate": 2966,
+          "n_test": 3072,
+          "metrics": {
+            "n": 3072.0,
+            "brier": 0.12319921727829865,
+            "log_loss": 0.40455012457006706,
+            "ece": 0.018286129957930566,
+            "mae": 0.3005990889965015
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 20612,
+          "n_calibrate": 3072,
+          "n_test": 3072,
+          "metrics": {
+            "n": 3072.0,
+            "brier": 0.13051794404532993,
+            "log_loss": 0.42539905529723016,
+            "ece": 0.02198338707186867,
+            "mae": 0.31243585990838224
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 23684,
+          "n_calibrate": 3072,
+          "n_test": 3118,
+          "metrics": {
+            "n": 3118.0,
+            "brier": 0.1214072885838113,
+            "log_loss": 0.40215907461279415,
+            "ece": 0.019898753654124326,
+            "mae": 0.2923650544292488
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 26756,
+          "n_calibrate": 3118,
+          "n_test": 1342,
+          "metrics": {
+            "n": 1342.0,
+            "brier": 0.1148262465886478,
+            "log_loss": 0.3837881534388068,
+            "ece": 0.013692963330363931,
+            "mae": 0.2886768441579306
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 10079,
+          "n_calibrate": 1764,
+          "n_test": 1727,
+          "metrics": {
+            "n": 1727.0,
+            "brier": 0.08734875486260156,
+            "log_loss": 0.31033537609667217,
+            "ece": 0.010982804126578906,
+            "mae": 0.2119043240261656
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 11843,
+          "n_calibrate": 1727,
+          "n_test": 1779,
+          "metrics": {
+            "n": 1779.0,
+            "brier": 0.08639607858358934,
+            "log_loss": 0.30876275711575624,
+            "ece": 0.019670296620216042,
+            "mae": 0.20903307618742487
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 13570,
+          "n_calibrate": 1779,
+          "n_test": 1833,
+          "metrics": {
+            "n": 1833.0,
+            "brier": 0.1005786861588074,
+            "log_loss": 0.34877172614360386,
+            "ece": 0.017516704956493424,
+            "mae": 0.22531546128711202
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_train": 15349,
+          "n_calibrate": 1833,
+          "n_test": 846,
+          "metrics": {
+            "n": 846.0,
+            "brier": 0.10440904856106856,
+            "log_loss": 0.3566633685012005,
+            "ece": 0.014336444562050781,
+            "mae": 0.23415302197714552
+          }
+        }
+      ],
+      "m3_vs_m4": [
+        {
+          "market": "opportunity",
+          "season": 2025,
+          "role": "examined",
+          "features": [
+            "snap_roll3"
+          ],
+          "m3": {
+            "n": 6987.0,
+            "brier": 0.13640560557877224,
+            "log_loss": 0.4296951394599422,
+            "ece": 0.014438692675661944,
+            "mae": 2.077184688855712
+          },
+          "m4": {
+            "n": 6987.0,
+            "brier": 0.12184664942629096,
+            "log_loss": 0.38251857521431337,
+            "ece": 0.04091466079101462,
+            "mae": 1.994929371459776
+          }
+        },
+        {
+          "market": "opportunity",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [
+            "snap_roll3"
+          ],
+          "m3": {
+            "n": 3066.0,
+            "brier": 0.13892328537633591,
+            "log_loss": 0.43186078717866755,
+            "ece": 0.019178295171696457,
+            "mae": 2.0994409188063146
+          },
+          "m4": {
+            "n": 3066.0,
+            "brier": 0.13209742037065622,
+            "log_loss": 0.41179567174928966,
+            "ece": 0.03738896297192932,
+            "mae": 2.1130533206879023
+          }
+        },
+        {
+          "market": "anytime_td",
+          "season": 2025,
+          "role": "examined",
+          "features": [],
+          "m3": {
+            "n": 8111.0,
+            "brier": 0.11565933403774445,
+            "log_loss": 0.38463670543294415,
+            "ece": 0.01015669526241798,
+            "mae": 0.2797893309831448
+          },
+          "m4": {
+            "n": 8111.0,
+            "brier": 0.11565933403774445,
+            "log_loss": 0.38463670543294415,
+            "ece": 0.01015669526241798,
+            "mae": 0.2797893309831448
+          }
+        },
+        {
+          "market": "anytime_td",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [],
+          "m3": {
+            "n": 3550.0,
+            "brier": 0.11262880412735121,
+            "log_loss": 0.3764357382801577,
+            "ece": 0.010685969696886973,
+            "mae": 0.27727272125728536
+          },
+          "m4": {
+            "n": 3550.0,
+            "brier": 0.11262880412735121,
+            "log_loss": 0.3764357382801577,
+            "ece": 0.010685969696886973,
+            "mae": 0.27727272125728536
+          }
+        },
+        {
+          "market": "receptions",
+          "season": 2025,
+          "role": "examined",
+          "features": [],
+          "m3": {
+            "n": 6987.0,
+            "brier": 0.08497305950726218,
+            "log_loss": 0.2912542053901225,
+            "ece": 0.01814208500726936,
+            "mae": 1.4898192444672342
+          },
+          "m4": {
+            "n": 6987.0,
+            "brier": 0.08497305950726218,
+            "log_loss": 0.2912542053901225,
+            "ece": 0.01814208500726936,
+            "mae": 1.4898192444672342
+          }
+        },
+        {
+          "market": "receptions",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [],
+          "m3": {
+            "n": 3066.0,
+            "brier": 0.09093560736146962,
+            "log_loss": 0.3065108576832103,
+            "ece": 0.017248751970067273,
+            "mae": 1.5151831482458784
+          },
+          "m4": {
+            "n": 3066.0,
+            "brier": 0.09093560736146962,
+            "log_loss": 0.3065108576832103,
+            "ece": 0.017248751970067273,
+            "mae": 1.5151831482458784
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "season": 2025,
+          "role": "examined",
+          "features": [],
+          "m3": {
+            "n": 6987.0,
+            "brier": 0.09443687103726846,
+            "log_loss": 0.3190910278887599,
+            "ece": 0.024751668991346523,
+            "mae": 18.59012883136893
+          },
+          "m4": {
+            "n": 6987.0,
+            "brier": 0.09290452393278745,
+            "log_loss": 0.3139445435962977,
+            "ece": 0.01755722479468948,
+            "mae": 18.59012883136893
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [],
+          "m3": {
+            "n": 3066.0,
+            "brier": 0.10104659981214172,
+            "log_loss": 0.3366413970806003,
+            "ece": 0.02462638737365667,
+            "mae": 18.988103365114025
+          },
+          "m4": {
+            "n": 3066.0,
+            "brier": 0.09935160189456037,
+            "log_loss": 0.32888666409822626,
+            "ece": 0.015538585421661958,
+            "mae": 18.988103365114025
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "season": 2025,
+          "role": "examined",
+          "features": [
+            "snap_roll3"
+          ],
+          "m3": {
+            "n": 3160.0,
+            "brier": 0.12869581543712177,
+            "log_loss": 0.4102087959257827,
+            "ece": 0.047795139734732046,
+            "mae": 18.16717765742664
+          },
+          "m4": {
+            "n": 3160.0,
+            "brier": 0.12152212005619335,
+            "log_loss": 0.38639966988269053,
+            "ece": 0.0225562929208757,
+            "mae": 17.596434961660517
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [
+            "snap_roll3"
+          ],
+          "m3": {
+            "n": 1362.0,
+            "brier": 0.11792609361268801,
+            "log_loss": 0.3801785502641375,
+            "ece": 0.057721498282590405,
+            "mae": 17.777286154019286
+          },
+          "m4": {
+            "n": 1362.0,
+            "brier": 0.12058823921984452,
+            "log_loss": 0.3847342138425287,
+            "ece": 0.04963771816617169,
+            "mae": 18.37833189615831
+          }
+        }
+      ],
+      "position_fair": [
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 1124,
+          "shared": {
+            "n": 1124.0,
+            "brier": 0.0684451496267293,
+            "log_loss": 0.24422559013254036,
+            "ece": 0.023617440706266386,
+            "mae": 12.215389441468547
+          },
+          "position_specific": {
+            "n": 1124.0,
+            "brier": 0.10053360676256583,
+            "log_loss": 1.3889267829617453,
+            "ece": 0.1005328078291815,
+            "mae": 10.72793193226681
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_test": 484,
+          "shared": {
+            "n": 484.0,
+            "brier": 0.04159927318100311,
+            "log_loss": 0.16701489678685583,
+            "ece": 0.03359777298142407,
+            "mae": 12.69064388297459
+          },
+          "position_specific": {
+            "n": 484.0,
+            "brier": 0.04190718447940032,
+            "log_loss": 0.16818067522465183,
+            "ece": 0.03412444126947318,
+            "mae": 10.756984854869414
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 2036,
+          "shared": {
+            "n": 2036.0,
+            "brier": 0.16116005535416453,
+            "log_loss": 0.4942783011674616,
+            "ece": 0.06678975943784435,
+            "mae": 21.452938931855375
+          },
+          "position_specific": {
+            "n": 2036.0,
+            "brier": 0.16018951016768657,
+            "log_loss": 0.49052152578490726,
+            "ece": 0.05456551056378211,
+            "mae": 22.27115653375702
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_test": 878,
+          "shared": {
+            "n": 878.0,
+            "brier": 0.1544260400413899,
+            "log_loss": 0.4745945310332636,
+            "ece": 0.06614262074088341,
+            "mae": 20.581312189538224
+          },
+          "position_specific": {
+            "n": 878.0,
+            "brier": 0.1547589568234986,
+            "log_loss": 0.47432397393473225,
+            "ece": 0.060410196214638966,
+            "mae": 21.47417722481725
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 3118,
+          "shared": {
+            "n": 3118.0,
+            "brier": 0.13952879291821785,
+            "log_loss": 0.44043752685623144,
+            "ece": 0.03541795022815614,
+            "mae": 23.26977951090302
+          },
+          "position_specific": {
+            "n": 3118.0,
+            "brier": 0.1403068358476343,
+            "log_loss": 0.4433752374162435,
+            "ece": 0.03988756975015149,
+            "mae": 24.9519207220718
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_test": 1342,
+          "shared": {
+            "n": 1342.0,
+            "brier": 0.15154220629052506,
+            "log_loss": 0.4712330768448807,
+            "ece": 0.045571535341763926,
+            "mae": 24.358632694431783
+          },
+          "position_specific": {
+            "n": 1342.0,
+            "brier": 0.15136426228949773,
+            "log_loss": 0.4702880066708042,
+            "ece": 0.042435589714509794,
+            "mae": 25.807424248918917
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 1833,
+          "shared": {
+            "n": 1833.0,
+            "brier": 0.08311835636684517,
+            "log_loss": 0.28832331500332326,
+            "ece": 0.026759438630754587,
+            "mae": 16.492344555130995
+          },
+          "position_specific": {
+            "n": 1833.0,
+            "brier": 0.08362149129559733,
+            "log_loss": 0.29095359394510334,
+            "ece": 0.016906554828446135,
+            "mae": 16.12397992577537
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_test": 846,
+          "shared": {
+            "n": 846.0,
+            "brier": 0.08396158438228903,
+            "log_loss": 0.29051670382320716,
+            "ece": 0.01988475489600863,
+            "mae": 16.515874209312283
+          },
+          "position_specific": {
+            "n": 846.0,
+            "brier": 0.08434364885888515,
+            "log_loss": 0.2921665806043396,
+            "ece": 0.015785239726518602,
+            "mae": 15.917225515490992
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 1124,
+          "shared": {
+            "n": 1124.0,
+            "brier": 0.07090358197337951,
+            "log_loss": 0.26062266778780413,
+            "ece": 0.010983832924565685,
+            "mae": 0.2036022078549749
+          },
+          "position_specific": {
+            "n": 1124.0,
+            "brier": 0.0717462286370607,
+            "log_loss": 0.2678902549361251,
+            "ece": 0.017021539880772592,
+            "mae": 0.17960352715327343
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_test": 484,
+          "shared": {
+            "n": 484.0,
+            "brier": 0.06924709178760076,
+            "log_loss": 0.2622836153425641,
+            "ece": 0.024141629661997475,
+            "mae": 0.20174102289949006
+          },
+          "position_specific": {
+            "n": 484.0,
+            "brier": 0.06905080443275864,
+            "log_loss": 0.25911196026907124,
+            "ece": 0.020888965881133866,
+            "mae": 0.18018460885890428
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 2036,
+          "shared": {
+            "n": 2036.0,
+            "brier": 0.144205223846916,
+            "log_loss": 0.455465261867069,
+            "ece": 0.014369464447503241,
+            "mae": 0.3472578945097758
+          },
+          "position_specific": {
+            "n": 2036.0,
+            "brier": 0.14489279941472633,
+            "log_loss": 0.45817127192468615,
+            "ece": 0.024392532303572783,
+            "mae": 0.3650297753838849
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_test": 878,
+          "shared": {
+            "n": 878.0,
+            "brier": 0.13865463032088363,
+            "log_loss": 0.4383300311499149,
+            "ece": 0.02524758824014555,
+            "mae": 0.3374362463572934
+          },
+          "position_specific": {
+            "n": 878.0,
+            "brier": 0.13997538776332652,
+            "log_loss": 0.4418341776089505,
+            "ece": 0.041221636837270516,
+            "mae": 0.3566090888317706
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 3118,
+          "shared": {
+            "n": 3118.0,
+            "brier": 0.12117664318386025,
+            "log_loss": 0.4011248703231256,
+            "ece": 0.02274250962167413,
+            "mae": 0.2876158024039249
+          },
+          "position_specific": {
+            "n": 3118.0,
+            "brier": 0.1214072885838113,
+            "log_loss": 0.40215907461279415,
+            "ece": 0.019898753654124326,
+            "mae": 0.2923650544292488
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_test": 1342,
+          "shared": {
+            "n": 1342.0,
+            "brier": 0.11474355547701517,
+            "log_loss": 0.38382740357447914,
+            "ece": 0.007966238592651081,
+            "mae": 0.2842475092461364
+          },
+          "position_specific": {
+            "n": 1342.0,
+            "brier": 0.1148262465886478,
+            "log_loss": 0.3837881534388068,
+            "ece": 0.013692963330363931,
+            "mae": 0.2886768441579306
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 1833,
+          "shared": {
+            "n": 1833.0,
+            "brier": 0.10049730838236717,
+            "log_loss": 0.34754707595868956,
+            "ece": 0.0151750900918342,
+            "mae": 0.2382538117064672
+          },
+          "position_specific": {
+            "n": 1833.0,
+            "brier": 0.1005786861588074,
+            "log_loss": 0.34877172614360386,
+            "ece": 0.017516704956493424,
+            "mae": 0.22531546128711202
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "n_test": 846,
+          "shared": {
+            "n": 846.0,
+            "brier": 0.10472219721009496,
+            "log_loss": 0.3578996998698973,
+            "ece": 0.01671586255909998,
+            "mae": 0.2469814700590912
+          },
+          "position_specific": {
+            "n": 846.0,
+            "brier": 0.10440904856106856,
+            "log_loss": 0.3566633685012005,
+            "ece": 0.014336444562050781,
+            "mae": 0.23415302197714552
+          }
+        }
+      ]
+    },
+    {
+      "league_id": "fbs",
+      "eligibility": {
+        "skill_stat_rows": 160256,
+        "current_involved_skill_rows": 158236,
+        "added_recorded_zeros": 2020,
+        "added_absent_expected_active": 0,
+        "added_absent_uncertain": 0,
+        "excluded_confirmed_inactive": 0,
+        "excluded_inactive_with_stat_row": 0,
+        "excluded_unknown_absent": 0,
+        "confirmed_active_pregame": 0,
+        "by_availability": {
+          "confirmed_inactive": 0,
+          "uncertain": 0,
+          "expected_active": 0,
+          "unknown": 160256
+        },
+        "corrected_skill_rows": 160256,
+        "roster_source": "not_in_source",
+        "same_week_roster_status_used": false,
+        "snap_counts_used": false,
+        "note": "FBS has no weekly roster, so players missing from the box score stay unknown and are not added.",
+        "postgame_participation_rows_not_used": 0
+      },
+      "involved_rows": 169022,
+      "corrected_rows": 160256,
+      "zero_impact": [
+        {
+          "market": "anytime_td",
+          "season": 2025,
+          "involved_only": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 123804,
+            "n_calibrate": 16838,
+            "n_test": 17594,
+            "metrics": {
+              "n": 17594.0,
+              "brier": 0.18370638061906114,
+              "log_loss": 0.5537394201179847,
+              "ece": 0.021772539698539917,
+              "mae": 0.45780868540236336
+            }
+          },
+          "corrected": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 125405,
+            "n_calibrate": 17036,
+            "n_test": 17815,
+            "metrics": {
+              "n": 17815.0,
+              "brier": 0.1821623572346792,
+              "log_loss": 0.5502979677783949,
+              "ece": 0.021258463326112607,
+              "mae": 0.4536980105567007
+            }
+          }
+        },
+        {
+          "market": "anytime_td",
+          "season": 2026,
+          "involved_only": null,
+          "corrected": null
+        },
+        {
+          "market": "receptions",
+          "season": 2025,
+          "involved_only": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 107055,
+            "n_calibrate": 14561,
+            "n_test": 15172,
+            "metrics": {
+              "n": 15172.0,
+              "brier": 0.10333112698957067,
+              "log_loss": 0.35998290336221,
+              "ece": 0.01897486340458139,
+              "mae": 1.457241232323395
+            }
+          },
+          "corrected": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 107253,
+            "n_calibrate": 14578,
+            "n_test": 15199,
+            "metrics": {
+              "n": 15199.0,
+              "brier": 0.10317619221483697,
+              "log_loss": 0.35959664002892555,
+              "ece": 0.018878653579130437,
+              "mae": 1.4574353617077036
+            }
+          }
+        },
+        {
+          "market": "receptions",
+          "season": 2026,
+          "involved_only": null,
+          "corrected": null
+        },
+        {
+          "market": "receiving_yards",
+          "season": 2025,
+          "involved_only": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 107055,
+            "n_calibrate": 14561,
+            "n_test": 15172,
+            "metrics": {
+              "n": 15172.0,
+              "brier": 0.13355680771436165,
+              "log_loss": 0.4343568606952246,
+              "ece": 0.020416737842349427,
+              "mae": 21.62800032041762
+            }
+          },
+          "corrected": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 107253,
+            "n_calibrate": 14578,
+            "n_test": 15199,
+            "metrics": {
+              "n": 15199.0,
+              "brier": 0.13336232283513022,
+              "log_loss": 0.43387443050203045,
+              "ece": 0.020819275214337428,
+              "mae": 21.621123381978034
+            }
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "season": 2026,
+          "involved_only": null,
+          "corrected": null
+        },
+        {
+          "market": "rushing_yards",
+          "season": 2025,
+          "involved_only": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 54610,
+            "n_calibrate": 7316,
+            "n_test": 7673,
+            "metrics": {
+              "n": 7673.0,
+              "brier": 0.214075882784619,
+              "log_loss": 0.6183506995239615,
+              "ece": 0.03414984360025565,
+              "mae": 29.686023083502075
+            }
+          },
+          "corrected": {
+            "season": 2025,
+            "role": "examined",
+            "n_train": 56041,
+            "n_calibrate": 7500,
+            "n_test": 7868,
+            "metrics": {
+              "n": 7868.0,
+              "brier": 0.21078395581537276,
+              "log_loss": 0.6111401148705283,
+              "ece": 0.037297911021283964,
+              "mae": 29.40680504369164
+            }
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "season": 2026,
+          "involved_only": null,
+          "corrected": null
+        }
+      ],
+      "position_specific": [
+        {
+          "market": "rushing_yards",
+          "position": "shared",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 41077,
+          "n_calibrate": 7381,
+          "n_test": 7583,
+          "metrics": {
+            "n": 7583.0,
+            "brier": 0.21044399639471392,
+            "log_loss": 0.6097046983199125,
+            "ece": 0.03637349563258879,
+            "mae": 29.605443658486834
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "shared",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 48458,
+          "n_calibrate": 7583,
+          "n_test": 7500,
+          "metrics": {
+            "n": 7500.0,
+            "brier": 0.2116410833711162,
+            "log_loss": 0.6122910935484571,
+            "ece": 0.03921606827594031,
+            "mae": 29.84328287015868
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "shared",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 56041,
+          "n_calibrate": 7500,
+          "n_test": 7868,
+          "metrics": {
+            "n": 7868.0,
+            "brier": 0.21078395581537276,
+            "log_loss": 0.6111401148705283,
+            "ece": 0.037297911021283964,
+            "mae": 29.40680504369164
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 13318,
+          "n_calibrate": 2366,
+          "n_test": 2468,
+          "metrics": {
+            "n": 2468.0,
+            "brier": 0.14288544919865928,
+            "log_loss": 0.45406457367070857,
+            "ece": 0.03429241646357922,
+            "mae": 22.679323603523635
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 15684,
+          "n_calibrate": 2468,
+          "n_test": 2458,
+          "metrics": {
+            "n": 2458.0,
+            "brier": 0.14453095927060533,
+            "log_loss": 0.4602061447468628,
+            "ece": 0.022395603141512566,
+            "mae": 22.53412502715074
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 18152,
+          "n_calibrate": 2458,
+          "n_test": 2616,
+          "metrics": {
+            "n": 2616.0,
+            "brier": 0.14864496472357097,
+            "log_loss": 0.4708826267557505,
+            "ece": 0.022158610721254128,
+            "mae": 23.0831301687835
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 27759,
+          "n_calibrate": 5015,
+          "n_test": 5115,
+          "metrics": {
+            "n": 5115.0,
+            "brier": 0.23336613170320314,
+            "log_loss": 0.6594146628019746,
+            "ece": 0.027942467789746753,
+            "mae": 32.03627846021691
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 32774,
+          "n_calibrate": 5115,
+          "n_test": 5042,
+          "metrics": {
+            "n": 5042.0,
+            "brier": 0.23585461930626242,
+            "log_loss": 0.664653601293875,
+            "ece": 0.038783161427346814,
+            "mae": 32.609451894966824
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 37889,
+          "n_calibrate": 5042,
+          "n_test": 5252,
+          "metrics": {
+            "n": 5252.0,
+            "brier": 0.23189739470271054,
+            "log_loss": 0.6562279807437843,
+            "ece": 0.04097320048580706,
+            "mae": 31.51945493537271
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "shared",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 78281,
+          "n_calibrate": 14273,
+          "n_test": 14699,
+          "metrics": {
+            "n": 14699.0,
+            "brier": 0.1399505405496271,
+            "log_loss": 0.4487032012148256,
+            "ece": 0.02117852060142938,
+            "mae": 22.293182335995066
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "shared",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 92554,
+          "n_calibrate": 14699,
+          "n_test": 14578,
+          "metrics": {
+            "n": 14578.0,
+            "brier": 0.1348246978791109,
+            "log_loss": 0.43565931587663725,
+            "ece": 0.018265519529333085,
+            "mae": 21.934594540376327
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "shared",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 107253,
+          "n_calibrate": 14578,
+          "n_test": 15199,
+          "metrics": {
+            "n": 15199.0,
+            "brier": 0.13336232283513022,
+            "log_loss": 0.43387443050203045,
+            "ece": 0.020819275214337428,
+            "mae": 21.621123381978034
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 39897,
+          "n_calibrate": 6931,
+          "n_test": 7206,
+          "metrics": {
+            "n": 7206.0,
+            "brier": 0.21090850269295297,
+            "log_loss": 0.6133109558650855,
+            "ece": 0.03371843399915441,
+            "mae": 27.787022545235967
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 46828,
+          "n_calibrate": 7206,
+          "n_test": 7098,
+          "metrics": {
+            "n": 7098.0,
+            "brier": 0.2055293219270728,
+            "log_loss": 0.6017078776099956,
+            "ece": 0.02699667939770066,
+            "mae": 27.527942138738297
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 54034,
+          "n_calibrate": 7098,
+          "n_test": 7341,
+          "metrics": {
+            "n": 7341.0,
+            "brier": 0.20436169761827253,
+            "log_loss": 0.5995148119118967,
+            "ece": 0.046034550622878576,
+            "mae": 27.407690556651595
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 10625,
+          "n_calibrate": 2327,
+          "n_test": 2378,
+          "metrics": {
+            "n": 2378.0,
+            "brier": 0.10707259612775777,
+            "log_loss": 0.3720982100591724,
+            "ece": 0.01615878366683555,
+            "mae": 17.284844487053302
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 12952,
+          "n_calibrate": 2378,
+          "n_test": 2438,
+          "metrics": {
+            "n": 2438.0,
+            "brier": 0.10609136667405795,
+            "log_loss": 0.36838015863673595,
+            "ece": 0.008232638357101859,
+            "mae": 17.705108873839656
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 15330,
+          "n_calibrate": 2438,
+          "n_test": 2606,
+          "metrics": {
+            "n": 2606.0,
+            "brier": 0.09956412637512972,
+            "log_loss": 0.3487004032099378,
+            "ece": 0.013325034056165155,
+            "mae": 16.168833477850814
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "shared",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 91599,
+          "n_calibrate": 16639,
+          "n_test": 17167,
+          "metrics": {
+            "n": 17167.0,
+            "brier": 0.18746020511780642,
+            "log_loss": 0.5622780500857766,
+            "ece": 0.019397140432235494,
+            "mae": 0.4624134309631294
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "shared",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 108238,
+          "n_calibrate": 17167,
+          "n_test": 17036,
+          "metrics": {
+            "n": 17036.0,
+            "brier": 0.18460035857932522,
+            "log_loss": 0.5552531567228505,
+            "ece": 0.010235981171401743,
+            "mae": 0.4626458361359012
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "shared",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 125405,
+          "n_calibrate": 17036,
+          "n_test": 17815,
+          "metrics": {
+            "n": 17815.0,
+            "brier": 0.1821623572346792,
+            "log_loss": 0.5502979677783949,
+            "ece": 0.021258463326112607,
+            "mae": 0.4536980105567007
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 13318,
+          "n_calibrate": 2366,
+          "n_test": 2468,
+          "metrics": {
+            "n": 2468.0,
+            "brier": 0.17772536781708162,
+            "log_loss": 0.5425767609649383,
+            "ece": 0.012846372791870475,
+            "mae": 0.42784393744795296
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 15684,
+          "n_calibrate": 2468,
+          "n_test": 2458,
+          "metrics": {
+            "n": 2458.0,
+            "brier": 0.17337717573340208,
+            "log_loss": 0.5320218416855793,
+            "ece": 0.012755688998546504,
+            "mae": 0.429100505767241
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 18152,
+          "n_calibrate": 2458,
+          "n_test": 2616,
+          "metrics": {
+            "n": 2616.0,
+            "brier": 0.19064957113286163,
+            "log_loss": 0.5850822147888741,
+            "ece": 0.03524446397917046,
+            "mae": 0.44844317687532836
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 27759,
+          "n_calibrate": 5015,
+          "n_test": 5115,
+          "metrics": {
+            "n": 5115.0,
+            "brier": 0.2096426097814251,
+            "log_loss": 0.614399002464018,
+            "ece": 0.03928144712996645,
+            "mae": 0.5574410572358376
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 32774,
+          "n_calibrate": 5115,
+          "n_test": 5042,
+          "metrics": {
+            "n": 5042.0,
+            "brier": 0.20880995788348802,
+            "log_loss": 0.607592516568562,
+            "ece": 0.013564338325822333,
+            "mae": 0.5701325808754684
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 37889,
+          "n_calibrate": 5042,
+          "n_test": 5252,
+          "metrics": {
+            "n": 5252.0,
+            "brier": 0.20226807326142002,
+            "log_loss": 0.593396202584861,
+            "ece": 0.0244635929008542,
+            "mae": 0.5395401143598199
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 39897,
+          "n_calibrate": 6931,
+          "n_test": 7206,
+          "metrics": {
+            "n": 7206.0,
+            "brier": 0.1814492969495147,
+            "log_loss": 0.5493906340889428,
+            "ece": 0.01151987950229785,
+            "mae": 0.42385015153504624
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 46828,
+          "n_calibrate": 7206,
+          "n_test": 7098,
+          "metrics": {
+            "n": 7098.0,
+            "brier": 0.17615388488512082,
+            "log_loss": 0.5386127304780132,
+            "ece": 0.01145210513965372,
+            "mae": 0.41552981493906954
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 54034,
+          "n_calibrate": 7098,
+          "n_test": 7341,
+          "metrics": {
+            "n": 7341.0,
+            "brier": 0.1715944968556133,
+            "log_loss": 0.528285152266524,
+            "ece": 0.019887344657521785,
+            "mae": 0.41342821576106814
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2023,
+          "role": "examined",
+          "n_train": 10625,
+          "n_calibrate": 2327,
+          "n_test": 2378,
+          "metrics": {
+            "n": 2378.0,
+            "brier": 0.3300814409162066,
+            "log_loss": 4.556257361506453,
+            "ece": 0.3300923896583172,
+            "mae": 0.37010379456311077
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2024,
+          "role": "examined",
+          "n_train": 12952,
+          "n_calibrate": 2378,
+          "n_test": 2438,
+          "metrics": {
+            "n": 2438.0,
+            "brier": 0.23379772764661116,
+            "log_loss": 3.230042201000299,
+            "ece": 0.23379719524200168,
+            "mae": 0.36618569133622547
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2025,
+          "role": "examined",
+          "n_train": 15330,
+          "n_calibrate": 2438,
+          "n_test": 2606,
+          "metrics": {
+            "n": 2606.0,
+            "brier": 0.19301573062264235,
+            "log_loss": 2.66661700447317,
+            "ece": 0.19301511665387566,
+            "mae": 0.3537548689076084
+          }
+        }
+      ],
+      "m3_vs_m4": [
+        {
+          "market": "opportunity",
+          "season": 2025,
+          "role": "examined",
+          "features": [],
+          "m3": {
+            "n": 15199.0,
+            "brier": 0.10317619221483697,
+            "log_loss": 0.35959664002892555,
+            "ece": 0.018878653579130437,
+            "mae": 1.4574353617077036
+          },
+          "m4": {
+            "n": 15199.0,
+            "brier": 0.10317619221483697,
+            "log_loss": 0.35959664002892555,
+            "ece": 0.018878653579130437,
+            "mae": 1.4574353617077036
+          }
+        },
+        {
+          "market": "opportunity",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [],
+          "m3": null,
+          "m4": null
+        },
+        {
+          "market": "anytime_td",
+          "season": 2025,
+          "role": "examined",
+          "features": [
+            "workload_delta",
+            "prior_carry_share"
+          ],
+          "m3": {
+            "n": 17815.0,
+            "brier": 0.1821623572346792,
+            "log_loss": 0.5502979677783949,
+            "ece": 0.021258463326112607,
+            "mae": 0.4536980105567007
+          },
+          "m4": {
+            "n": 17815.0,
+            "brier": 0.18009728138910058,
+            "log_loss": 0.545270187691055,
+            "ece": 0.022542973410734236,
+            "mae": 0.44997219640379194
+          }
+        },
+        {
+          "market": "anytime_td",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [
+            "workload_delta",
+            "prior_carry_share"
+          ],
+          "m3": null,
+          "m4": null
+        },
+        {
+          "market": "receptions",
+          "season": 2025,
+          "role": "examined",
+          "features": [],
+          "m3": {
+            "n": 15199.0,
+            "brier": 0.10317619221483697,
+            "log_loss": 0.35959664002892555,
+            "ece": 0.018878653579130437,
+            "mae": 1.4574353617077036
+          },
+          "m4": {
+            "n": 15199.0,
+            "brier": 0.10317619221483697,
+            "log_loss": 0.35959664002892555,
+            "ece": 0.018878653579130437,
+            "mae": 1.4574353617077036
+          }
+        },
+        {
+          "market": "receptions",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [],
+          "m3": null,
+          "m4": null
+        },
+        {
+          "market": "receiving_yards",
+          "season": 2025,
+          "role": "examined",
+          "features": [],
+          "m3": {
+            "n": 15199.0,
+            "brier": 0.13336232283513022,
+            "log_loss": 0.43387443050203045,
+            "ece": 0.020819275214337428,
+            "mae": 21.621123381978034
+          },
+          "m4": {
+            "n": 15199.0,
+            "brier": 0.13358051417554823,
+            "log_loss": 0.43577287757666194,
+            "ece": 0.022143512553096094,
+            "mae": 21.621123381978034
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [],
+          "m3": null,
+          "m4": null
+        },
+        {
+          "market": "rushing_yards",
+          "season": 2025,
+          "role": "examined",
+          "features": [
+            "workload_delta",
+            "prior_carry_share"
+          ],
+          "m3": {
+            "n": 7868.0,
+            "brier": 0.21078395581537276,
+            "log_loss": 0.6111401148705283,
+            "ece": 0.037297911021283964,
+            "mae": 29.40680504369164
+          },
+          "m4": {
+            "n": 7868.0,
+            "brier": 0.18610381501157947,
+            "log_loss": 0.5548145022675224,
+            "ece": 0.01767960800101696,
+            "mae": 27.027123355789428
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "season": 2026,
+          "role": "prospective_shadow",
+          "features": [
+            "workload_delta",
+            "prior_carry_share"
+          ],
+          "m3": null,
+          "m4": null
+        }
+      ],
+      "position_fair": [
+        {
+          "market": "rushing_yards",
+          "position": "QB",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 2616,
+          "shared": {
+            "n": 2616.0,
+            "brier": 0.15506506399507394,
+            "log_loss": 0.48288158845289636,
+            "ece": 0.026079537191354786,
+            "mae": 28.849680733821025
+          },
+          "position_specific": {
+            "n": 2616.0,
+            "brier": 0.14864496472357097,
+            "log_loss": 0.4708826267557505,
+            "ece": 0.022158610721254128,
+            "mae": 23.0831301687835
+          }
+        },
+        {
+          "market": "rushing_yards",
+          "position": "RB",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 5252,
+          "shared": {
+            "n": 5252.0,
+            "brier": 0.2312449904799321,
+            "log_loss": 0.6553265077669068,
+            "ece": 0.037584778779504814,
+            "mae": 29.68430641357389
+          },
+          "position_specific": {
+            "n": 5252.0,
+            "brier": 0.23189739470271054,
+            "log_loss": 0.6562279807437843,
+            "ece": 0.04097320048580706,
+            "mae": 31.51945493537271
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "WR",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 7341,
+          "shared": {
+            "n": 7341.0,
+            "brier": 0.20064650767070163,
+            "log_loss": 0.5914604913599968,
+            "ece": 0.027231296474589346,
+            "mae": 25.38972249272017
+          },
+          "position_specific": {
+            "n": 7341.0,
+            "brier": 0.20436169761827253,
+            "log_loss": 0.5995148119118967,
+            "ece": 0.046034550622878576,
+            "mae": 27.407690556651595
+          }
+        },
+        {
+          "market": "receiving_yards",
+          "position": "TE",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 2606,
+          "shared": {
+            "n": 2606.0,
+            "brier": 0.09999550300643599,
+            "log_loss": 0.3516741837288205,
+            "ece": 0.019174137708724587,
+            "mae": 16.933614262411083
+          },
+          "position_specific": {
+            "n": 2606.0,
+            "brier": 0.09956412637512972,
+            "log_loss": 0.3487004032099378,
+            "ece": 0.013325034056165155,
+            "mae": 16.168833477850814
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "QB",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 2616,
+          "shared": {
+            "n": 2616.0,
+            "brier": 0.18883840623653467,
+            "log_loss": 0.5646526540259507,
+            "ece": 0.028016064956584465,
+            "mae": 0.47045289681280483
+          },
+          "position_specific": {
+            "n": 2616.0,
+            "brier": 0.19064957113286163,
+            "log_loss": 0.5850822147888741,
+            "ece": 0.03524446397917046,
+            "mae": 0.44844317687532836
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "RB",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 5252,
+          "shared": {
+            "n": 5252.0,
+            "brier": 0.20243957053129924,
+            "log_loss": 0.594453275778442,
+            "ece": 0.0221208766609589,
+            "mae": 0.5061398005253612
+          },
+          "position_specific": {
+            "n": 5252.0,
+            "brier": 0.20226807326142002,
+            "log_loss": 0.593396202584861,
+            "ece": 0.0244635929008542,
+            "mae": 0.5395401143598199
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "WR",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 7341,
+          "shared": {
+            "n": 7341.0,
+            "brier": 0.1714635772080741,
+            "log_loss": 0.5265698572579981,
+            "ece": 0.01730542266175355,
+            "mae": 0.4293036658887583
+          },
+          "position_specific": {
+            "n": 7341.0,
+            "brier": 0.1715944968556133,
+            "log_loss": 0.528285152266524,
+            "ece": 0.019887344657521785,
+            "mae": 0.41342821576106814
+          }
+        },
+        {
+          "market": "anytime_td",
+          "position": "TE",
+          "season": 2025,
+          "role": "examined",
+          "n_test": 2606,
+          "shared": {
+            "n": 2606.0,
+            "brier": 0.15658399877200876,
+            "log_loss": 0.4925968550258742,
+            "ece": 0.024396650166527978,
+            "mae": 0.39990822577005153
+          },
+          "position_specific": {
+            "n": 2606.0,
+            "brier": 0.19301573062264235,
+            "log_loss": 2.66661700447317,
+            "ece": 0.19301511665387566,
+            "mae": 0.3537548689076084
+          }
+        }
+      ]
+    }
+  ]
+}

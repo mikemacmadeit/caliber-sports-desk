@@ -1,0 +1,92 @@
+{
+  "league_id": "nfl",
+  "frozen_at": "2026-11-07T00:56:45.679581+00:00",
+  "feature_selection_source": "m4_comparison.json",
+  "beta_train_end": "2025-08-01",
+  "play_enabled": false,
+  "promoted": false,
+  "research_only": true,
+  "markets": {
+    "opportunity": {
+      "features": [
+        "snap_roll3"
+      ],
+      "betas": {
+        "snap_roll3": 0.3473836313811227
+      },
+      "feature_mu": {
+        "snap_roll3": 0.22505462815506516
+      },
+      "feature_sd": {
+        "snap_roll3": 0.10527832463293109
+      },
+      "opp_beta": 0.0028743563798316733,
+      "distribution": "poisson",
+      "platt_a": -0.45422161239289505,
+      "platt_b": 0.6659063955717194,
+      "sigma": null,
+      "line_default": 4.5,
+      "n_train": 42079
+    },
+    "anytime_td": {
+      "features": [],
+      "betas": {},
+      "feature_mu": {},
+      "feature_sd": {},
+      "opp_beta": 0.022510512591501063,
+      "distribution": "anytime_td",
+      "platt_a": 0.25648236609242203,
+      "platt_b": 1.2721760275844758,
+      "sigma": null,
+      "line_default": 0.5,
+      "n_train": 47031
+    },
+    "receptions": {
+      "features": [],
+      "betas": {},
+      "feature_mu": {},
+      "feature_sd": {},
+      "opp_beta": 0.014048135645293197,
+      "distribution": "poisson",
+      "platt_a": 0.11607541143689168,
+      "platt_b": 0.9609301948190074,
+      "sigma": null,
+      "line_default": 4.5,
+      "n_train": 42079
+    },
+    "receiving_yards": {
+      "features": [],
+      "betas": {},
+      "feature_mu": {},
+      "feature_sd": {},
+      "opp_beta": 0.024532036205508576,
+      "distribution": "lognormal",
+      "platt_a": 2.0369706948346735,
+      "platt_b": 2.0311946240504746,
+      "sigma": 1.2953730008616418,
+      "line_default": 49.5,
+      "n_train": 42079
+    },
+    "rushing_yards": {
+      "features": [
+        "snap_roll3"
+      ],
+      "betas": {
+        "snap_roll3": 0.33846424126112984
+      },
+      "feature_mu": {
+        "snap_roll3": 0.22125507481745071
+      },
+      "feature_sd": {
+        "snap_roll3": 0.12449226905244376
+      },
+      "opp_beta": -0.010255030219301476,
+      "distribution": "lognormal",
+      "platt_a": 1.2614640079041113,
+      "platt_b": 1.6160480273089652,
+      "sigma": 1.1565673166760413,
+      "line_default": 39.5,
+      "n_train": 18141
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "status": "ok",
+  "league_id": "fbs",
+  "holdout_start": "2024-08-15T00:00:00+00:00",
+  "train_n": 6025,
+  "test_n": 2301,
+  "model_version_id": "ats-ridge-fbs-20240815",
+  "backtest_run_id": "74674fea-19a2-4f2a-92ed-8c9b681d8822",
+  "comparisons": {
+    "league_home_mean": {
+      "family": "league_home_mean",
+      "regression": {
+        "n": 2301,
+        "mae": 17.14632822460377,
+        "rmse": 21.781515698535646,
+        "bias": -2.7988747450594276,
+        "corr": NaN
+      },
+      "cover": {
+        "n": 0,
+        "note": "No historical spreads available for ATS grading on this slice."
+      },
+      "sigma": 21.446360573088057,
+      "train_n": 6025
+    },
+    "simple_rating": {
+      "family": "simple_rating",
+      "regression": {
+        "n": 2301,
+        "mae": 15.08927366720089,
+        "rmse": 19.037167478594256,
+        "bias": -2.0479343350497645,
+        "corr": 0.48917349483459005
+      },
+      "cover": {
+        "n": 0,
+        "note": "No historical spreads available for ATS grading on this slice."
+      },
+      "sigma": 21.446360573088057,
+      "train_n": 6025
+    },
+    "ridge_margin": {
+      "family": "ridge_margin",
+      "regression": {
+        "n": 2301,
+        "mae": 14.672348305467914,
+        "rmse": 18.49927084227004,
+        "bias": 1.90208236861183,
+        "corr": 0.5484607927687022
+      },
+      "cover": {
+        "n": 0,
+        "note": "No historical spreads available for ATS grading on this slice."
+      },
+      "sigma": 17.797340816711845,
+      "train_n": 6025
+    }
+  },
+  "feature_ablation": {
+    "core_epa": {
+      "n": 2301,
+      "mae": 17.307448431163213,
+      "rmse": 21.910820025613635,
+      "bias": -8.076215745525893,
+      "corr": 0.35659171567431647
+    },
+    "plus_success_pace": {
+      "n": 2301,
+      "mae": 17.367690735401933,
+      "rmse": 21.932232401303274,
+      "bias": -8.104429433475621,
+      "corr": 0.3425651657550278
+    },
+    "plus_scoring": {
+      "n": 2301,
+      "mae": 15.23028667589056,
+      "rmse": 19.1636826037803,
+      "bias": -5.667116002328348,
+      "corr": 0.5313898920392383
+    },
+    "plus_rest_weather": {
+      "n": 2301,
+      "mae": 21.30928684924954,
+      "rmse": 26.513344990960487,
+      "bias": -15.605315177555246,
+      "corr": 0.2601502120256065
+    },
+    "full": {
+      "n": 2301,
+      "mae": 14.622416506418668,
+      "rmse": 18.43692911096555,
+      "bias": 1.8255540398693053,
+      "corr": 0.5513120279225836
+    },
+    "_best_by_mae": "full",
+    "_note": "Lower MAE is better. Groups are nested expansions; do not overfit to this single holdout."
+  },
+  "simulation_compare": {
+    "status": "skipped",
+    "reason": "No labeled rows with spreads for simulation comparison.",
+    "improves_brier": false
+  },
+  "market_line_coverage": {
+    "train_with_spread": 0,
+    "test_with_spread": 0,
+    "source": null,
+    "note": "FBS historical sportsbook spreads are not in the database; margin metrics only."
+  },
+  "slices": {
+    "overall": {
+      "n": 2301,
+      "mae": 14.672348305467914,
+      "rmse": 18.49927084227004,
+      "bias": 1.90208236861183,
+      "corr": 0.5484607927687022
+    },
+    "higher_sample": {
+      "n": 1199,
+      "mae": 13.953566284386714,
+      "rmse": 17.59200223969914,
+      "bias": -1.041462294746545,
+      "corr": 0.4251378341137941
+    }
+  },
+  "research_only": true,
+  "play_enabled": false,
+  "generated_at": "2026-11-07T14:14:24.304147+00:00"
+}

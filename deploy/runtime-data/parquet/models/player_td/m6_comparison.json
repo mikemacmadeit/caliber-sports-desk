@@ -1,0 +1,570 @@
+{
+  "by_league": {
+    "nfl": {
+      "features_improved": [
+        "prior_td_rate",
+        "roll3_td_rate",
+        "workload_delta",
+        "prior_target_share",
+        "prior_carry_share",
+        "prior_rz_targets",
+        "prior_gl_carries",
+        "own_off_epa",
+        "opp_adj_def",
+        "team_rz_td",
+        "team_points_per_opp",
+        "snap_roll3",
+        "usage_x_defense",
+        "is_home",
+        "roll5_td_rate",
+        "roll3_carries"
+      ],
+      "features_rejected_count": 31,
+      "selected_family": "hist_gbm",
+      "final_shadow": {
+        "n": 2705.0,
+        "brier": 0.10368002931560343,
+        "log_loss": 0.3508426526139073,
+        "ece": 0.014517223589260634,
+        "base_rate": 0.14048059149722736,
+        "mean_p": 0.1302371098460083
+      },
+      "coverage": {
+        "n_rows": 83337,
+        "n_2024": 19692,
+        "n_2025": 11661,
+        "n_2026": 3550,
+        "players": 2177,
+        "td_rate": 0.1392538728295955,
+        "universe": "corrected"
+      },
+      "family_windows": [
+        {
+          "season": 2024,
+          "best": "hist_gbm",
+          "hierarchical_opp": {
+            "brier": 0.11437146363931178,
+            "log_loss": 0.38244663593249845,
+            "ece": 0.03088039202477212,
+            "n": 8031.0
+          },
+          "opportunity_poisson": {
+            "brier": 0.10799574154019373,
+            "log_loss": 0.3531741069005263,
+            "ece": 0.027343121853992108,
+            "n": 8031.0
+          },
+          "logistic_glm": {
+            "brier": 0.10737653166739268,
+            "log_loss": 0.3508064787341329,
+            "ece": 0.024429904705954325,
+            "n": 8031.0
+          },
+          "hist_gbm": {
+            "brier": 0.10508066436388505,
+            "log_loss": 0.3355418629953783,
+            "ece": 0.009248723083105929,
+            "n": 8031.0
+          },
+          "ensemble": {
+            "brier": 0.10653149838388377,
+            "log_loss": 0.348875377603532,
+            "ece": 0.018609165825654854,
+            "n": 8031.0
+          }
+        },
+        {
+          "season": 2025,
+          "best": "hist_gbm",
+          "hierarchical_opp": {
+            "brier": 0.11440581876480121,
+            "log_loss": 0.3803054083298101,
+            "ece": 0.02076583902534487,
+            "n": 8111.0
+          },
+          "opportunity_poisson": {
+            "brier": 0.10757518437510614,
+            "log_loss": 0.35383912949907226,
+            "ece": 0.01967555820618711,
+            "n": 8111.0
+          },
+          "logistic_glm": {
+            "brier": 0.10726461913559293,
+            "log_loss": 0.3520927374887421,
+            "ece": 0.01905676732022427,
+            "n": 8111.0
+          },
+          "hist_gbm": {
+            "brier": 0.10516315559396866,
+            "log_loss": 0.3371953591333284,
+            "ece": 0.010846030684215805,
+            "n": 8111.0
+          },
+          "ensemble": {
+            "brier": 0.10645534277284392,
+            "log_loss": 0.3489606074860027,
+            "ece": 0.01919796203288381,
+            "n": 8111.0
+          }
+        },
+        {
+          "season": 2026,
+          "best": "hist_gbm",
+          "hierarchical_opp": {
+            "brier": 0.10916785731695201,
+            "log_loss": 0.3641676340132915,
+            "ece": 0.02204299284023922,
+            "n": 3550.0
+          },
+          "opportunity_poisson": {
+            "brier": 0.10731711907962976,
+            "log_loss": 0.35313164699870475,
+            "ece": 0.018946773327252066,
+            "n": 3550.0
+          },
+          "logistic_glm": {
+            "brier": 0.1065910352619991,
+            "log_loss": 0.3503901340514864,
+            "ece": 0.017475524400665104,
+            "n": 3550.0
+          },
+          "hist_gbm": {
+            "brier": 0.10481698489010345,
+            "log_loss": 0.35355262422731953,
+            "ece": 0.010040117538557373,
+            "n": 3550.0
+          },
+          "ensemble": {
+            "brier": 0.1051787372381744,
+            "log_loss": 0.34629745932638706,
+            "ece": 0.013982555972929066,
+            "n": 3550.0
+          }
+        }
+      ],
+      "position_performance": {
+        "RB": [
+          {
+            "season": 2024,
+            "status": "ok",
+            "metrics": {
+              "n": 2047.0,
+              "brier": 0.1379215621761596,
+              "log_loss": 0.4418392286215386,
+              "ece": 0.036936251703497305,
+              "base_rate": 0.19638495359062041,
+              "mean_p": 0.19257210027333102
+            }
+          },
+          {
+            "season": 2025,
+            "status": "ok",
+            "metrics": {
+              "n": 2036.0,
+              "brier": 0.14015300659403468,
+              "log_loss": 0.4430523490199635,
+              "ece": 0.03495203382722375,
+              "base_rate": 0.19302554027504912,
+              "mean_p": 0.19691394384078725
+            }
+          },
+          {
+            "season": 2026,
+            "status": "ok",
+            "metrics": {
+              "n": 878.0,
+              "brier": 0.12976940304017126,
+              "log_loss": 0.40680360835130397,
+              "ece": 0.031091352865349725,
+              "base_rate": 0.1958997722095672,
+              "mean_p": 0.19955749494290448
+            }
+          }
+        ],
+        "WR": [
+          {
+            "season": 2024,
+            "status": "ok",
+            "metrics": {
+              "n": 3072.0,
+              "brier": 0.13104687735946316,
+              "log_loss": 0.4281809842819002,
+              "ece": 0.03834496487643321,
+              "base_rate": 0.16080729166666666,
+              "mean_p": 0.17258367376759906
+            }
+          },
+          {
+            "season": 2025,
+            "status": "ok",
+            "metrics": {
+              "n": 3118.0,
+              "brier": 0.12219610781900316,
+              "log_loss": 0.4012885972513036,
+              "ece": 0.03328737129276253,
+              "base_rate": 0.14624759461193074,
+              "mean_p": 0.1700737823714627
+            }
+          },
+          {
+            "season": 2026,
+            "status": "ok",
+            "metrics": {
+              "n": 1342.0,
+              "brier": 0.11502534633914875,
+              "log_loss": 0.3859910423772111,
+              "ece": 0.037040736203478045,
+              "base_rate": 0.14008941877794337,
+              "mean_p": 0.16291872400042337
+            }
+          }
+        ],
+        "TE": [
+          {
+            "season": 2024,
+            "status": "ok",
+            "metrics": {
+              "n": 1779.0,
+              "brier": 0.08789546581495904,
+              "log_loss": 0.3125328717308176,
+              "ece": 0.029681140017074774,
+              "base_rate": 0.09893198426082069,
+              "mean_p": 0.11732488278923883
+            }
+          },
+          {
+            "season": 2025,
+            "status": "ok",
+            "metrics": {
+              "n": 1833.0,
+              "brier": 0.10211167342282386,
+              "log_loss": 0.36046738416703095,
+              "ece": 0.032177749378671155,
+              "base_rate": 0.11729405346426623,
+              "mean_p": 0.10891855586836761
+            }
+          },
+          {
+            "season": 2026,
+            "status": "ok",
+            "metrics": {
+              "n": 846.0,
+              "brier": 0.10515712549450626,
+              "log_loss": 0.36081129578282456,
+              "ece": 0.011597333663042159,
+              "base_rate": 0.12411347517730496,
+              "mean_p": 0.12259011606261061
+            }
+          }
+        ],
+        "QB": [
+          {
+            "season": 2024,
+            "status": "ok",
+            "metrics": {
+              "n": 1133.0,
+              "brier": 0.07652281129201312,
+              "log_loss": 0.29333609196365823,
+              "ece": 0.04587938628113999,
+              "base_rate": 0.08737864077669903,
+              "mean_p": 0.09570608180088641
+            }
+          },
+          {
+            "season": 2025,
+            "status": "ok",
+            "metrics": {
+              "n": 1124.0,
+              "brier": 0.07358252011257699,
+              "log_loss": 0.2821671850287823,
+              "ece": 0.023503272150857176,
+              "base_rate": 0.08185053380782918,
+              "mean_p": 0.1007178394782938
+            }
+          },
+          {
+            "season": 2026,
+            "status": "ok",
+            "metrics": {
+              "n": 484.0,
+              "brier": 0.07065990755525779,
+              "log_loss": 0.262049044508293,
+              "ece": 0.036355695107053936,
+              "base_rate": 0.07851239669421488,
+              "mean_p": 0.1095819906991005
+            }
+          }
+        ]
+      },
+      "artifact": "data\\parquet\\models\\player_td\\nfl_m6_player_td.json"
+    },
+    "fbs": {
+      "features_improved": [
+        "prior_td_rate",
+        "roll3_td_rate",
+        "workload_delta",
+        "prior_carry_share",
+        "own_off_epa",
+        "opp_adj_def",
+        "team_rz_td",
+        "team_points_per_opp",
+        "usage_x_defense",
+        "is_home",
+        "prior_targets",
+        "prior_carries"
+      ],
+      "features_rejected_count": 23,
+      "selected_family": "hist_gbm",
+      "final_shadow": {
+        "n": 5856.0,
+        "brier": 0.1699974028330894,
+        "log_loss": 0.5184062056974701,
+        "ece": 0.02373220827610022,
+        "base_rate": 0.24726775956284153,
+        "mean_p": 0.2689148706163668
+      },
+      "coverage": {
+        "n_rows": 158236,
+        "n_2024": 34432,
+        "n_2025": 17594,
+        "n_2026": 0,
+        "players": 14748,
+        "td_rate": 0.25963750347582093,
+        "universe": "involved"
+      },
+      "family_windows": [
+        {
+          "season": 2024,
+          "best": "hist_gbm",
+          "hierarchical_opp": {
+            "brier": 0.17891064557670472,
+            "log_loss": 0.54200821921195,
+            "ece": 0.016948470995625763,
+            "n": 16838.0
+          },
+          "opportunity_poisson": {
+            "brier": 0.17501183074462573,
+            "log_loss": 0.531120300234066,
+            "ece": 0.017488635055039843,
+            "n": 16838.0
+          },
+          "logistic_glm": {
+            "brier": 0.17477886575273802,
+            "log_loss": 0.5303976547875131,
+            "ece": 0.015005979962395818,
+            "n": 16838.0
+          },
+          "hist_gbm": {
+            "brier": 0.17335395190636466,
+            "log_loss": 0.52661850195291,
+            "ece": 0.014026516742129541,
+            "n": 16838.0
+          },
+          "ensemble": {
+            "brier": 0.17405554906836745,
+            "log_loss": 0.5285423632900482,
+            "ece": 0.014022739880538189,
+            "n": 16838.0
+          }
+        },
+        {
+          "season": 2025,
+          "best": "hist_gbm",
+          "hierarchical_opp": {
+            "brier": 0.17728904454317937,
+            "log_loss": 0.5408600592773961,
+            "ece": 0.02663847698853111,
+            "n": 17594.0
+          },
+          "opportunity_poisson": {
+            "brier": 0.1729613406616937,
+            "log_loss": 0.5264935147747799,
+            "ece": 0.014162477635923985,
+            "n": 17594.0
+          },
+          "logistic_glm": {
+            "brier": 0.1726808501771786,
+            "log_loss": 0.5256238764419028,
+            "ece": 0.014080675733828528,
+            "n": 17594.0
+          },
+          "hist_gbm": {
+            "brier": 0.1707598518352965,
+            "log_loss": 0.520172226939043,
+            "ece": 0.012184663207197688,
+            "n": 17594.0
+          },
+          "ensemble": {
+            "brier": 0.1719458963400292,
+            "log_loss": 0.5238133712269653,
+            "ece": 0.012634044706359112,
+            "n": 17594.0
+          }
+        }
+      ],
+      "position_performance": {
+        "RB": [
+          {
+            "season": 2024,
+            "status": "ok",
+            "metrics": {
+              "n": 5039.0,
+              "brier": 0.19569450985632625,
+              "log_loss": 0.5832542021023649,
+              "ece": 0.02000951678359623,
+              "base_rate": 0.30164715221274063,
+              "mean_p": 0.2912936326861496
+            }
+          },
+          {
+            "season": 2025,
+            "status": "ok",
+            "metrics": {
+              "n": 5251.0,
+              "brier": 0.19217631256261472,
+              "log_loss": 0.5725154158584465,
+              "ece": 0.020004261753831378,
+              "base_rate": 0.2868025138068939,
+              "mean_p": 0.28078390321613056
+            }
+          },
+          {
+            "season": 2026,
+            "status": "insufficient_rows",
+            "metrics": null
+          }
+        ],
+        "WR": [
+          {
+            "season": 2024,
+            "status": "ok",
+            "metrics": {
+              "n": 7089.0,
+              "brier": 0.17424553253482014,
+              "log_loss": 0.5361810621860005,
+              "ece": 0.028827858854446976,
+              "base_rate": 0.23035689095782197,
+              "mean_p": 0.22167541065323
+            }
+          },
+          {
+            "season": 2025,
+            "status": "ok",
+            "metrics": {
+              "n": 7318.0,
+              "brier": 0.1707138878693897,
+              "log_loss": 0.5294750329503396,
+              "ece": 0.03865887546805919,
+              "base_rate": 0.22014211533205794,
+              "mean_p": 0.21604852236774977
+            }
+          },
+          {
+            "season": 2026,
+            "status": "insufficient_rows",
+            "metrics": null
+          }
+        ],
+        "TE": [
+          {
+            "season": 2024,
+            "status": "ok",
+            "metrics": {
+              "n": 2433.0,
+              "brier": 0.1705266764700946,
+              "log_loss": 0.5633457288278129,
+              "ece": 0.06636730500466136,
+              "base_rate": 0.2120838471023428,
+              "mean_p": 0.207958400669603
+            }
+          },
+          {
+            "season": 2025,
+            "status": "ok",
+            "metrics": {
+              "n": 2603.0,
+              "brier": 0.16518590874082026,
+              "log_loss": 0.5427643523437498,
+              "ece": 0.0793989922470778,
+              "base_rate": 0.19285439877064925,
+              "mean_p": 0.20464734513934194
+            }
+          },
+          {
+            "season": 2026,
+            "status": "insufficient_rows",
+            "metrics": null
+          }
+        ],
+        "QB": [
+          {
+            "season": 2024,
+            "status": "ok",
+            "metrics": {
+              "n": 2277.0,
+              "brier": 0.17848534982281813,
+              "log_loss": 0.554727756800357,
+              "ece": 0.038482500092132596,
+              "base_rate": 0.2437417654808959,
+              "mean_p": 0.2321248527729018
+            }
+          },
+          {
+            "season": 2025,
+            "status": "ok",
+            "metrics": {
+              "n": 2422.0,
+              "brier": 0.19223489422529735,
+              "log_loss": 0.6357031179487449,
+              "ece": 0.0497071935242186,
+              "base_rate": 0.28075970272502065,
+              "mean_p": 0.2358603317664185
+            }
+          },
+          {
+            "season": 2026,
+            "status": "insufficient_rows",
+            "metrics": null
+          }
+        ]
+      },
+      "artifact": "data\\parquet\\models\\player_td\\fbs_m6_player_td.json"
+    }
+  },
+  "integration_requirements": {
+    "player_model_accepts": [
+      "expected_off_tds",
+      "expected_rush_tds",
+      "expected_rec_tds",
+      "off_td_pmf (optional)",
+      "team scoring uncertainty via pmf or predictive intervals"
+    ],
+    "player_model_requires_from_self": [
+      "verified prior player share of rush/rec TDs (not invented)",
+      "position path (QB rush-only for Anytime TD)"
+    ],
+    "must_not": [
+      "rebuild Agent 1 team models inside player_td",
+      "connect simulator yet",
+      "promote or enable Validated Play",
+      "overwrite shared artifacts"
+    ],
+    "adapter_suggestion": "Thin adapter: load Agent 1 nfl_team_td_v1 / fbs_team_td_v1 predictions into TeamScoringContext; pass into PlayerTdRequest.team_scoring.",
+    "protocol": "TeamScoringProvider.team_scoring_for_game(game_id, team_id)"
+  },
+  "safety": {
+    "version": "m6_player_td",
+    "research_only": true,
+    "play_enabled": false,
+    "promoted": false,
+    "artifact_dir": "data\\parquet\\models\\player_td",
+    "database_url": "sqlite:///C:/dev/Sports bet/data/caliber_player_td_dev.db",
+    "does_not_modify": [
+      "spe.models.team_td",
+      "M3/M4/M5 artifacts",
+      "team_td_v1 artifacts",
+      "live forecasts",
+      "Validated Play"
+    ]
+  }
+}

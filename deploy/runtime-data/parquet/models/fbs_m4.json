@@ -1,0 +1,100 @@
+{
+  "league_id": "fbs",
+  "frozen_at": "2026-11-07T00:57:11.803035+00:00",
+  "feature_selection_source": "m4_comparison.json",
+  "beta_train_end": "2025-08-01",
+  "play_enabled": false,
+  "promoted": false,
+  "research_only": true,
+  "markets": {
+    "opportunity": {
+      "features": [],
+      "betas": {},
+      "feature_mu": {},
+      "feature_sd": {},
+      "opp_beta": -0.03228679411295221,
+      "distribution": "poisson",
+      "platt_a": 0.7100494215522777,
+      "platt_b": 1.2368363772458602,
+      "sigma": null,
+      "line_default": 4.5,
+      "n_train": 121616
+    },
+    "anytime_td": {
+      "features": [
+        "workload_delta",
+        "prior_carry_share"
+      ],
+      "betas": {
+        "workload_delta": 0.06519983183438181,
+        "prior_carry_share": 0.0612081523672182
+      },
+      "feature_mu": {
+        "workload_delta": 0.26031330986440787,
+        "prior_carry_share": 0.08669310452679131
+      },
+      "feature_sd": {
+        "workload_delta": 2.0054603731673377,
+        "prior_carry_share": 0.11582540045029545
+      },
+      "opp_beta": 0.08076161727203064,
+      "distribution": "anytime_td",
+      "platt_a": 0.3152278140751775,
+      "platt_b": 1.5094820902565558,
+      "sigma": null,
+      "line_default": 0.5,
+      "n_train": 140642
+    },
+    "receptions": {
+      "features": [],
+      "betas": {},
+      "feature_mu": {},
+      "feature_sd": {},
+      "opp_beta": -0.03228679411295221,
+      "distribution": "poisson",
+      "platt_a": 0.7100494215522777,
+      "platt_b": 1.2368363772458602,
+      "sigma": null,
+      "line_default": 4.5,
+      "n_train": 121616
+    },
+    "receiving_yards": {
+      "features": [],
+      "betas": {},
+      "feature_mu": {},
+      "feature_sd": {},
+      "opp_beta": -0.02834523476603129,
+      "distribution": "lognormal",
+      "platt_a": 2.825073621193468,
+      "platt_b": 2.4864733757556543,
+      "sigma": 1.3039166866697713,
+      "line_default": 49.5,
+      "n_train": 121616
+    },
+    "rushing_yards": {
+      "features": [
+        "workload_delta",
+        "prior_carry_share"
+      ],
+      "betas": {
+        "workload_delta": 0.23614222133320042,
+        "prior_carry_share": 0.5
+      },
+      "feature_mu": {
+        "workload_delta": 0.40705048903064545,
+        "prior_carry_share": 0.1856888915092431
+      },
+      "feature_sd": {
+        "workload_delta": 2.775924345625413,
+        "prior_carry_share": 0.1091657441170241
+      },
+      "opp_beta": 0.14859534599558924,
+      "distribution": "lognormal",
+      "platt_a": 1.04777234886659,
+      "platt_b": 1.4647930946147778,
+      "sigma": 1.2719739771417788,
+      "line_default": 39.5,
+      "n_train": 61926
+    }
+  }
+}

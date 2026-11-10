@@ -1,0 +1,5028 @@
+{
+  "generated_at": "2026-11-07T00:17:16.050501+00:00",
+  "play_enabled": false,
+  "promoted": false,
+  "research_only": true,
+  "source_audit": {
+    "weather": [
+      {
+        "provider": "nflverse",
+        "quality_status": "observed_not_forecast",
+        "rows": 1840,
+        "inferred_24h": 0,
+        "issued_before_kickoff": 1840,
+        "missing_temperature": 0,
+        "missing_wind": 0,
+        "issued_min": "2016-09-08 20:30:00.000000",
+        "issued_max": "2026-10-04 20:20:00.000000"
+      },
+      {
+        "provider": "noaa_cdo",
+        "quality_status": "daily_observation_not_forecast",
+        "rows": 6667,
+        "inferred_24h": 0,
+        "issued_before_kickoff": 0,
+        "missing_temperature": 104,
+        "missing_wind": 877,
+        "issued_min": "2016-09-02 04:00:00.000000",
+        "issued_max": "2026-11-02 05:00:00.000000"
+      },
+      {
+        "provider": "nws",
+        "quality_status": "nws_forecast",
+        "rows": 22,
+        "inferred_24h": 0,
+        "issued_before_kickoff": 22,
+        "missing_temperature": 0,
+        "missing_wind": 0,
+        "issued_min": "2026-11-06 22:18:09.306406",
+        "issued_max": "2026-11-06 22:18:09.306406"
+      },
+      {
+        "provider": "nws",
+        "quality_status": "ok",
+        "rows": 8,
+        "inferred_24h": 0,
+        "issued_before_kickoff": 8,
+        "missing_temperature": 0,
+        "missing_wind": 0,
+        "issued_min": "2026-11-06 15:00:00.000000",
+        "issued_max": "2026-11-06 15:00:00.000000"
+      },
+      {
+        "provider": "open_meteo",
+        "quality_status": "forecast_lead_24h",
+        "rows": 2425,
+        "inferred_24h": 2425,
+        "issued_before_kickoff": 2425,
+        "missing_temperature": 0,
+        "missing_wind": 0,
+        "issued_min": "2024-01-19 16:00:00.000000",
+        "issued_max": "2026-11-04 20:00:00.000000"
+      }
+    ],
+    "news": [
+      {
+        "league_id": "fbs",
+        "rows": 101,
+        "verified_injury_rows": 0,
+        "seen_min": "2026-10-23 23:00:00.000000",
+        "seen_max": "2026-11-06 11:30:00.000000"
+      }
+    ],
+    "ngs_weeks": {
+      "rows": 27879,
+      "week0": 2361,
+      "season_min": 2016,
+      "season_max": 2026
+    },
+    "nfl_usage_pregame": {
+      "rows": 271024,
+      "snap_roll3": 263124,
+      "snap_delta": 251616,
+      "depth_rank": 267268,
+      "starter": 267268,
+      "roster_status": 270509,
+      "separation": 34080,
+      "cushion": 34060,
+      "yac_oe": 33872,
+      "ryoe": 11077
+    },
+    "decisions": {
+      "open_meteo": "rejected_inferred_issue_time",
+      "noaa_cdo": "rejected_after_kickoff_observation",
+      "gdelt": "rejected_unverified_unlinked_news",
+      "nws_historical": "unavailable_live_forecasts_are_not_a_backtest",
+      "ngs_week0": "rejected_season_aggregate",
+      "participation_same_game": "rejected_available_only_after_kickoff"
+    },
+    "licenses": {
+      "nflverse": {
+        "license": "CC-BY-4.0 (nflverse-data releases)",
+        "commercial_redisplay": "requires_contract",
+        "notes": "Attribute CC-BY data. Do not include FTN/CC-BY-SA-derived features in a proprietary app pending license review."
+      },
+      "open_meteo": {
+        "license": "Open-Meteo CC BY 4.0 (noncommercial) / paid commercial",
+        "commercial_redisplay": "requires_contract",
+        "notes": "Previous Runs API is on the free noncommercial tier and is CC BY 4.0. Commercial use needs a paid subscription. API Standard does not include Previous Runs."
+      },
+      "noaa_cdo": {
+        "license": "NOAA Climate Data Online / public domain observations",
+        "commercial_redisplay": "permitted",
+        "notes": "Free token required. Five requests per second and 10,000 requests per day. Daily station observations are not kickoff forecasts."
+      },
+      "gdelt": {
+        "license": "GDELT Project DOC 2.0",
+        "commercial_redisplay": "unknown",
+        "notes": "Article metadata only. Headlines are not verified injury reports. Confirm GDELT redistribution terms before a commercial product republishes articles."
+      },
+      "nws": {
+        "license": "NWS / NOAA public web services",
+        "commercial_redisplay": "unknown",
+        "notes": "Verify terms, rate limits, User-Agent, and location coverage."
+      }
+    }
+  },
+  "feature_audit": {
+    "nfl": {
+      "snap_participation": "usage_pregame offense_snap_share_roll3, prior games only",
+      "target_share": "prior mean of targets divided by team targets",
+      "carry_share": "prior mean of carries divided by team carries",
+      "red_zone_targets": "prior mean from player game stats",
+      "goal_line_carries": "prior mean from player game stats",
+      "recent_workload": "prior 3-game mean minus prior 10-game mean",
+      "offensive_efficiency": "prior team offensive EPA per play",
+      "defensive_efficiency": "prior opponent defensive EPA per play",
+      "opponent_adjusted": "prior opponent-adjusted defensive EPA",
+      "pace": "prior team seconds per play",
+      "home_field": "team is the home team; the box score has no team, so only a unique roster-week team that is in the game is used",
+      "pregame_weather": "rejected: Open-Meteo issued_at is inferred as the valid hour minus 24 hours",
+      "availability": "not used: box-score rows are players who played, so an out label cannot be scored",
+      "depth_chart": "usage_pregame depth rank, starter flag, and roster status from an earlier chart",
+      "separation": "prior-week NGS average separation, cushion, and yards after catch above expectation",
+      "rush_yards_over_expected": "prior-week NGS rush yards over expected",
+      "formation": "prior-game shotgun share and zone share"
+    },
+    "fbs": {
+      "snap_participation": "not in source",
+      "target_share": "not separate from receptions; CFBD box sets targets equal to receptions on every row",
+      "carry_share": "prior mean of carries divided by team carries",
+      "red_zone_targets": "not in source; stored zeros are the column default",
+      "goal_line_carries": "not in source; stored zeros are the column default",
+      "recent_workload": "prior 3-game mean minus prior 10-game mean of the market count",
+      "offensive_efficiency": "prior team offensive PPA stored in the EPA-named column",
+      "defensive_efficiency": "prior opponent defensive PPA",
+      "opponent_adjusted": "prior opponent-adjusted defensive PPA",
+      "pace": "prior team seconds per play",
+      "home_field": "team is the home team",
+      "pregame_weather": "rejected: no historical forecast has a source issue timestamp",
+      "availability": "not used: one college injury row",
+      "depth_chart": "not in source"
+    },
+    "excluded_everywhere": [
+      "Open-Meteo previous-day values have no API issue timestamp; stored issued_at is inferred",
+      "NWS forecasts are live only and are not a historical backtest",
+      "nflverse schedule weather is observed_not_forecast",
+      "NOAA daily observations are issued after the local observation day",
+      "GDELT headlines are not verified and are not linked to players",
+      "NGS week-zero totals are season aggregates",
+      "same-game EPA, snap counts, and target shares"
+    ]
+  },
+  "selection_seasons": [
+    2022,
+    2023
+  ],
+  "report_seasons": [
+    2024,
+    2025
+  ],
+  "baseline": "M3 feature set re-fit before each test season: player shrinkage plus opponent adjustment",
+  "leagues": [
+    {
+      "league_id": "nfl",
+      "rows": 52851,
+      "markets": {
+        "opportunity": {
+          "features": [
+            "snap_roll3"
+          ],
+          "distribution": "poisson",
+          "distribution_selection_brier": {},
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -5.096641444435335e-06,
+                "2023": 5.3945887615647337e-05
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00027339151181715593,
+                "2023": -0.0017327516659855213
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0001808311436648502,
+                "2023": -8.710766889796773e-05
+              },
+              "train_coverage": {
+                "2022": 0.9671101857575067,
+                "2023": 0.9721257237386269
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.004576859007076273,
+                "2023": 0.002657132971566334
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.007117203548663298,
+                "2023": 0.010546955091154775
+              },
+              "train_coverage": {
+                "2022": 0.9056247763427567,
+                "2023": 0.9130686517783292
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 6.406901347233429e-06,
+                "2023": 0.0003454313068438353
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00027648793406997996,
+                "2023": -0.00013996312290487367
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_target_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.027374660083066438,
+                "2023": -0.08149840927737184
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_carry_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.009575766351314297,
+                "2023": -0.021869054284149758
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -7.097444976844614e-05,
+                "2023": -6.002193085441476e-05
+              },
+              "train_coverage": {
+                "2022": 0.9443703438628452,
+                "2023": 0.9503722084367245
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "snap_roll3",
+              "kept": true,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.06330009616086496,
+                "2023": 0.031164998249063824
+              },
+              "train_coverage": {
+                "2022": 0.9749503887569537,
+                "2023": 0.9770057899090158
+              },
+              "reason": "improved the primary metric on both 2022 and 2023"
+            },
+            {
+              "feature": "snap_delta",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0019335199698615746,
+                "2023": -0.001947957814930401
+              },
+              "train_coverage": {
+                "2022": 0.9255018055239272,
+                "2023": 0.9313757926661153
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "depth_rank",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.04269042077086338,
+                "2023": -0.04587214136201734
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "starter",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0337181938829576,
+                "2023": -0.03896134530260653
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "roster_active",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.004437232117983747,
+                "2023": -0.0002831092931496748
+              },
+              "train_coverage": {
+                "2022": 0.98366895474804,
+                "2023": 0.9854976564653984
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "shotgun_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.0012676061891352397,
+                "2023": 0.0010925919118069949
+              },
+              "train_coverage": {
+                "2022": 0.9906633267185009,
+                "2023": 0.9920871243451889
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "zone_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.002632139962391644,
+                "2023": -0.0067539492856592
+              },
+              "train_coverage": {
+                "2022": 0.6690198119652558,
+                "2023": 0.719492693686242
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_rz_targets",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.07996723675574069,
+                "2023": -0.11455314297859598
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_separation",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0009105475764514814,
+                "2023": -0.0003989012661800295
+              },
+              "train_coverage": {
+                "2022": 0.4884023553140961,
+                "2023": 0.4927488282326992
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_cushion",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0002122042670835711,
+                "2023": -0.0005239195475046365
+              },
+              "train_coverage": {
+                "2022": 0.4882396955008296,
+                "2023": 0.4925834022608216
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_yac_oe",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 7.313098562544695e-05,
+                "2023": -0.0004374628966212768
+              },
+              "train_coverage": {
+                "2022": 0.4847262435342724,
+                "2023": 0.48938516680452165
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_ryoe",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {},
+              "train_coverage": {
+                "2022": 0.13526790071244998,
+                "2023": 0.14849738075544527
+              },
+              "reason": "below 30% coverage on the selection seasons; missing values were not filled"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [
+                "snap_roll3"
+              ],
+              "m3": {
+                "n": 4926.0,
+                "brier": 0.16800387445009501,
+                "log_loss": 0.5133642221760434,
+                "ece": 0.048119132858393164,
+                "mae": 2.1261959885378703
+              },
+              "new": {
+                "n": 4926.0,
+                "brier": 0.15010238338983087,
+                "log_loss": 0.46606480964268526,
+                "ece": 0.03252281460549801,
+                "mae": 2.0628958923770053
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.12783710680472665,
+                  "log_loss": 0.41824173620981187,
+                  "ece": 0.09086479961890359,
+                  "mae": 1.946104623103459
+                },
+                "TE": {
+                  "n": 1147.0,
+                  "brier": 0.15653114339759697,
+                  "log_loss": 0.48187346792143065,
+                  "ece": 0.04981321422473949,
+                  "mae": 1.872810681186599
+                },
+                "WR": {
+                  "n": 2221.0,
+                  "brier": 0.2021052011086718,
+                  "log_loss": 0.5963541943801991,
+                  "ece": 0.05071497258464563,
+                  "mae": 2.3833843248182487
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.1139696819148963,
+                  "log_loss": 0.3760918923830543,
+                  "ece": 0.05247506170530073,
+                  "mae": 1.7593779275003436
+                },
+                "TE": {
+                  "n": 1147.0,
+                  "brier": 0.1485009686869693,
+                  "log_loss": 0.462710603031039,
+                  "ece": 0.06049078259518939,
+                  "mae": 1.8908612327883692
+                },
+                "WR": {
+                  "n": 2221.0,
+                  "brier": 0.1762759860742659,
+                  "log_loss": 0.5309117614995351,
+                  "ece": 0.029960813157881058,
+                  "mae": 2.3646539940546307
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [
+                "snap_roll3"
+              ],
+              "m3": {
+                "n": 4917.0,
+                "brier": 0.16844491476285695,
+                "log_loss": 0.5146341851521848,
+                "ece": 0.04118257580868405,
+                "mae": 2.059984252906743
+              },
+              "new": {
+                "n": 4917.0,
+                "brier": 0.14982681940505502,
+                "log_loss": 0.4642898058664838,
+                "ece": 0.030025912003707654,
+                "mae": 2.0288192546576793
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.1260331267796815,
+                  "log_loss": 0.4131297284402275,
+                  "ece": 0.051028136187344746,
+                  "mae": 1.7779478636760284
+                },
+                "TE": {
+                  "n": 1110.0,
+                  "brier": 0.1719075303721927,
+                  "log_loss": 0.5263813645566937,
+                  "ece": 0.05769671968112451,
+                  "mae": 1.9203491241251531
+                },
+                "WR": {
+                  "n": 2314.0,
+                  "brier": 0.1941481542323981,
+                  "log_loss": 0.5744901854684977,
+                  "ece": 0.04479583409044457,
+                  "mae": 2.3089364232045053
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.11350938344923862,
+                  "log_loss": 0.37031028524059745,
+                  "ece": 0.04211956511265962,
+                  "mae": 1.5973458701512477
+                },
+                "TE": {
+                  "n": 1110.0,
+                  "brier": 0.15663150352397587,
+                  "log_loss": 0.48634487803298404,
+                  "ece": 0.07187831283244944,
+                  "mae": 1.8814960567844627
+                },
+                "WR": {
+                  "n": 2314.0,
+                  "brier": 0.16999481098242397,
+                  "log_loss": 0.5143461127764377,
+                  "ece": 0.03665146117959016,
+                  "mae": 2.3778765203047723
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [
+                "snap_roll3"
+              ],
+              "m3": {
+                "n": 4844.0,
+                "brier": 0.17216270608693993,
+                "log_loss": 0.5234267602221754,
+                "ece": 0.050602409475395405,
+                "mae": 2.116213777511877
+              },
+              "new": {
+                "n": 4844.0,
+                "brier": 0.1538085754536601,
+                "log_loss": 0.4742510386683659,
+                "ece": 0.038010317464998326,
+                "mae": 2.123489394891845
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.11935365158890747,
+                  "log_loss": 0.39595377209050236,
+                  "ece": 0.08377561071285342,
+                  "mae": 1.8332471639345163
+                },
+                "TE": {
+                  "n": 1134.0,
+                  "brier": 0.15882855058823644,
+                  "log_loss": 0.49294353779912414,
+                  "ece": 0.05253681501267964,
+                  "mae": 1.91583565734096
+                },
+                "WR": {
+                  "n": 2228.0,
+                  "brier": 0.21407650819717952,
+                  "log_loss": 0.623733287438908,
+                  "ece": 0.07255616819006963,
+                  "mae": 2.4064226238294117
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.1081979746213562,
+                  "log_loss": 0.35823053529815024,
+                  "ece": 0.05399956644938947,
+                  "mae": 1.656583940019873
+                },
+                "TE": {
+                  "n": 1134.0,
+                  "brier": 0.15765209934330054,
+                  "log_loss": 0.4896612613458618,
+                  "ece": 0.06670218018437245,
+                  "mae": 2.026580196781452
+                },
+                "WR": {
+                  "n": 2228.0,
+                  "brier": 0.18219114023939714,
+                  "log_loss": 0.5435810177879254,
+                  "ece": 0.022012386586853235,
+                  "mae": 2.4833856762102697
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [
+                "snap_roll3"
+              ],
+              "m3": {
+                "n": 4903.0,
+                "brier": 0.1695412886178301,
+                "log_loss": 0.5123624500706235,
+                "ece": 0.056889905157566006,
+                "mae": 2.0539647539460972
+              },
+              "new": {
+                "n": 4903.0,
+                "brier": 0.15103183728477357,
+                "log_loss": 0.465572481938134,
+                "ece": 0.045718631987471975,
+                "mae": 2.0397817788436954
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.10540540257208908,
+                  "log_loss": 0.3521443404916402,
+                  "ece": 0.07921699961878355,
+                  "mae": 1.775990226735566
+                },
+                "TE": {
+                  "n": 1181.0,
+                  "brier": 0.16993203727662323,
+                  "log_loss": 0.5085554333712646,
+                  "ece": 0.05885800806084904,
+                  "mae": 1.8050761492497764
+                },
+                "WR": {
+                  "n": 2239.0,
+                  "brier": 0.21181553821130902,
+                  "log_loss": 0.6204908749154541,
+                  "ece": 0.07461014579688582,
+                  "mae": 2.369361657027639
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.09505850465439575,
+                  "log_loss": 0.32089294197836676,
+                  "ece": 0.06063024374277454,
+                  "mae": 1.6079342333460924
+                },
+                "TE": {
+                  "n": 1181.0,
+                  "brier": 0.1577959789983569,
+                  "log_loss": 0.48349421717369706,
+                  "ece": 0.06290988013756978,
+                  "mae": 1.8565896760281064
+                },
+                "WR": {
+                  "n": 2239.0,
+                  "brier": 0.18453786717629142,
+                  "log_loss": 0.5519477335893778,
+                  "ece": 0.03637500095766387,
+                  "mae": 2.4224435847383594
+                }
+              }
+            }
+          ]
+        },
+        "anytime_td": {
+          "features": [],
+          "distribution": "poisson",
+          "distribution_selection_brier": {},
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 1.848843844931558e-05,
+                "2023": 0.00018228665797906385
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 1.0208216133206216e-05,
+                "2023": -1.3458859061260542e-05
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -1.3087622333818327e-05,
+                "2023": 1.0932728302076589e-05
+              },
+              "train_coverage": {
+                "2022": 0.9671101857575067,
+                "2023": 0.9721257237386269
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 4.7722205446160126e-05,
+                "2023": 4.147123106232331e-05
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.0003705436101181514,
+                "2023": 0.0005967300976842671
+              },
+              "train_coverage": {
+                "2022": 0.9056247763427567,
+                "2023": 0.9130686517783292
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 1.9714721708891103e-05,
+                "2023": -4.9779107061026506e-05
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 4.3714171314546135e-05,
+                "2023": -3.2038609988183087e-05
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_target_share",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -9.649384371290814e-05,
+                "2023": -9.260977564920503e-05
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_carry_share",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -2.7313529984723806e-05,
+                "2023": -7.151637139651834e-05
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -2.5406257067983606e-05,
+                "2023": 6.716905991660527e-06
+              },
+              "train_coverage": {
+                "2022": 0.9443703438628452,
+                "2023": 0.9503722084367245
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "snap_roll3",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.0006538160595479792,
+                "2023": 0.0007304533353235387
+              },
+              "train_coverage": {
+                "2022": 0.9749503887569537,
+                "2023": 0.9770057899090158
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "snap_delta",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.00022520592539274076,
+                "2023": 0.0004501314451172689
+              },
+              "train_coverage": {
+                "2022": 0.9255018055239272,
+                "2023": 0.9313757926661153
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "depth_rank",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.00033925710038687495,
+                "2023": 0.00024184224568368773
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "starter",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.00035601740376164925,
+                "2023": 0.00022642027044122992
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "roster_active",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.00015859998223424765,
+                "2023": 0.00024282726685417866
+              },
+              "train_coverage": {
+                "2022": 0.98366895474804,
+                "2023": 0.9854976564653984
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "shotgun_share",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 1.5237300521470099e-05,
+                "2023": 0.00019761337130821954
+              },
+              "train_coverage": {
+                "2022": 0.9906633267185009,
+                "2023": 0.9920871243451889
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "zone_share",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -0.00010084116760331052,
+                "2023": -2.964231589275279e-05
+              },
+              "train_coverage": {
+                "2022": 0.6690198119652558,
+                "2023": 0.719492693686242
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_rz_targets",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -0.0001653308471295245,
+                "2023": -0.00011510854781324187
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_separation",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 2.1339348778293132e-06,
+                "2023": 1.2943443950613753e-05
+              },
+              "train_coverage": {
+                "2022": 0.4884023553140961,
+                "2023": 0.4927488282326992
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_cushion",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -2.8649337837194366e-05,
+                "2023": -9.139919004946817e-06
+              },
+              "train_coverage": {
+                "2022": 0.4882396955008296,
+                "2023": 0.4925834022608216
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_yac_oe",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 4.5540977550384554e-05,
+                "2023": 6.634456280513179e-05
+              },
+              "train_coverage": {
+                "2022": 0.4847262435342724,
+                "2023": 0.48938516680452165
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_ryoe",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {},
+              "train_coverage": {
+                "2022": 0.13526790071244998,
+                "2023": 0.14849738075544527
+              },
+              "reason": "below 30% coverage on the selection seasons; missing values were not filled"
+            },
+            {
+              "feature": "prior_gl_carries",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -5.017817836205918e-05,
+                "2023": -0.00014190855917187162
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 5508.0,
+                "brier": 0.1557572379663938,
+                "log_loss": 0.48838888615836135,
+                "ece": 0.04082086297614115,
+                "mae": 0.3774949103846755
+              },
+              "new": {
+                "n": 5508.0,
+                "brier": 0.1557572379663938,
+                "log_loss": 0.48838888615836135,
+                "ece": 0.04082086297614115,
+                "mae": 0.3774949103846755
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 582.0,
+                  "brier": 0.13319616749518978,
+                  "log_loss": 0.436153253198384,
+                  "ece": 0.048292408662470906,
+                  "mae": 0.3154177500707551
+                },
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.18002994646704268,
+                  "log_loss": 0.5411809877496142,
+                  "ece": 0.05258923510467621,
+                  "mae": 0.4392222731405243
+                },
+                "TE": {
+                  "n": 1147.0,
+                  "brier": 0.13610389424190794,
+                  "log_loss": 0.44451568327568886,
+                  "ece": 0.033265598300005424,
+                  "mae": 0.3396934902170205
+                },
+                "WR": {
+                  "n": 2221.0,
+                  "brier": 0.15479192883636908,
+                  "log_loss": 0.4877016316828819,
+                  "ece": 0.04590268967570255,
+                  "mae": 0.36998293607643123
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 582.0,
+                  "brier": 0.13319616749518978,
+                  "log_loss": 0.436153253198384,
+                  "ece": 0.048292408662470906,
+                  "mae": 0.3154177500707551
+                },
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.18002994646704268,
+                  "log_loss": 0.5411809877496142,
+                  "ece": 0.05258923510467621,
+                  "mae": 0.4392222731405243
+                },
+                "TE": {
+                  "n": 1147.0,
+                  "brier": 0.13610389424190794,
+                  "log_loss": 0.44451568327568886,
+                  "ece": 0.033265598300005424,
+                  "mae": 0.3396934902170205
+                },
+                "WR": {
+                  "n": 2221.0,
+                  "brier": 0.15479192883636908,
+                  "log_loss": 0.4877016316828819,
+                  "ece": 0.04590268967570255,
+                  "mae": 0.36998293607643123
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 5526.0,
+                "brier": 0.15358395045725373,
+                "log_loss": 0.4803927552122754,
+                "ece": 0.029272427129497063,
+                "mae": 0.3719286746031883
+              },
+              "new": {
+                "n": 5526.0,
+                "brier": 0.15358395045725373,
+                "log_loss": 0.4803927552122754,
+                "ece": 0.029272427129497063,
+                "mae": 0.3719286746031883
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 609.0,
+                  "brier": 0.12282322669313149,
+                  "log_loss": 0.40516759538627956,
+                  "ece": 0.04247890079694254,
+                  "mae": 0.3125287543013573
+                },
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.17807710983114344,
+                  "log_loss": 0.5379167063483553,
+                  "ece": 0.05217520785130293,
+                  "mae": 0.42993650850893117
+                },
+                "TE": {
+                  "n": 1110.0,
+                  "brier": 0.1296242937240551,
+                  "log_loss": 0.4236207872134631,
+                  "ece": 0.03764658670375701,
+                  "mae": 0.31883831110969113
+                },
+                "WR": {
+                  "n": 2314.0,
+                  "brier": 0.1573696949693469,
+                  "log_loss": 0.49030880869825044,
+                  "ece": 0.025978652929231422,
+                  "mae": 0.3756016041279604
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 609.0,
+                  "brier": 0.12282322669313149,
+                  "log_loss": 0.40516759538627956,
+                  "ece": 0.04247890079694254,
+                  "mae": 0.3125287543013573
+                },
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.17807710983114344,
+                  "log_loss": 0.5379167063483553,
+                  "ece": 0.05217520785130293,
+                  "mae": 0.42993650850893117
+                },
+                "TE": {
+                  "n": 1110.0,
+                  "brier": 0.1296242937240551,
+                  "log_loss": 0.4236207872134631,
+                  "ece": 0.03764658670375701,
+                  "mae": 0.31883831110969113
+                },
+                "WR": {
+                  "n": 2314.0,
+                  "brier": 0.1573696949693469,
+                  "log_loss": 0.49030880869825044,
+                  "ece": 0.025978652929231422,
+                  "mae": 0.3756016041279604
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 5458.0,
+                "brier": 0.16078057899243242,
+                "log_loss": 0.5002981980611059,
+                "ece": 0.02937191454814004,
+                "mae": 0.3788836714291182
+              },
+              "new": {
+                "n": 5458.0,
+                "brier": 0.16078057899243242,
+                "log_loss": 0.5002981980611059,
+                "ece": 0.02937191454814004,
+                "mae": 0.3788836714291182
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 614.0,
+                  "brier": 0.12305429145369039,
+                  "log_loss": 0.4113222205040837,
+                  "ece": 0.041309925246344394,
+                  "mae": 0.3154282298344611
+                },
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.18629613240613027,
+                  "log_loss": 0.5620801444559256,
+                  "ece": 0.04757106213913748,
+                  "mae": 0.44068891240118785
+                },
+                "TE": {
+                  "n": 1134.0,
+                  "brier": 0.12859963984540876,
+                  "log_loss": 0.4205567415499507,
+                  "ece": 0.03241357699562842,
+                  "mae": 0.30699651522482096
+                },
+                "WR": {
+                  "n": 2228.0,
+                  "brier": 0.17058447279064254,
+                  "log_loss": 0.5243095164392653,
+                  "ece": 0.042315656961427216,
+                  "mae": 0.39184880121106863
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 614.0,
+                  "brier": 0.12305429145369039,
+                  "log_loss": 0.4113222205040837,
+                  "ece": 0.041309925246344394,
+                  "mae": 0.3154282298344611
+                },
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.18629613240613027,
+                  "log_loss": 0.5620801444559256,
+                  "ece": 0.04757106213913748,
+                  "mae": 0.44068891240118785
+                },
+                "TE": {
+                  "n": 1134.0,
+                  "brier": 0.12859963984540876,
+                  "log_loss": 0.4205567415499507,
+                  "ece": 0.03241357699562842,
+                  "mae": 0.30699651522482096
+                },
+                "WR": {
+                  "n": 2228.0,
+                  "brier": 0.17058447279064254,
+                  "log_loss": 0.5243095164392653,
+                  "ece": 0.042315656961427216,
+                  "mae": 0.39184880121106863
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 5513.0,
+                "brier": 0.1609845827253601,
+                "log_loss": 0.49938621552422835,
+                "ece": 0.030446362103312065,
+                "mae": 0.3811769522330476
+              },
+              "new": {
+                "n": 5513.0,
+                "brier": 0.1609845827253601,
+                "log_loss": 0.49938621552422835,
+                "ece": 0.030446362103312065,
+                "mae": 0.3811769522330476
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 610.0,
+                  "brier": 0.12404065029387971,
+                  "log_loss": 0.4078648489941254,
+                  "ece": 0.02427531154928419,
+                  "mae": 0.31727374823263943
+                },
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.18575517926073273,
+                  "log_loss": 0.5569474262125473,
+                  "ece": 0.04517606250612617,
+                  "mae": 0.45211854923594635
+                },
+                "TE": {
+                  "n": 1181.0,
+                  "brier": 0.14664293491303143,
+                  "log_loss": 0.4665900752073688,
+                  "ece": 0.0227067843085326,
+                  "mae": 0.33293482133123614
+                },
+                "WR": {
+                  "n": 2239.0,
+                  "brier": 0.16220766900834604,
+                  "log_loss": 0.5034938527939008,
+                  "ece": 0.033439695323256496,
+                  "mae": 0.37704498380070683
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 610.0,
+                  "brier": 0.12404065029387971,
+                  "log_loss": 0.4078648489941254,
+                  "ece": 0.02427531154928419,
+                  "mae": 0.31727374823263943
+                },
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.18575517926073273,
+                  "log_loss": 0.5569474262125473,
+                  "ece": 0.04517606250612617,
+                  "mae": 0.45211854923594635
+                },
+                "TE": {
+                  "n": 1181.0,
+                  "brier": 0.14664293491303143,
+                  "log_loss": 0.4665900752073688,
+                  "ece": 0.0227067843085326,
+                  "mae": 0.33293482133123614
+                },
+                "WR": {
+                  "n": 2239.0,
+                  "brier": 0.16220766900834604,
+                  "log_loss": 0.5034938527939008,
+                  "ece": 0.033439695323256496,
+                  "mae": 0.37704498380070683
+                }
+              }
+            }
+          ]
+        },
+        "receptions": {
+          "features": [],
+          "distribution": "poisson",
+          "distribution_selection_brier": {},
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00040872419726234455,
+                "2023": 0.0003390077504603628
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 5.454505566793166e-05,
+                "2023": -0.00012350421045526083
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -7.983589091042909e-05,
+                "2023": -7.46201271502045e-05
+              },
+              "train_coverage": {
+                "2022": 0.9671101857575067,
+                "2023": 0.9721257237386269
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.0032757630778832425,
+                "2023": 0.0020259414605559023
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.005764839367689678,
+                "2023": 0.008934781793902502
+              },
+              "train_coverage": {
+                "2022": 0.9056247763427567,
+                "2023": 0.9130686517783292
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.0001175658971515059,
+                "2023": 0.0003544611099410844
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00011787438938637429,
+                "2023": -1.5368667680704107e-05
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_target_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.020073554718728293,
+                "2023": -0.05462295276110196
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -7.167339850933097e-05,
+                "2023": -8.032889581066627e-05
+              },
+              "train_coverage": {
+                "2022": 0.9443703438628452,
+                "2023": 0.9503722084367245
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "snap_roll3",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.03586706554483565,
+                "2023": 0.013389430221550258
+              },
+              "train_coverage": {
+                "2022": 0.9749503887569537,
+                "2023": 0.9770057899090158
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "snap_delta",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.014737093158351922,
+                "2023": 0.0032847966377786975
+              },
+              "train_coverage": {
+                "2022": 0.9255018055239272,
+                "2023": 0.9313757926661153
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "depth_rank",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.00820911042252015,
+                "2023": -0.018221498919168244
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "starter",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 5.93611457655463e-05,
+                "2023": -0.01577195994149161
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "roster_active",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.01088569422358665,
+                "2023": 0.0012268998745630366
+              },
+              "train_coverage": {
+                "2022": 0.98366895474804,
+                "2023": 0.9854976564653984
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "shotgun_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 3.0529448302729634e-07,
+                "2023": -0.003034423743660586
+              },
+              "train_coverage": {
+                "2022": 0.9906633267185009,
+                "2023": 0.9920871243451889
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "zone_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.001097705427807849,
+                "2023": -0.002975022102439606
+              },
+              "train_coverage": {
+                "2022": 0.6690198119652558,
+                "2023": 0.719492693686242
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_rz_targets",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.004020770027155063,
+                "2023": -0.039710856205644296
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_separation",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0007443627911694062,
+                "2023": 2.2399119245397614e-05
+              },
+              "train_coverage": {
+                "2022": 0.4884023553140961,
+                "2023": 0.4927488282326992
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_cushion",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00045946216697201336,
+                "2023": 0.00035654429938891674
+              },
+              "train_coverage": {
+                "2022": 0.4882396955008296,
+                "2023": 0.4925834022608216
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_yac_oe",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.0002481936183689193,
+                "2023": -0.00016025649868489644
+              },
+              "train_coverage": {
+                "2022": 0.4847262435342724,
+                "2023": 0.48938516680452165
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 4926.0,
+                "brier": 0.1180073965353655,
+                "log_loss": 0.38237250360676517,
+                "ece": 0.02139100839644723,
+                "mae": 1.5994846824559554
+              },
+              "new": {
+                "n": 4926.0,
+                "brier": 0.1180073965353655,
+                "log_loss": 0.38237250360676517,
+                "ece": 0.02139100839644723,
+                "mae": 1.5994846824559554
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.07158950961840833,
+                  "log_loss": 0.26109828811233377,
+                  "ece": 0.040967502674260324,
+                  "mae": 1.4854295281732568
+                },
+                "TE": {
+                  "n": 1147.0,
+                  "brier": 0.1004689338565732,
+                  "log_loss": 0.3359638957257202,
+                  "ece": 0.034061283443310345,
+                  "mae": 1.4196344777704468
+                },
+                "WR": {
+                  "n": 2221.0,
+                  "brier": 0.15962634498615075,
+                  "log_loss": 0.4914116305675407,
+                  "ece": 0.04208241642899607,
+                  "mae": 1.7723735231343545
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.07158950961840833,
+                  "log_loss": 0.26109828811233377,
+                  "ece": 0.040967502674260324,
+                  "mae": 1.4854295281732568
+                },
+                "TE": {
+                  "n": 1147.0,
+                  "brier": 0.1004689338565732,
+                  "log_loss": 0.3359638957257202,
+                  "ece": 0.034061283443310345,
+                  "mae": 1.4196344777704468
+                },
+                "WR": {
+                  "n": 2221.0,
+                  "brier": 0.15962634498615075,
+                  "log_loss": 0.4914116305675407,
+                  "ece": 0.04208241642899607,
+                  "mae": 1.7723735231343545
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 4917.0,
+                "brier": 0.12074979313986214,
+                "log_loss": 0.3895090734756692,
+                "ece": 0.02890201165141137,
+                "mae": 1.5746217502731117
+              },
+              "new": {
+                "n": 4917.0,
+                "brier": 0.12074979313986214,
+                "log_loss": 0.3895090734756692,
+                "ece": 0.02890201165141137,
+                "mae": 1.5746217502731117
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.07638190349390536,
+                  "log_loss": 0.2780170929613626,
+                  "ece": 0.029714577842414675,
+                  "mae": 1.4069328795038107
+                },
+                "TE": {
+                  "n": 1110.0,
+                  "brier": 0.11798167368227826,
+                  "log_loss": 0.3840639186139441,
+                  "ece": 0.023947400249919676,
+                  "mae": 1.4878805143903986
+                },
+                "WR": {
+                  "n": 2314.0,
+                  "brier": 0.15070392963049806,
+                  "log_loss": 0.46405602628654835,
+                  "ece": 0.04196060331629107,
+                  "mae": 1.7244239351859803
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.07638190349390536,
+                  "log_loss": 0.2780170929613626,
+                  "ece": 0.029714577842414675,
+                  "mae": 1.4069328795038107
+                },
+                "TE": {
+                  "n": 1110.0,
+                  "brier": 0.11798167368227826,
+                  "log_loss": 0.3840639186139441,
+                  "ece": 0.023947400249919676,
+                  "mae": 1.4878805143903986
+                },
+                "WR": {
+                  "n": 2314.0,
+                  "brier": 0.15070392963049806,
+                  "log_loss": 0.46405602628654835,
+                  "ece": 0.04196060331629107,
+                  "mae": 1.7244239351859803
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 4844.0,
+                "brier": 0.12379500698313417,
+                "log_loss": 0.39940698636661315,
+                "ece": 0.0313897883725839,
+                "mae": 1.5913762464124572
+              },
+              "new": {
+                "n": 4844.0,
+                "brier": 0.12379500698313417,
+                "log_loss": 0.39940698636661315,
+                "ece": 0.0313897883725839,
+                "mae": 1.5913762464124572
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.0692496936006815,
+                  "log_loss": 0.25925573729855744,
+                  "ece": 0.03495615637258416,
+                  "mae": 1.4214489445694616
+                },
+                "TE": {
+                  "n": 1134.0,
+                  "brier": 0.12089507435614352,
+                  "log_loss": 0.39097808313054083,
+                  "ece": 0.027623129296735913,
+                  "mae": 1.492597849546824
+                },
+                "WR": {
+                  "n": 2228.0,
+                  "brier": 0.16155294146778504,
+                  "log_loss": 0.49692158573311435,
+                  "ece": 0.0582635286654665,
+                  "mae": 1.7546827829371194
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.0692496936006815,
+                  "log_loss": 0.25925573729855744,
+                  "ece": 0.03495615637258416,
+                  "mae": 1.4214489445694616
+                },
+                "TE": {
+                  "n": 1134.0,
+                  "brier": 0.12089507435614352,
+                  "log_loss": 0.39097808313054083,
+                  "ece": 0.027623129296735913,
+                  "mae": 1.492597849546824
+                },
+                "WR": {
+                  "n": 2228.0,
+                  "brier": 0.16155294146778504,
+                  "log_loss": 0.49692158573311435,
+                  "ece": 0.0582635286654665,
+                  "mae": 1.7546827829371194
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 4903.0,
+                "brier": 0.1142623843463654,
+                "log_loss": 0.3692961845819468,
+                "ece": 0.03573648450502787,
+                "mae": 1.5344840694761626
+              },
+              "new": {
+                "n": 4903.0,
+                "brier": 0.1142623843463654,
+                "log_loss": 0.3692961845819468,
+                "ece": 0.03573648450502787,
+                "mae": 1.5344840694761626
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.06865182746407297,
+                  "log_loss": 0.2504865491918689,
+                  "ece": 0.02934589454296477,
+                  "mae": 1.3838775954834261
+                },
+                "TE": {
+                  "n": 1181.0,
+                  "brier": 0.1164839432464737,
+                  "log_loss": 0.3713993369207284,
+                  "ece": 0.044366538876722025,
+                  "mae": 1.4255359975648723
+                },
+                "WR": {
+                  "n": 2239.0,
+                  "brier": 0.14330070270072526,
+                  "log_loss": 0.4468803142699256,
+                  "ece": 0.053532767411074,
+                  "mae": 1.691704736675119
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.06865182746407297,
+                  "log_loss": 0.2504865491918689,
+                  "ece": 0.02934589454296477,
+                  "mae": 1.3838775954834261
+                },
+                "TE": {
+                  "n": 1181.0,
+                  "brier": 0.1164839432464737,
+                  "log_loss": 0.3713993369207284,
+                  "ece": 0.044366538876722025,
+                  "mae": 1.4255359975648723
+                },
+                "WR": {
+                  "n": 2239.0,
+                  "brier": 0.14330070270072526,
+                  "log_loss": 0.4468803142699256,
+                  "ece": 0.053532767411074,
+                  "mae": 1.691704736675119
+                }
+              }
+            }
+          ]
+        },
+        "receiving_yards": {
+          "features": [],
+          "distribution": "lognormal",
+          "distribution_selection_brier": {
+            "gaussian": 0.2505533687135368,
+            "lognormal": 0.2495331406411046
+          },
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.0029459359514625305,
+                "2023": 0.00938103774624821
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.011114471795181657,
+                "2023": -0.0012622899355214656
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.00044623325601378383,
+                "2023": -0.00010881061111689405
+              },
+              "train_coverage": {
+                "2022": 0.9671101857575067,
+                "2023": 0.9721257237386269
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.03419985747133936,
+                "2023": 0.053395693017979085
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.028830764129846642,
+                "2023": 0.03311811193280079
+              },
+              "train_coverage": {
+                "2022": 0.9056247763427567,
+                "2023": 0.9130686517783292
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.0002325225079218285,
+                "2023": 0.005702104200889124
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.008340405448358013,
+                "2023": 0.0021890975527831813
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_target_share",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.49142113895725004,
+                "2023": -1.062418924592091
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.0006035109624775714,
+                "2023": -0.00010476682724203101
+              },
+              "train_coverage": {
+                "2022": 0.9443703438628452,
+                "2023": 0.9503722084367245
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "snap_roll3",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.052482493219493165,
+                "2023": -0.2977561321529336
+              },
+              "train_coverage": {
+                "2022": 0.9749503887569537,
+                "2023": 0.9770057899090158
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "snap_delta",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.10671025634874098,
+                "2023": 0.0353075085921013
+              },
+              "train_coverage": {
+                "2022": 0.9255018055239272,
+                "2023": 0.9313757926661153
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "depth_rank",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -1.634241234469286,
+                "2023": -1.8451535806953743
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "starter",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -1.5463146115949336,
+                "2023": -1.8257034121869609
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "roster_active",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.019461584544000488,
+                "2023": 0.0012179407375789708
+              },
+              "train_coverage": {
+                "2022": 0.98366895474804,
+                "2023": 0.9854976564653984
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "shotgun_share",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.002469517402605703,
+                "2023": -0.043549462922662485
+              },
+              "train_coverage": {
+                "2022": 0.9906633267185009,
+                "2023": 0.9920871243451889
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "zone_share",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.04261727523822145,
+                "2023": -0.1088522471035489
+              },
+              "train_coverage": {
+                "2022": 0.6690198119652558,
+                "2023": 0.719492693686242
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_rz_targets",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.47886357843605865,
+                "2023": -0.9426537432510536
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_separation",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.011706933418505372,
+                "2023": 0.0019367937315912798
+              },
+              "train_coverage": {
+                "2022": 0.4884023553140961,
+                "2023": 0.4927488282326992
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_cushion",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.01610300426517597,
+                "2023": 0.014471393049156234
+              },
+              "train_coverage": {
+                "2022": 0.4882396955008296,
+                "2023": 0.4925834022608216
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_yac_oe",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.002485894613251105,
+                "2023": -0.00565510003554337
+              },
+              "train_coverage": {
+                "2022": 0.4847262435342724,
+                "2023": 0.48938516680452165
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 4926.0,
+                "brier": 0.12577498879776017,
+                "log_loss": 0.4037899037036372,
+                "ece": 0.024689733570872664,
+                "mae": 20.717070817579028
+              },
+              "new": {
+                "n": 4926.0,
+                "brier": 0.12546492581944238,
+                "log_loss": 0.40198104213156544,
+                "ece": 0.02476601321154796,
+                "mae": 20.717070817579028
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.044956328759608144,
+                  "log_loss": 0.19508311092534145,
+                  "ece": 0.05697361088175503,
+                  "mae": 15.902112278188547
+                },
+                "TE": {
+                  "n": 1147.0,
+                  "brier": 0.10270046725123645,
+                  "log_loss": 0.3465916719406573,
+                  "ece": 0.03408761949359727,
+                  "mae": 17.825011495038318
+                },
+                "WR": {
+                  "n": 2221.0,
+                  "brier": 0.19438460093342141,
+                  "log_loss": 0.5797338726278708,
+                  "ece": 0.06644612069584467,
+                  "mae": 25.58825381952615
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.04705990756807212,
+                  "log_loss": 0.19910802762729635,
+                  "ece": 0.053012418306938563,
+                  "mae": 15.902112278188547
+                },
+                "TE": {
+                  "n": 1147.0,
+                  "brier": 0.10334911255845342,
+                  "log_loss": 0.3469014453597328,
+                  "ece": 0.03875194617648396,
+                  "mae": 17.825011495038318
+                },
+                "WR": {
+                  "n": 2221.0,
+                  "brier": 0.19188629288202197,
+                  "log_loss": 0.5727385631108286,
+                  "ece": 0.05973091501314388,
+                  "mae": 25.58825381952615
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 4917.0,
+                "brier": 0.1247783799157766,
+                "log_loss": 0.4009181350620754,
+                "ece": 0.02593863494726175,
+                "mae": 20.903362852829495
+              },
+              "new": {
+                "n": 4917.0,
+                "brier": 0.12406821482166223,
+                "log_loss": 0.3978320964757228,
+                "ece": 0.029003865700852713,
+                "mae": 20.903362852829495
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.04147840324281853,
+                  "log_loss": 0.1814625675365775,
+                  "ece": 0.047545201763465,
+                  "mae": 14.795756485502324
+                },
+                "TE": {
+                  "n": 1110.0,
+                  "brier": 0.11628778983738317,
+                  "log_loss": 0.38374261488071293,
+                  "ece": 0.021942759216477183,
+                  "mae": 18.20928909413121
+                },
+                "WR": {
+                  "n": 2314.0,
+                  "brier": 0.18259662544721272,
+                  "log_loss": 0.5507504555965959,
+                  "ece": 0.05475316393527215,
+                  "mae": 26.136326629223
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.04229415519356967,
+                  "log_loss": 0.18210921609685757,
+                  "ece": 0.039080254547778547,
+                  "mae": 14.795756485502324
+                },
+                "TE": {
+                  "n": 1110.0,
+                  "brier": 0.11606298094096071,
+                  "log_loss": 0.3849241863293419,
+                  "ece": 0.020837745810948365,
+                  "mae": 18.20928909413121
+                },
+                "WR": {
+                  "n": 2314.0,
+                  "brier": 0.1806691139713256,
+                  "log_loss": 0.5432089506970402,
+                  "ece": 0.04231702895483449,
+                  "mae": 26.136326629223
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 4844.0,
+                "brier": 0.13380335176622624,
+                "log_loss": 0.4224853324032326,
+                "ece": 0.04080701589071885,
+                "mae": 20.680630571143706
+              },
+              "new": {
+                "n": 4844.0,
+                "brier": 0.13171756375780935,
+                "log_loss": 0.41613726453865024,
+                "ece": 0.02024865816988703,
+                "mae": 20.680630571143706
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.044149054678341605,
+                  "log_loss": 0.18875730421555148,
+                  "ece": 0.04205188784862285,
+                  "mae": 14.971937977207116
+                },
+                "TE": {
+                  "n": 1134.0,
+                  "brier": 0.12745326027113985,
+                  "log_loss": 0.4071269665550276,
+                  "ece": 0.04827598817760203,
+                  "mae": 18.390522138197188
+                },
+                "WR": {
+                  "n": 2228.0,
+                  "brier": 0.19667079882173472,
+                  "log_loss": 0.5857713847578143,
+                  "ece": 0.08356975478436164,
+                  "mae": 25.643496543843607
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.044805393699137996,
+                  "log_loss": 0.18778181381476344,
+                  "ece": 0.03434208445620046,
+                  "mae": 14.971937977207116
+                },
+                "TE": {
+                  "n": 1134.0,
+                  "brier": 0.12553263040986154,
+                  "log_loss": 0.40110939148499863,
+                  "ece": 0.028968669919203067,
+                  "mae": 18.390522138197188
+                },
+                "WR": {
+                  "n": 2228.0,
+                  "brier": 0.19267696700894216,
+                  "log_loss": 0.5756814234325646,
+                  "ece": 0.05379923076139902,
+                  "mae": 25.643496543843607
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 4903.0,
+                "brier": 0.12616720446239457,
+                "log_loss": 0.40145838635955583,
+                "ece": 0.043538777953543585,
+                "mae": 20.25041561226127
+              },
+              "new": {
+                "n": 4903.0,
+                "brier": 0.12420782343374963,
+                "log_loss": 0.3933827777634235,
+                "ece": 0.0402487124509921,
+                "mae": 20.25041561226127
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.044398173558454816,
+                  "log_loss": 0.18824375872390897,
+                  "ece": 0.047587889507668686,
+                  "mae": 15.176385466145444
+                },
+                "TE": {
+                  "n": 1181.0,
+                  "brier": 0.11728732813090956,
+                  "log_loss": 0.3801911167059138,
+                  "ece": 0.03603471051359737,
+                  "mae": 17.536420758479252
+                },
+                "WR": {
+                  "n": 2239.0,
+                  "brier": 0.18501070905284855,
+                  "log_loss": 0.55389873394536,
+                  "ece": 0.06565029550621414,
+                  "mae": 25.04274014509126
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.04503637336065968,
+                  "log_loss": 0.18568582951266877,
+                  "ece": 0.04113070406335518,
+                  "mae": 15.176385466145444
+                },
+                "TE": {
+                  "n": 1181.0,
+                  "brier": 0.11734891368861203,
+                  "log_loss": 0.3764416049605827,
+                  "ece": 0.036881509351724406,
+                  "mae": 17.536420758479252
+                },
+                "WR": {
+                  "n": 2239.0,
+                  "brier": 0.18026482784080636,
+                  "log_loss": 0.5398866184673202,
+                  "ece": 0.05280362076632763,
+                  "mae": 25.04274014509126
+                }
+              }
+            }
+          ]
+        },
+        "rushing_yards": {
+          "features": [
+            "snap_roll3"
+          ],
+          "distribution": "lognormal",
+          "distribution_selection_brier": {
+            "gaussian": 0.32828599524379387,
+            "lognormal": 0.3247217358820341
+          },
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.003866140796592532,
+                "2023": -0.010272962366961735
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.0009987065862873123,
+                "2023": -0.013407840513501412
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.00033680011615189187,
+                "2023": 0.0002863905300465319
+              },
+              "train_coverage": {
+                "2022": 0.9671101857575067,
+                "2023": 0.9721257237386269
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.018219111479417904,
+                "2023": 0.044665575192155416
+              },
+              "train_coverage": {
+                "2022": 0.9911838381209538,
+                "2023": 0.9925282602701958
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.15454203399453093,
+                "2023": 0.13685064516183587
+              },
+              "train_coverage": {
+                "2022": 0.9056247763427567,
+                "2023": 0.9130686517783292
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.001184752757829699,
+                "2023": -0.030597724031487417
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.002579504410807232,
+                "2023": -0.0023218308794596965
+              },
+              "train_coverage": {
+                "2022": 0.9909561143823807,
+                "2023": 0.9923352633030053
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_carry_share",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.904874995636785,
+                "2023": -1.3187878693241473
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.0012219162275002304,
+                "2023": 0.011758762071412576
+              },
+              "train_coverage": {
+                "2022": 0.9443703438628452,
+                "2023": 0.9503722084367245
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "snap_roll3",
+              "kept": true,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.2609341003163195,
+                "2023": 0.38082820472111223
+              },
+              "train_coverage": {
+                "2022": 0.9749503887569537,
+                "2023": 0.9770057899090158
+              },
+              "reason": "improved the primary metric on both 2022 and 2023"
+            },
+            {
+              "feature": "snap_delta",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.035948205040892134,
+                "2023": -0.05432698365300226
+              },
+              "train_coverage": {
+                "2022": 0.9255018055239272,
+                "2023": 0.9313757926661153
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "depth_rank",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.1543700616219219,
+                "2023": -0.20086886197813314
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "starter",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.17268805799017173,
+                "2023": -0.20203511138776875
+              },
+              "train_coverage": {
+                "2022": 0.9746901330557273,
+                "2023": 0.9760408050730631
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "roster_active",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.006066725102083836,
+                "2023": -0.007100146893822767
+              },
+              "train_coverage": {
+                "2022": 0.98366895474804,
+                "2023": 0.9854976564653984
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "shotgun_share",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.20687862065806684,
+                "2023": -0.5920990678744147
+              },
+              "train_coverage": {
+                "2022": 0.9906633267185009,
+                "2023": 0.9920871243451889
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "zone_share",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.04299682925374171,
+                "2023": -0.05163206466998105
+              },
+              "train_coverage": {
+                "2022": 0.6690198119652558,
+                "2023": 0.719492693686242
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "ngs_ryoe",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {},
+              "train_coverage": {
+                "2022": 0.13526790071244998,
+                "2023": 0.14849738075544527
+              },
+              "reason": "below 30% coverage on the selection seasons; missing values were not filled"
+            },
+            {
+              "feature": "prior_gl_carries",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -2.0776708299926625,
+                "2023": -2.39133829156566
+              },
+              "train_coverage": {
+                "2022": 0.9676957610852662,
+                "2023": 0.9701406120760959
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [
+                "snap_roll3"
+              ],
+              "m3": {
+                "n": 2140.0,
+                "brier": 0.16321116828970153,
+                "log_loss": 0.4934561591758997,
+                "ece": 0.049918451715222995,
+                "mae": 21.665227306049278
+              },
+              "new": {
+                "n": 2140.0,
+                "brier": 0.1567815538274479,
+                "log_loss": 0.47596377866332684,
+                "ece": 0.027974926476734163,
+                "mae": 21.40429320573296
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 582.0,
+                  "brier": 0.09855672534327879,
+                  "log_loss": 0.3301391676121818,
+                  "ece": 0.0533461410004719,
+                  "mae": 15.264731119579164
+                },
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.18736321308740245,
+                  "log_loss": 0.554464175279933,
+                  "ece": 0.05800294170947727,
+                  "mae": 24.05617004066135
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 582.0,
+                  "brier": 0.11193391966823556,
+                  "log_loss": 0.3707410395499052,
+                  "ece": 0.12034726421649763,
+                  "mae": 17.65693191438595
+                },
+                "RB": {
+                  "n": 1558.0,
+                  "brier": 0.17353464951465045,
+                  "log_loss": 0.5152703474463893,
+                  "ece": 0.04317375368285127,
+                  "mae": 22.80414190378428
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [
+                "snap_roll3"
+              ],
+              "m3": {
+                "n": 2102.0,
+                "brier": 0.1794234291390387,
+                "log_loss": 0.5390692658640847,
+                "ece": 0.05236122913723075,
+                "mae": 21.32638478031329
+              },
+              "new": {
+                "n": 2102.0,
+                "brier": 0.16794018205458622,
+                "log_loss": 0.5024820857236563,
+                "ece": 0.045541365733585755,
+                "mae": 20.945556575592178
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 609.0,
+                  "brier": 0.09886236645015545,
+                  "log_loss": 0.3353672396199583,
+                  "ece": 0.048265281483556716,
+                  "mae": 14.61478667693517
+                },
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.2122845725935128,
+                  "log_loss": 0.6221600454907913,
+                  "ece": 0.08010797459593672,
+                  "mae": 24.064069472180183
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 609.0,
+                  "brier": 0.12852855317760198,
+                  "log_loss": 0.4058200885677286,
+                  "ece": 0.14861367082992802,
+                  "mae": 18.562634774423397
+                },
+                "RB": {
+                  "n": 1493.0,
+                  "brier": 0.18401632538083096,
+                  "log_loss": 0.5419108575039374,
+                  "ece": 0.040891997329197204,
+                  "mae": 21.91755883742191
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [
+                "snap_roll3"
+              ],
+              "m3": {
+                "n": 2096.0,
+                "brier": 0.16428878075858558,
+                "log_loss": 0.4999737981600307,
+                "ece": 0.02821325617322192,
+                "mae": 21.68296496308861
+              },
+              "new": {
+                "n": 2096.0,
+                "brier": 0.15730278661844194,
+                "log_loss": 0.48372143170841003,
+                "ece": 0.037589046695864395,
+                "mae": 20.98049612774857
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 614.0,
+                  "brier": 0.11815925064755324,
+                  "log_loss": 0.38193266815603777,
+                  "ece": 0.027922051118234627,
+                  "mae": 14.981101231992717
+                },
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.18340047541997148,
+                  "log_loss": 0.5488788277298361,
+                  "ece": 0.04225667742907304,
+                  "mae": 24.45958057097854
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 614.0,
+                  "brier": 0.13310276343240404,
+                  "log_loss": 0.41935215572437273,
+                  "ece": 0.10554395545928634,
+                  "mae": 17.61978396075149
+                },
+                "RB": {
+                  "n": 1482.0,
+                  "brier": 0.16732897706124036,
+                  "log_loss": 0.510389944160636,
+                  "ece": 0.03859905222223182,
+                  "mae": 22.372855959419418
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [
+                "snap_roll3"
+              ],
+              "m3": {
+                "n": 2093.0,
+                "brier": 0.1665863437087269,
+                "log_loss": 0.5036303134165496,
+                "ece": 0.058277782897136705,
+                "mae": 21.08599204421946
+              },
+              "new": {
+                "n": 2093.0,
+                "brier": 0.16509692658018618,
+                "log_loss": 0.4955885239664042,
+                "ece": 0.03325252619715544,
+                "mae": 21.154314420482812
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 610.0,
+                  "brier": 0.11416367933858483,
+                  "log_loss": 0.3703134623607862,
+                  "ece": 0.04654209243558642,
+                  "mae": 14.877048058964528
+                },
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.18814927375983057,
+                  "log_loss": 0.5584673189081313,
+                  "ece": 0.07271858340935698,
+                  "mae": 23.639906967351966
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 610.0,
+                  "brier": 0.14730072326710078,
+                  "log_loss": 0.4463115045052066,
+                  "ece": 0.1494218813207806,
+                  "mae": 18.638451858869978
+                },
+                "RB": {
+                  "n": 1483.0,
+                  "brier": 0.17241701020862996,
+                  "log_loss": 0.515857560966627,
+                  "ece": 0.03940553502042954,
+                  "mae": 22.18916011339166
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "league_id": "fbs",
+      "rows": 169022,
+      "markets": {
+        "opportunity": {
+          "features": [],
+          "distribution": "poisson",
+          "distribution_selection_brier": {},
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0003384211743859833,
+                "2023": 0.00021050658512122844
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00014813225009890907,
+                "2023": 0.00016000986123398953
+              },
+              "train_coverage": {
+                "2022": 0.9692927722427938,
+                "2023": 0.9736995147864279
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00022406328857926816,
+                "2023": 0.0001729246885577851
+              },
+              "train_coverage": {
+                "2022": 0.9683926269920828,
+                "2023": 0.9727967918616056
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0006057349161694425,
+                "2023": -0.00046344492319638775
+              },
+              "train_coverage": {
+                "2022": 0.9676970602074426,
+                "2023": 0.9722239100054684
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.002951586569048592,
+                "2023": 0.0045628819029042145
+              },
+              "train_coverage": {
+                "2022": 0.7458624005237209,
+                "2023": 0.7560044094542866
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00013192286061403102,
+                "2023": 9.413204408104114e-05
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0002065877122114923,
+                "2023": -0.00016178245532572078
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_target_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {},
+              "train_coverage": {
+                "2022": 0.0,
+                "2023": 0.0
+              },
+              "reason": "below 30% coverage on the selection seasons; missing values were not filled"
+            },
+            {
+              "feature": "prior_carry_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.014102783023252297,
+                "2023": 0.010330723514438755
+              },
+              "train_coverage": {
+                "2022": 0.8870113131891737,
+                "2023": 0.8919336498650255
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.00012841118049777833,
+                "2023": -0.00022278020365740225
+              },
+              "train_coverage": {
+                "2022": 0.8770483418915325,
+                "2023": 0.8831234213198851
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 14251.0,
+                "brier": 0.1071031824762708,
+                "log_loss": 0.3762185644811237,
+                "ece": 0.04372458177329645,
+                "mae": 1.4561983451860663
+              },
+              "new": {
+                "n": 14251.0,
+                "brier": 0.1071031824762708,
+                "log_loss": 0.3762185644811237,
+                "ece": 0.04372458177329645,
+                "mae": 1.4561983451860663
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.03439276093642462,
+                  "log_loss": 0.16238635623081404,
+                  "ece": 0.01794479482920228,
+                  "mae": 1.3379121665493579
+                },
+                "TE": {
+                  "n": 2323.0,
+                  "brier": 0.0740836629065724,
+                  "log_loss": 0.2804567939620666,
+                  "ece": 0.016944117801492926,
+                  "mae": 1.1583714984853586
+                },
+                "WR": {
+                  "n": 6916.0,
+                  "brier": 0.17088701369635734,
+                  "log_loss": 0.563347196734785,
+                  "ece": 0.09589009972818685,
+                  "mae": 1.6419563110930824
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.03439276093642462,
+                  "log_loss": 0.16238635623081404,
+                  "ece": 0.01794479482920228,
+                  "mae": 1.3379121665493579
+                },
+                "TE": {
+                  "n": 2323.0,
+                  "brier": 0.0740836629065724,
+                  "log_loss": 0.2804567939620666,
+                  "ece": 0.016944117801492926,
+                  "mae": 1.1583714984853586
+                },
+                "WR": {
+                  "n": 6916.0,
+                  "brier": 0.17088701369635734,
+                  "log_loss": 0.563347196734785,
+                  "ece": 0.09589009972818685,
+                  "mae": 1.6419563110930824
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 14676.0,
+                "brier": 0.09790456229801926,
+                "log_loss": 0.34114877134281185,
+                "ece": 0.03431828396463398,
+                "mae": 1.4274790844648453
+              },
+              "new": {
+                "n": 14676.0,
+                "brier": 0.09790456229801926,
+                "log_loss": 0.34114877134281185,
+                "ece": 0.03431828396463398,
+                "mae": 1.4274790844648453
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.025373617919962715,
+                  "log_loss": 0.12434799902849944,
+                  "ece": 0.019705734146725547,
+                  "mae": 1.2943117613016244
+                },
+                "TE": {
+                  "n": 2373.0,
+                  "brier": 0.07000010315039526,
+                  "log_loss": 0.26736076570448714,
+                  "ece": 0.016005870638477363,
+                  "mae": 1.1474644047674036
+                },
+                "WR": {
+                  "n": 7191.0,
+                  "brier": 0.15867433968891578,
+                  "log_loss": 0.5196197052116076,
+                  "ece": 0.08162750122063324,
+                  "mae": 1.6145498939395242
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.025373617919962715,
+                  "log_loss": 0.12434799902849944,
+                  "ece": 0.019705734146725547,
+                  "mae": 1.2943117613016244
+                },
+                "TE": {
+                  "n": 2373.0,
+                  "brier": 0.07000010315039526,
+                  "log_loss": 0.26736076570448714,
+                  "ece": 0.016005870638477363,
+                  "mae": 1.1474644047674036
+                },
+                "WR": {
+                  "n": 7191.0,
+                  "brier": 0.15867433968891578,
+                  "log_loss": 0.5196197052116076,
+                  "ece": 0.08162750122063324,
+                  "mae": 1.6145498939395242
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 14561.0,
+                "brier": 0.09858759616561623,
+                "log_loss": 0.3443910817385746,
+                "ece": 0.03388799099197034,
+                "mae": 1.4173419690115394
+              },
+              "new": {
+                "n": 14561.0,
+                "brier": 0.09858759616561623,
+                "log_loss": 0.3443910817385746,
+                "ece": 0.03388799099197034,
+                "mae": 1.4173419690115394
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.03170142152201215,
+                  "log_loss": 0.14927307256244618,
+                  "ece": 0.01139870684950155,
+                  "mae": 1.3263137549514654
+                },
+                "TE": {
+                  "n": 2433.0,
+                  "brier": 0.07697182198078809,
+                  "log_loss": 0.2779339594211381,
+                  "ece": 0.008724895165486971,
+                  "mae": 1.1743211677572964
+                },
+                "WR": {
+                  "n": 7089.0,
+                  "brier": 0.15355030072490633,
+                  "log_loss": 0.5058933848612766,
+                  "ece": 0.07283586233825114,
+                  "mae": 1.5654532371876273
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.03170142152201215,
+                  "log_loss": 0.14927307256244618,
+                  "ece": 0.01139870684950155,
+                  "mae": 1.3263137549514654
+                },
+                "TE": {
+                  "n": 2433.0,
+                  "brier": 0.07697182198078809,
+                  "log_loss": 0.2779339594211381,
+                  "ece": 0.008724895165486971,
+                  "mae": 1.1743211677572964
+                },
+                "WR": {
+                  "n": 7089.0,
+                  "brier": 0.15355030072490633,
+                  "log_loss": 0.5058933848612766,
+                  "ece": 0.07283586233825114,
+                  "mae": 1.5654532371876273
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 15172.0,
+                "brier": 0.09970598563533302,
+                "log_loss": 0.3532383906718809,
+                "ece": 0.04028747276575753,
+                "mae": 1.3954181170994993
+              },
+              "new": {
+                "n": 15172.0,
+                "brier": 0.09970598563533302,
+                "log_loss": 0.3532383906718809,
+                "ece": 0.04028747276575753,
+                "mae": 1.3954181170994993
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.030286528074202988,
+                  "log_loss": 0.14565733016923743,
+                  "ece": 0.013065325126212016,
+                  "mae": 1.320500674923398
+                },
+                "TE": {
+                  "n": 2603.0,
+                  "brier": 0.07043874860962883,
+                  "log_loss": 0.27186423497934237,
+                  "ece": 0.016277579698963207,
+                  "mae": 1.090113767316862
+                },
+                "WR": {
+                  "n": 7318.0,
+                  "brier": 0.15992793010532508,
+                  "log_loss": 0.5311319512030448,
+                  "ece": 0.09293366585019852,
+                  "mae": 1.5577710429468496
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.030286528074202988,
+                  "log_loss": 0.14565733016923743,
+                  "ece": 0.013065325126212016,
+                  "mae": 1.320500674923398
+                },
+                "TE": {
+                  "n": 2603.0,
+                  "brier": 0.07043874860962883,
+                  "log_loss": 0.27186423497934237,
+                  "ece": 0.016277579698963207,
+                  "mae": 1.090113767316862
+                },
+                "WR": {
+                  "n": 7318.0,
+                  "brier": 0.15992793010532508,
+                  "log_loss": 0.5311319512030448,
+                  "ece": 0.09293366585019852,
+                  "mae": 1.5577710429468496
+                }
+              }
+            }
+          ]
+        },
+        "anytime_td": {
+          "features": [
+            "workload_delta",
+            "prior_carry_share"
+          ],
+          "distribution": "poisson",
+          "distribution_selection_brier": {},
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.00017010446492793374,
+                "2023": 0.0001607635169944277
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -4.447552672937061e-05,
+                "2023": 2.892551536987087e-05
+              },
+              "train_coverage": {
+                "2022": 0.9692927722427938,
+                "2023": 0.9736995147864279
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.00010851394269778547,
+                "2023": 0.00012380833158778803
+              },
+              "train_coverage": {
+                "2022": 0.9683926269920828,
+                "2023": 0.9727967918616056
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -1.3731545144612944e-05,
+                "2023": 9.734513877174278e-06
+              },
+              "train_coverage": {
+                "2022": 0.9676970602074426,
+                "2023": 0.9722239100054684
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": true,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.0013280496670041997,
+                "2023": 0.0011321527644861107
+              },
+              "train_coverage": {
+                "2022": 0.7458624005237209,
+                "2023": 0.7560044094542866
+              },
+              "reason": "improved the primary metric on both 2022 and 2023"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": -4.248130294565167e-06,
+                "2023": 2.122679590793597e-06
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 3.244055695250658e-05,
+                "2023": 6.270299576149885e-05
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_target_share",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {},
+              "train_coverage": {
+                "2022": 0.0,
+                "2023": 0.0
+              },
+              "reason": "below 30% coverage on the selection seasons; missing values were not filled"
+            },
+            {
+              "feature": "prior_carry_share",
+              "kept": true,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.0015078325272207538,
+                "2023": 0.0014081385522088374
+              },
+              "train_coverage": {
+                "2022": 0.8870113131891737,
+                "2023": 0.8919336498650255
+              },
+              "reason": "improved the primary metric on both 2022 and 2023"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.001,
+              "gains": {
+                "2022": 0.0003489139068367231,
+                "2023": 0.0003185746288972835
+              },
+              "train_coverage": {
+                "2022": 0.8770483418915325,
+                "2023": 0.8831234213198851
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [
+                "workload_delta",
+                "prior_carry_share"
+              ],
+              "m3": {
+                "n": 16440.0,
+                "brier": 0.18771139493792768,
+                "log_loss": 0.5662687102138246,
+                "ece": 0.03696125245113292,
+                "mae": 0.462371754122879
+              },
+              "new": {
+                "n": 16440.0,
+                "brier": 0.18487551274370273,
+                "log_loss": 0.5581356459259574,
+                "ece": 0.026070089797009543,
+                "mae": 0.45832330475107197
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 2189.0,
+                  "brier": 0.17588358682282001,
+                  "log_loss": 0.5354054272729475,
+                  "ece": 0.032666329216145214,
+                  "mae": 0.4563482800014566
+                },
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.20753573788135896,
+                  "log_loss": 0.6117347668572113,
+                  "ece": 0.05017935366134453,
+                  "mae": 0.5213542519293565
+                },
+                "TE": {
+                  "n": 2323.0,
+                  "brier": 0.16665775329946939,
+                  "log_loss": 0.5180612836798512,
+                  "ece": 0.057511090453430086,
+                  "mae": 0.4116924702019004
+                },
+                "WR": {
+                  "n": 6916.0,
+                  "brier": 0.18416007548414395,
+                  "log_loss": 0.5592805237331054,
+                  "ece": 0.04143117070948919,
+                  "mae": 0.4385564103395016
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 2189.0,
+                  "brier": 0.172911340462937,
+                  "log_loss": 0.5264388756806876,
+                  "ece": 0.01903329570269078,
+                  "mae": 0.45761423457751677
+                },
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.20109657350872434,
+                  "log_loss": 0.5935776591536415,
+                  "ece": 0.03663030095651896,
+                  "mae": 0.5202074399151155
+                },
+                "TE": {
+                  "n": 2323.0,
+                  "brier": 0.16544539591812785,
+                  "log_loss": 0.5146444330737041,
+                  "ece": 0.04033962032857494,
+                  "mae": 0.4039379777711381
+                },
+                "WR": {
+                  "n": 6916.0,
+                  "brier": 0.18343331753753125,
+                  "log_loss": 0.5570915376589718,
+                  "ece": 0.03572177657692381,
+                  "mae": 0.4319678946501629
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [
+                "workload_delta",
+                "prior_carry_share"
+              ],
+              "m3": {
+                "n": 16947.0,
+                "brier": 0.18807717400666774,
+                "log_loss": 0.5670631991130959,
+                "ece": 0.04211050455718803,
+                "mae": 0.45913529591089536
+              },
+              "new": {
+                "n": 16947.0,
+                "brier": 0.1855368826899728,
+                "log_loss": 0.5594416390425083,
+                "ece": 0.03329480958727134,
+                "mae": 0.45590101811346667
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 2271.0,
+                  "brier": 0.1873883293260905,
+                  "log_loss": 0.5641594834600115,
+                  "ece": 0.04255637167567014,
+                  "mae": 0.4603103230123241
+                },
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.2063099562440083,
+                  "log_loss": 0.6093626334447707,
+                  "ece": 0.05052398440051029,
+                  "mae": 0.5161571076502601
+                },
+                "TE": {
+                  "n": 2373.0,
+                  "brier": 0.16581537810973704,
+                  "log_loss": 0.5158975784805244,
+                  "ece": 0.052877369800833005,
+                  "mae": 0.40661434995237705
+                },
+                "WR": {
+                  "n": 7191.0,
+                  "brier": 0.18267954156830338,
+                  "log_loss": 0.5547944809523012,
+                  "ece": 0.04347297055173011,
+                  "mae": 0.4355597454451167
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 2271.0,
+                  "brier": 0.1859489276830727,
+                  "log_loss": 0.5583619373380263,
+                  "ece": 0.038903720003152384,
+                  "mae": 0.4651940861837424
+                },
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.2007757767188947,
+                  "log_loss": 0.5929835643597793,
+                  "ece": 0.029902783067092827,
+                  "mae": 0.5164911219804554
+                },
+                "TE": {
+                  "n": 2373.0,
+                  "brier": 0.16402975119446006,
+                  "log_loss": 0.5111350171553103,
+                  "ece": 0.03627395896033707,
+                  "mae": 0.3986166205640947
+                },
+                "WR": {
+                  "n": 7191.0,
+                  "brier": 0.18167086163360696,
+                  "log_loss": 0.5518790321849516,
+                  "ece": 0.03356513054669278,
+                  "mae": 0.4287969584317836
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [
+                "workload_delta",
+                "prior_carry_share"
+              ],
+              "m3": {
+                "n": 16838.0,
+                "brier": 0.1845344351910049,
+                "log_loss": 0.5577663016962471,
+                "ece": 0.037518521388418345,
+                "mae": 0.45816265498747166
+              },
+              "new": {
+                "n": 16838.0,
+                "brier": 0.18161200605334743,
+                "log_loss": 0.5496875371153515,
+                "ece": 0.023421897948787504,
+                "mae": 0.4541417551785031
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 2277.0,
+                  "brier": 0.1780683628651823,
+                  "log_loss": 0.5385711003359384,
+                  "ece": 0.035104352392878686,
+                  "mae": 0.45957748061620696
+                },
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.20415149911821223,
+                  "log_loss": 0.6034935184121556,
+                  "ece": 0.041286372594270065,
+                  "mae": 0.5268209219280999
+                },
+                "TE": {
+                  "n": 2433.0,
+                  "brier": 0.16807226414471188,
+                  "log_loss": 0.520829661915667,
+                  "ece": 0.04562213238382277,
+                  "mae": 0.40454169766848497
+                },
+                "WR": {
+                  "n": 7089.0,
+                  "brier": 0.178317101817092,
+                  "log_loss": 0.5441049775394,
+                  "ece": 0.04440276132908511,
+                  "mae": 0.42730769999898804
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 2277.0,
+                  "brier": 0.17516739806061649,
+                  "log_loss": 0.5305772765859884,
+                  "ece": 0.015388133599094335,
+                  "mae": 0.46152219509134695
+                },
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.19810346691233705,
+                  "log_loss": 0.5866501436184604,
+                  "ece": 0.021106912288782982,
+                  "mae": 0.526147317783046
+                },
+                "TE": {
+                  "n": 2433.0,
+                  "brier": 0.1667369288573338,
+                  "log_loss": 0.5170985682657465,
+                  "ece": 0.02712253194160669,
+                  "mae": 0.39671535145951214
+                },
+                "WR": {
+                  "n": 7089.0,
+                  "brier": 0.17706481518706177,
+                  "log_loss": 0.5407368318349569,
+                  "ece": 0.029778441492397122,
+                  "mae": 0.4202973693134257
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [
+                "workload_delta",
+                "prior_carry_share"
+              ],
+              "m3": {
+                "n": 17594.0,
+                "brier": 0.1830165134624362,
+                "log_loss": 0.5575587517928432,
+                "ece": 0.04341608201129504,
+                "mae": 0.4495183993713355
+              },
+              "new": {
+                "n": 17594.0,
+                "brier": 0.17971541821286938,
+                "log_loss": 0.5480058417858136,
+                "ece": 0.03548719779731744,
+                "mae": 0.44569725667173304
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 2422.0,
+                  "brier": 0.1937223893685527,
+                  "log_loss": 0.5841622905502579,
+                  "ece": 0.038671345106797456,
+                  "mae": 0.4781249477800983
+                },
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.20172851743716072,
+                  "log_loss": 0.5992003763606497,
+                  "ece": 0.054063185075147124,
+                  "mae": 0.5006528982321283
+                },
+                "TE": {
+                  "n": 2603.0,
+                  "brier": 0.16138401699245566,
+                  "log_loss": 0.5053606025840603,
+                  "ece": 0.06117496850034764,
+                  "mae": 0.39303406954546866
+                },
+                "WR": {
+                  "n": 7318.0,
+                  "brier": 0.17374116828553907,
+                  "log_loss": 0.5374409383075266,
+                  "ece": 0.050287254333131096,
+                  "mae": 0.423450675508625
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 2422.0,
+                  "brier": 0.18833530418946287,
+                  "log_loss": 0.5686885019658684,
+                  "ece": 0.04082832407931499,
+                  "mae": 0.4768254004954603
+                },
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.1959949767387764,
+                  "log_loss": 0.5820008242972216,
+                  "ece": 0.02947118654726256,
+                  "mae": 0.5016410061992769
+                },
+                "TE": {
+                  "n": 2603.0,
+                  "brier": 0.15916587416821384,
+                  "log_loss": 0.5001977352934951,
+                  "ece": 0.051329408368376614,
+                  "mae": 0.3849744421180985
+                },
+                "WR": {
+                  "n": 7318.0,
+                  "brier": 0.1724906488077575,
+                  "log_loss": 0.533772915450204,
+                  "ece": 0.04261559193507016,
+                  "mae": 0.4168517378377497
+                }
+              }
+            }
+          ]
+        },
+        "receptions": {
+          "features": [],
+          "distribution": "poisson",
+          "distribution_selection_brier": {},
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0003384211743859833,
+                "2023": 0.00021050658512122844
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00014813225009890907,
+                "2023": 0.00016000986123398953
+              },
+              "train_coverage": {
+                "2022": 0.9692927722427938,
+                "2023": 0.9736995147864279
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00022406328857926816,
+                "2023": 0.0001729246885577851
+              },
+              "train_coverage": {
+                "2022": 0.9683926269920828,
+                "2023": 0.9727967918616056
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0006057349161694425,
+                "2023": -0.00046344492319638775
+              },
+              "train_coverage": {
+                "2022": 0.9676970602074426,
+                "2023": 0.9722239100054684
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.002951586569048592,
+                "2023": 0.0045628819029042145
+              },
+              "train_coverage": {
+                "2022": 0.7458624005237209,
+                "2023": 0.7560044094542866
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": 0.00013192286061403102,
+                "2023": 9.413204408104114e-05
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.0002065877122114923,
+                "2023": -0.00016178245532572078
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_target_share",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {},
+              "train_coverage": {
+                "2022": 0.0,
+                "2023": 0.0
+              },
+              "reason": "below 30% coverage on the selection seasons; missing values were not filled"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.02,
+              "gains": {
+                "2022": -0.00012841118049777833,
+                "2023": -0.00022278020365740225
+              },
+              "train_coverage": {
+                "2022": 0.8770483418915325,
+                "2023": 0.8831234213198851
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 14251.0,
+                "brier": 0.1071031824762708,
+                "log_loss": 0.3762185644811237,
+                "ece": 0.04372458177329645,
+                "mae": 1.4561983451860663
+              },
+              "new": {
+                "n": 14251.0,
+                "brier": 0.1071031824762708,
+                "log_loss": 0.3762185644811237,
+                "ece": 0.04372458177329645,
+                "mae": 1.4561983451860663
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.03439276093642462,
+                  "log_loss": 0.16238635623081404,
+                  "ece": 0.01794479482920228,
+                  "mae": 1.3379121665493579
+                },
+                "TE": {
+                  "n": 2323.0,
+                  "brier": 0.0740836629065724,
+                  "log_loss": 0.2804567939620666,
+                  "ece": 0.016944117801492926,
+                  "mae": 1.1583714984853586
+                },
+                "WR": {
+                  "n": 6916.0,
+                  "brier": 0.17088701369635734,
+                  "log_loss": 0.563347196734785,
+                  "ece": 0.09589009972818685,
+                  "mae": 1.6419563110930824
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.03439276093642462,
+                  "log_loss": 0.16238635623081404,
+                  "ece": 0.01794479482920228,
+                  "mae": 1.3379121665493579
+                },
+                "TE": {
+                  "n": 2323.0,
+                  "brier": 0.0740836629065724,
+                  "log_loss": 0.2804567939620666,
+                  "ece": 0.016944117801492926,
+                  "mae": 1.1583714984853586
+                },
+                "WR": {
+                  "n": 6916.0,
+                  "brier": 0.17088701369635734,
+                  "log_loss": 0.563347196734785,
+                  "ece": 0.09589009972818685,
+                  "mae": 1.6419563110930824
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 14676.0,
+                "brier": 0.09790456229801926,
+                "log_loss": 0.34114877134281185,
+                "ece": 0.03431828396463398,
+                "mae": 1.4274790844648453
+              },
+              "new": {
+                "n": 14676.0,
+                "brier": 0.09790456229801926,
+                "log_loss": 0.34114877134281185,
+                "ece": 0.03431828396463398,
+                "mae": 1.4274790844648453
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.025373617919962715,
+                  "log_loss": 0.12434799902849944,
+                  "ece": 0.019705734146725547,
+                  "mae": 1.2943117613016244
+                },
+                "TE": {
+                  "n": 2373.0,
+                  "brier": 0.07000010315039526,
+                  "log_loss": 0.26736076570448714,
+                  "ece": 0.016005870638477363,
+                  "mae": 1.1474644047674036
+                },
+                "WR": {
+                  "n": 7191.0,
+                  "brier": 0.15867433968891578,
+                  "log_loss": 0.5196197052116076,
+                  "ece": 0.08162750122063324,
+                  "mae": 1.6145498939395242
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.025373617919962715,
+                  "log_loss": 0.12434799902849944,
+                  "ece": 0.019705734146725547,
+                  "mae": 1.2943117613016244
+                },
+                "TE": {
+                  "n": 2373.0,
+                  "brier": 0.07000010315039526,
+                  "log_loss": 0.26736076570448714,
+                  "ece": 0.016005870638477363,
+                  "mae": 1.1474644047674036
+                },
+                "WR": {
+                  "n": 7191.0,
+                  "brier": 0.15867433968891578,
+                  "log_loss": 0.5196197052116076,
+                  "ece": 0.08162750122063324,
+                  "mae": 1.6145498939395242
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 14561.0,
+                "brier": 0.09858759616561623,
+                "log_loss": 0.3443910817385746,
+                "ece": 0.03388799099197034,
+                "mae": 1.4173419690115394
+              },
+              "new": {
+                "n": 14561.0,
+                "brier": 0.09858759616561623,
+                "log_loss": 0.3443910817385746,
+                "ece": 0.03388799099197034,
+                "mae": 1.4173419690115394
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.03170142152201215,
+                  "log_loss": 0.14927307256244618,
+                  "ece": 0.01139870684950155,
+                  "mae": 1.3263137549514654
+                },
+                "TE": {
+                  "n": 2433.0,
+                  "brier": 0.07697182198078809,
+                  "log_loss": 0.2779339594211381,
+                  "ece": 0.008724895165486971,
+                  "mae": 1.1743211677572964
+                },
+                "WR": {
+                  "n": 7089.0,
+                  "brier": 0.15355030072490633,
+                  "log_loss": 0.5058933848612766,
+                  "ece": 0.07283586233825114,
+                  "mae": 1.5654532371876273
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.03170142152201215,
+                  "log_loss": 0.14927307256244618,
+                  "ece": 0.01139870684950155,
+                  "mae": 1.3263137549514654
+                },
+                "TE": {
+                  "n": 2433.0,
+                  "brier": 0.07697182198078809,
+                  "log_loss": 0.2779339594211381,
+                  "ece": 0.008724895165486971,
+                  "mae": 1.1743211677572964
+                },
+                "WR": {
+                  "n": 7089.0,
+                  "brier": 0.15355030072490633,
+                  "log_loss": 0.5058933848612766,
+                  "ece": 0.07283586233825114,
+                  "mae": 1.5654532371876273
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 15172.0,
+                "brier": 0.09970598563533302,
+                "log_loss": 0.3532383906718809,
+                "ece": 0.04028747276575753,
+                "mae": 1.3954181170994993
+              },
+              "new": {
+                "n": 15172.0,
+                "brier": 0.09970598563533302,
+                "log_loss": 0.3532383906718809,
+                "ece": 0.04028747276575753,
+                "mae": 1.3954181170994993
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.030286528074202988,
+                  "log_loss": 0.14565733016923743,
+                  "ece": 0.013065325126212016,
+                  "mae": 1.320500674923398
+                },
+                "TE": {
+                  "n": 2603.0,
+                  "brier": 0.07043874860962883,
+                  "log_loss": 0.27186423497934237,
+                  "ece": 0.016277579698963207,
+                  "mae": 1.090113767316862
+                },
+                "WR": {
+                  "n": 7318.0,
+                  "brier": 0.15992793010532508,
+                  "log_loss": 0.5311319512030448,
+                  "ece": 0.09293366585019852,
+                  "mae": 1.5577710429468496
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.030286528074202988,
+                  "log_loss": 0.14565733016923743,
+                  "ece": 0.013065325126212016,
+                  "mae": 1.320500674923398
+                },
+                "TE": {
+                  "n": 2603.0,
+                  "brier": 0.07043874860962883,
+                  "log_loss": 0.27186423497934237,
+                  "ece": 0.016277579698963207,
+                  "mae": 1.090113767316862
+                },
+                "WR": {
+                  "n": 7318.0,
+                  "brier": 0.15992793010532508,
+                  "log_loss": 0.5311319512030448,
+                  "ece": 0.09293366585019852,
+                  "mae": 1.5577710429468496
+                }
+              }
+            }
+          ]
+        },
+        "receiving_yards": {
+          "features": [],
+          "distribution": "lognormal",
+          "distribution_selection_brier": {
+            "gaussian": 0.2682391986007463,
+            "lognormal": 0.2656134886528245
+          },
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.0019414267438442323,
+                "2023": 7.658888541328679e-05
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.003979264359244894,
+                "2023": -0.0007222392465138228
+              },
+              "train_coverage": {
+                "2022": 0.9692927722427938,
+                "2023": 0.9736995147864279
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.00013367376423545352,
+                "2023": 0.0018296994697060143
+              },
+              "train_coverage": {
+                "2022": 0.9683926269920828,
+                "2023": 0.9727967918616056
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.05295264410437284,
+                "2023": -0.03397692356845994
+              },
+              "train_coverage": {
+                "2022": 0.9676970602074426,
+                "2023": 0.9722239100054684
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.008631331946638454,
+                "2023": 0.029883608124698924
+              },
+              "train_coverage": {
+                "2022": 0.7458624005237209,
+                "2023": 0.7560044094542866
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.0021497638386911433,
+                "2023": 0.0028398224881378553
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.01014997928609418,
+                "2023": -0.014058287167532768
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_target_share",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {},
+              "train_coverage": {
+                "2022": 0.0,
+                "2023": 0.0
+              },
+              "reason": "below 30% coverage on the selection seasons; missing values were not filled"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.0075827589942925044,
+                "2023": -0.016406684905525992
+              },
+              "train_coverage": {
+                "2022": 0.8770483418915325,
+                "2023": 0.8831234213198851
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 14251.0,
+                "brier": 0.13500272234286537,
+                "log_loss": 0.4334144294668618,
+                "ece": 0.04755945797891999,
+                "mae": 21.541024380543355
+              },
+              "new": {
+                "n": 14251.0,
+                "brier": 0.1338641745876411,
+                "log_loss": 0.434707669618197,
+                "ece": 0.040506279904039794,
+                "mae": 21.541024380543355
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.03389786114300067,
+                  "log_loss": 0.16054825098560527,
+                  "ece": 0.04742575585243957,
+                  "mae": 17.107769891129845
+                },
+                "TE": {
+                  "n": 2323.0,
+                  "brier": 0.09995058050695935,
+                  "log_loss": 0.34859344217482,
+                  "ece": 0.006343198492189252,
+                  "mae": 17.40181538039383
+                },
+                "WR": {
+                  "n": 6916.0,
+                  "brier": 0.22004663353698503,
+                  "log_loss": 0.6596498892741887,
+                  "ece": 0.1339488430020654,
+                  "mae": 26.14409754542014
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.03544280781709011,
+                  "log_loss": 0.16627557434270948,
+                  "ece": 0.04167841185853188,
+                  "mae": 17.107769891129845
+                },
+                "TE": {
+                  "n": 2323.0,
+                  "brier": 0.10075822529334964,
+                  "log_loss": 0.3529120593608577,
+                  "ece": 0.02250788950973337,
+                  "mae": 17.40181538039383
+                },
+                "WR": {
+                  "n": 6916.0,
+                  "brier": 0.21630966482255148,
+                  "log_loss": 0.6567135782573733,
+                  "ece": 0.11782698254239808,
+                  "mae": 26.14409754542014
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [],
+              "m3": {
+                "n": 14676.0,
+                "brier": 0.13323647625788093,
+                "log_loss": 0.4276411831520861,
+                "ece": 0.048242320105020046,
+                "mae": 21.12749864151908
+              },
+              "new": {
+                "n": 14676.0,
+                "brier": 0.13174931406518345,
+                "log_loss": 0.42697226866256704,
+                "ece": 0.042014077283909095,
+                "mae": 21.12749864151908
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.02985493070916623,
+                  "log_loss": 0.1465385708760884,
+                  "ece": 0.04564799694462746,
+                  "mae": 16.68743767741449
+                },
+                "TE": {
+                  "n": 2373.0,
+                  "brier": 0.10531226325348904,
+                  "log_loss": 0.36339079947590686,
+                  "ece": 0.012226473102335777,
+                  "mae": 17.09744826764698
+                },
+                "WR": {
+                  "n": 7191.0,
+                  "brier": 0.21594411334652672,
+                  "log_loss": 0.6486761872430988,
+                  "ece": 0.1293623464853759,
+                  "mae": 25.613787222481545
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.030805864298386953,
+                  "log_loss": 0.1485734139070342,
+                  "ece": 0.03822104603033821,
+                  "mae": 16.68743767741449
+                },
+                "TE": {
+                  "n": 2373.0,
+                  "brier": 0.105942105173034,
+                  "log_loss": 0.3663324584387045,
+                  "ece": 0.019486020022969133,
+                  "mae": 17.09744826764698
+                },
+                "WR": {
+                  "n": 7191.0,
+                  "brier": 0.21202513410536344,
+                  "log_loss": 0.6448937281496355,
+                  "ece": 0.11379516053398986,
+                  "mae": 25.613787222481545
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 14561.0,
+                "brier": 0.1279552636331111,
+                "log_loss": 0.41441203982184194,
+                "ece": 0.03739405715316544,
+                "mae": 20.88325721020702
+              },
+              "new": {
+                "n": 14561.0,
+                "brier": 0.12727817957211476,
+                "log_loss": 0.4153266017894065,
+                "ece": 0.030413848974220694,
+                "mae": 20.88325721020702
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.028801346978172746,
+                  "log_loss": 0.14414649985723654,
+                  "ece": 0.04736271933441059,
+                  "mae": 16.63203609099642
+                },
+                "TE": {
+                  "n": 2433.0,
+                  "brier": 0.10114302923838238,
+                  "log_loss": 0.34938020423848365,
+                  "ece": 0.011902821611478587,
+                  "mae": 17.54028994796601
+                },
+                "WR": {
+                  "n": 7089.0,
+                  "brier": 0.2076379766118964,
+                  "log_loss": 0.6288415096844399,
+                  "ece": 0.11120792315008617,
+                  "mae": 25.052440814203997
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.029912717576177868,
+                  "log_loss": 0.14705604918099296,
+                  "ece": 0.04070915081353018,
+                  "mae": 16.63203609099642
+                },
+                "TE": {
+                  "n": 2433.0,
+                  "brier": 0.10148823853756683,
+                  "log_loss": 0.35119509881083355,
+                  "ece": 0.01949766849905716,
+                  "mae": 17.54028994796601
+                },
+                "WR": {
+                  "n": 7089.0,
+                  "brier": 0.2053387649204828,
+                  "log_loss": 0.6280289944175154,
+                  "ece": 0.09513466784938354,
+                  "mae": 25.052440814203997
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [],
+              "m3": {
+                "n": 15172.0,
+                "brier": 0.12747901857101487,
+                "log_loss": 0.4161060518718116,
+                "ece": 0.041791847563541554,
+                "mae": 20.57891857667777
+              },
+              "new": {
+                "n": 15172.0,
+                "brier": 0.12665962812069112,
+                "log_loss": 0.4179117927411576,
+                "ece": 0.036084674335151105,
+                "mae": 20.57891857667777
+              },
+              "m3_by_position": {
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.029575989828379657,
+                  "log_loss": 0.14811012748916802,
+                  "ece": 0.048486511210519806,
+                  "mae": 16.801503501077345
+                },
+                "TE": {
+                  "n": 2603.0,
+                  "brier": 0.09814344260530733,
+                  "log_loss": 0.344279741639429,
+                  "ece": 0.017547908455150415,
+                  "mae": 16.505159200644503
+                },
+                "WR": {
+                  "n": 7318.0,
+                  "brier": 0.20816353731470363,
+                  "log_loss": 0.6339538906895422,
+                  "ece": 0.12223693837522341,
+                  "mae": 24.738416010101165
+                }
+              },
+              "new_by_position": {
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.030606103016048294,
+                  "log_loss": 0.15238383113477497,
+                  "ece": 0.04248287855463423,
+                  "mae": 16.801503501077345
+                },
+                "TE": {
+                  "n": 2603.0,
+                  "brier": 0.09898069504419431,
+                  "log_loss": 0.34813955354405746,
+                  "ece": 0.02929405511011575,
+                  "mae": 16.505159200644503
+                },
+                "WR": {
+                  "n": 7318.0,
+                  "brier": 0.20542777831508857,
+                  "log_loss": 0.6332581257590816,
+                  "ece": 0.10877451982124896,
+                  "mae": 24.738416010101165
+                }
+              }
+            }
+          ]
+        },
+        "rushing_yards": {
+          "features": [
+            "workload_delta",
+            "prior_carry_share"
+          ],
+          "distribution": "lognormal",
+          "distribution_selection_brier": {
+            "gaussian": 0.37309072466797033,
+            "lognormal": 0.3711851304295736
+          },
+          "ablation": [
+            {
+              "feature": "is_home",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.0629867495147245,
+                "2023": -0.14040018760238482
+              },
+              "train_coverage": {
+                "2022": 1.0,
+                "2023": 1.0
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "own_off_epa",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.03524512716678174,
+                "2023": -0.13554063286870743
+              },
+              "train_coverage": {
+                "2022": 0.9692927722427938,
+                "2023": 0.9736995147864279
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "opp_adj_def",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.10776887723915607,
+                "2023": -0.1092426094398462
+              },
+              "train_coverage": {
+                "2022": 0.9683926269920828,
+                "2023": 0.9727967918616056
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "pace",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.001965524920056083,
+                "2023": -0.007237629109539512
+              },
+              "train_coverage": {
+                "2022": 0.9676970602074426,
+                "2023": 0.9722239100054684
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "workload_delta",
+              "kept": true,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.604989556696065,
+                "2023": 0.5326569604486693
+              },
+              "train_coverage": {
+                "2022": 0.7458624005237209,
+                "2023": 0.7560044094542866
+              },
+              "reason": "improved the primary metric on both 2022 and 2023"
+            },
+            {
+              "feature": "team_rz_td",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 0.0012071428682567387,
+                "2023": 0.0037394568865494193
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "team_points_per_opp",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.0027395249348813877,
+                "2023": 0.002238831497113125
+              },
+              "train_coverage": {
+                "2022": 0.9674004214316401,
+                "2023": 0.9720937095836191
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            },
+            {
+              "feature": "prior_carry_share",
+              "kept": true,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": 1.238511097674472,
+                "2023": 1.0155402765378483
+              },
+              "train_coverage": {
+                "2022": 0.8870113131891737,
+                "2023": 0.8919336498650255
+              },
+              "reason": "improved the primary metric on both 2022 and 2023"
+            },
+            {
+              "feature": "usage_x_defense",
+              "kept": false,
+              "minimum_gain": 0.15,
+              "gains": {
+                "2022": -0.02818551955246562,
+                "2023": -0.030708023645733107
+              },
+              "train_coverage": {
+                "2022": 0.8770483418915325,
+                "2023": 0.8831234213198851
+              },
+              "reason": "did not clear the minimum gain on both selection seasons"
+            }
+          ],
+          "windows": [
+            {
+              "season": 2022,
+              "held_out": false,
+              "features": [
+                "workload_delta",
+                "prior_carry_share"
+              ],
+              "m3": {
+                "n": 7201.0,
+                "brier": 0.20261022922108346,
+                "log_loss": 0.5914482494833878,
+                "ece": 0.04234366728306692,
+                "mae": 29.349551090211083
+              },
+              "new": {
+                "n": 7201.0,
+                "brier": 0.18396123164523095,
+                "log_loss": 0.5476854284728316,
+                "ece": 0.020342126567701475,
+                "mae": 27.506050435840546
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 2189.0,
+                  "brier": 0.14787923960474791,
+                  "log_loss": 0.46056860807788147,
+                  "ece": 0.06332408202915854,
+                  "mae": 26.774569381536388
+                },
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.22651408721592756,
+                  "log_loss": 0.6486101678865509,
+                  "ece": 0.06398240117085441,
+                  "mae": 30.474178975344547
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 2189.0,
+                  "brier": 0.14084176460022413,
+                  "log_loss": 0.4387742253703276,
+                  "ece": 0.06276586421791445,
+                  "mae": 25.044258172156564
+                },
+                "RB": {
+                  "n": 5012.0,
+                  "brier": 0.20279373630634828,
+                  "log_loss": 0.595252591998646,
+                  "ece": 0.03280262876431604,
+                  "mae": 28.581242627621123
+                }
+              }
+            },
+            {
+              "season": 2023,
+              "held_out": false,
+              "features": [
+                "workload_delta",
+                "prior_carry_share"
+              ],
+              "m3": {
+                "n": 7383.0,
+                "brier": 0.20512482205696886,
+                "log_loss": 0.5994539902644115,
+                "ece": 0.0399986672833604,
+                "mae": 28.764703801573848
+              },
+              "new": {
+                "n": 7383.0,
+                "brier": 0.1872238987843426,
+                "log_loss": 0.5588392309966825,
+                "ece": 0.021607655378968416,
+                "mae": 27.21650656458733
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 2271.0,
+                  "brier": 0.1595299295094933,
+                  "log_loss": 0.4903013486256578,
+                  "ece": 0.04803606775849175,
+                  "mae": 27.405493959873883
+                },
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.2253802995560528,
+                  "log_loss": 0.6479449231989988,
+                  "ece": 0.05554373225882596,
+                  "mae": 29.368531178432335
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 2271.0,
+                  "brier": 0.15131120419013774,
+                  "log_loss": 0.4661465931590537,
+                  "ece": 0.0601054906795173,
+                  "mae": 25.936593277903604
+                },
+                "RB": {
+                  "n": 5112.0,
+                  "brier": 0.2031780712067681,
+                  "log_loss": 0.6000178265618733,
+                  "ece": 0.03134629126611769,
+                  "mae": 27.78510653995093
+                }
+              }
+            },
+            {
+              "season": 2024,
+              "held_out": true,
+              "features": [
+                "workload_delta",
+                "prior_carry_share"
+              ],
+              "m3": {
+                "n": 7316.0,
+                "brier": 0.20352826658234244,
+                "log_loss": 0.5945893961954237,
+                "ece": 0.04366513640507973,
+                "mae": 28.660662789556383
+              },
+              "new": {
+                "n": 7316.0,
+                "brier": 0.1831797138013201,
+                "log_loss": 0.5468676598745226,
+                "ece": 0.023618441727841635,
+                "mae": 26.86104763516467
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 2277.0,
+                  "brier": 0.15328155700515272,
+                  "log_loss": 0.47595082182362314,
+                  "ece": 0.045821861831617086,
+                  "mae": 26.507184920878405
+                },
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.226233517169217,
+                  "log_loss": 0.6481992461348144,
+                  "ece": 0.06475610570541923,
+                  "mae": 29.633766402769275
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 2277.0,
+                  "brier": 0.1426828077311506,
+                  "log_loss": 0.44777649799512087,
+                  "ece": 0.05361296251497197,
+                  "mae": 24.658906734052287
+                },
+                "RB": {
+                  "n": 5039.0,
+                  "brier": 0.20147926830058102,
+                  "log_loss": 0.5916445155203645,
+                  "ece": 0.025618380150175087,
+                  "mae": 27.856140874266256
+                }
+              }
+            },
+            {
+              "season": 2025,
+              "held_out": true,
+              "features": [
+                "workload_delta",
+                "prior_carry_share"
+              ],
+              "m3": {
+                "n": 7673.0,
+                "brier": 0.2086814664382807,
+                "log_loss": 0.608181635373424,
+                "ece": 0.04891004969225152,
+                "mae": 28.735027396400888
+              },
+              "new": {
+                "n": 7673.0,
+                "brier": 0.18547133010563047,
+                "log_loss": 0.5537641515113875,
+                "ece": 0.020162021816661404,
+                "mae": 26.919984442568307
+              },
+              "m3_by_position": {
+                "QB": {
+                  "n": 2422.0,
+                  "brier": 0.15802145953753385,
+                  "log_loss": 0.488978603284127,
+                  "ece": 0.043513489850086115,
+                  "mae": 27.859307208681305
+                },
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.2320481654886728,
+                  "log_loss": 0.6631634947754954,
+                  "ece": 0.07724039051679449,
+                  "mae": 29.138949372149664
+                }
+              },
+              "new_by_position": {
+                "QB": {
+                  "n": 2422.0,
+                  "brier": 0.14289398214126703,
+                  "log_loss": 0.449912114579741,
+                  "ece": 0.050654218123126905,
+                  "mae": 25.587077943122658
+                },
+                "RB": {
+                  "n": 5251.0,
+                  "brier": 0.20510993927906185,
+                  "log_loss": 0.6016654338287457,
+                  "ece": 0.03751021031075545,
+                  "mae": 27.534781536770815
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "recommendation": "keep_m3"
+}

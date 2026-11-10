@@ -1,0 +1,249 @@
+{
+  "status": "ok",
+  "league_id": "nfl",
+  "holdout_start": "2024-09-01T00:00:00+00:00",
+  "train_n": 2096,
+  "test_n": 692,
+  "model_version_id": "ats-ridge-nfl-20240901",
+  "backtest_run_id": "2ff64322-5a0c-41ab-b139-b273f3a7bf6a",
+  "comparisons": {
+    "league_home_mean": {
+      "family": "league_home_mean",
+      "regression": {
+        "n": 692,
+        "mae": 10.961924447337069,
+        "rmse": 14.103223513275708,
+        "bias": -0.0185075894630017,
+        "corr": -4.3683491682230253e-17
+      },
+      "cover": {
+        "n": 681,
+        "brier": 0.2718772965195541,
+        "log_loss": 0.7429057299526708,
+        "ece": 0.12905881941657368,
+        "accuracy": 0.4977973568281938,
+        "base_rate": 0.5022026431718062,
+        "mean_p": 0.5023916619677841,
+        "market_baseline": {
+          "n": 681,
+          "brier": 0.250671885215681,
+          "log_loss": 0.6944960101769935,
+          "ece": 0.021602075421829757,
+          "accuracy": 0.5080763582966226,
+          "base_rate": 0.5022026431718062,
+          "mean_p": 0.5238047185936359,
+          "skipped_no_price": 0,
+          "note": "Vigged implied probabilities from nflverse home_spread_odds when present. Consensus prices are not executable sportsbook ticks. Missing prices excluded."
+        },
+        "flat_stake": {
+          "n": 681,
+          "flat_stake_roi": -0.04421452202611439,
+          "note": "Hypothetical flat $1 on the model-favored side at consensus closing price. Not a profit claim. Closing consensus \u2260 live book ticks."
+        },
+        "beats_market_brier": false
+      },
+      "sigma": 14.189577470534136,
+      "train_n": 2096
+    },
+    "simple_rating": {
+      "family": "simple_rating",
+      "regression": {
+        "n": 692,
+        "mae": 10.72489719496869,
+        "rmse": 13.811746421540011,
+        "bias": 0.6842865898966091,
+        "corr": 0.23134386120544853
+      },
+      "cover": {
+        "n": 681,
+        "brier": 0.2728033770643147,
+        "log_loss": 0.7465525617375344,
+        "ece": 0.11822570698377206,
+        "accuracy": 0.49632892804698975,
+        "base_rate": 0.5022026431718062,
+        "mean_p": 0.5209012228191109,
+        "market_baseline": {
+          "n": 681,
+          "brier": 0.250671885215681,
+          "log_loss": 0.6944960101769935,
+          "ece": 0.021602075421829757,
+          "accuracy": 0.5080763582966226,
+          "base_rate": 0.5022026431718062,
+          "mean_p": 0.5238047185936359,
+          "skipped_no_price": 0,
+          "note": "Vigged implied probabilities from nflverse home_spread_odds when present. Consensus prices are not executable sportsbook ticks. Missing prices excluded."
+        },
+        "flat_stake": {
+          "n": 681,
+          "flat_stake_roi": -0.050903336604640886,
+          "note": "Hypothetical flat $1 on the model-favored side at consensus closing price. Not a profit claim. Closing consensus \u2260 live book ticks."
+        },
+        "beats_market_brier": false
+      },
+      "sigma": 14.189577470534136,
+      "train_n": 2096
+    },
+    "ridge_margin": {
+      "family": "ridge_margin",
+      "regression": {
+        "n": 692,
+        "mae": 10.420511995514062,
+        "rmse": 13.438329573157645,
+        "bias": 0.5940058439444093,
+        "corr": 0.306389745782715
+      },
+      "cover": {
+        "n": 681,
+        "brier": 0.25049563207953307,
+        "log_loss": 0.6941436908343068,
+        "ece": 0.016355758098367215,
+        "accuracy": 0.5036710719530103,
+        "base_rate": 0.5022026431718062,
+        "mean_p": 0.4919498676570026,
+        "market_baseline": {
+          "n": 681,
+          "brier": 0.250671885215681,
+          "log_loss": 0.6944960101769935,
+          "ece": 0.021602075421829757,
+          "accuracy": 0.5080763582966226,
+          "base_rate": 0.5022026431718062,
+          "mean_p": 0.5238047185936359,
+          "skipped_no_price": 0,
+          "note": "Vigged implied probabilities from nflverse home_spread_odds when present. Consensus prices are not executable sportsbook ticks. Missing prices excluded."
+        },
+        "flat_stake": {
+          "n": 681,
+          "flat_stake_roi": -0.036694494800463405,
+          "note": "Hypothetical flat $1 on the model-favored side at consensus closing price. Not a profit claim. Closing consensus \u2260 live book ticks."
+        },
+        "beats_market_brier": true
+      },
+      "sigma": 13.373715952806107,
+      "train_n": 2096
+    }
+  },
+  "feature_ablation": {
+    "core_epa": {
+      "n": 692,
+      "mae": 10.901293961009708,
+      "rmse": 13.994790107283091,
+      "bias": 0.13049986592018842,
+      "corr": 0.12813984439909057
+    },
+    "plus_success_pace": {
+      "n": 692,
+      "mae": 10.886135887083762,
+      "rmse": 13.988328631586853,
+      "bias": 0.34771810166744666,
+      "corr": 0.1322787990890014
+    },
+    "plus_scoring": {
+      "n": 692,
+      "mae": 10.633205170419874,
+      "rmse": 13.730176057268777,
+      "bias": 0.045664647746303785,
+      "corr": 0.23219699711580602
+    },
+    "plus_rest_weather": {
+      "n": 692,
+      "mae": 10.90059390754298,
+      "rmse": 13.974451495671909,
+      "bias": 0.294764388604131,
+      "corr": 0.13790922484525922
+    },
+    "full": {
+      "n": 692,
+      "mae": 10.450200890880739,
+      "rmse": 13.475181599736484,
+      "bias": 0.5898265466512777,
+      "corr": 0.29804032813307807
+    },
+    "_best_by_mae": "full",
+    "_note": "Lower MAE is better. Groups are nested expansions; do not overfit to this single holdout."
+  },
+  "simulation_compare": {
+    "status": "ok",
+    "n": 296,
+    "model": {
+      "n": 296,
+      "brier": 0.25090793588621113,
+      "log_loss": 0.6949724467429057,
+      "ece": 0.03243448790795882,
+      "accuracy": 0.48986486486486486,
+      "base_rate": 0.5236486486486487,
+      "mean_p": 0.49121416074068985
+    },
+    "simulation": {
+      "n": 296,
+      "brier": 0.26751594763513514,
+      "log_loss": 0.7341301982108366,
+      "ece": 0.10607094594594593,
+      "accuracy": 0.5304054054054054,
+      "base_rate": 0.5236486486486487,
+      "mean_p": 0.5216993243243243
+    },
+    "improves_brier": false,
+    "decision": "keep_closed_form_normal \u2014 simulation did not measurably improve cover Brier",
+    "note": "ATS margin sim is independent of Anytime TD correlated simulation paths."
+  },
+  "market_line_coverage": {
+    "train_with_spread": 2096,
+    "test_with_spread": 692,
+    "source": "nflverse_consensus",
+    "note": "NFL consensus closing spreads from nflverse \u2014 not bookmaker ticks."
+  },
+  "slices": {
+    "overall": {
+      "n": 692,
+      "mae": 10.420511995514062,
+      "rmse": 13.438329573157645,
+      "bias": 0.5940058439444093,
+      "corr": 0.306389745782715
+    },
+    "spread_0_3": {
+      "n": 267,
+      "mae": 10.128608584530692,
+      "rmse": 13.074624780651357,
+      "bias": 1.248093721088181,
+      "corr": 0.11962693432756905
+    },
+    "spread_3_7": {
+      "n": 289,
+      "mae": 10.232502192750053,
+      "rmse": 13.160810006815773,
+      "bias": 1.6969385358787878,
+      "corr": 0.30912556966708366
+    },
+    "spread_7_plus": {
+      "n": 136,
+      "mae": 11.393107905303454,
+      "rmse": 14.66990957544362,
+      "bias": -3.0338545322792854,
+      "corr": 0.4132659509058718
+    },
+    "home_favorites": {
+      "n": 411,
+      "mae": 10.272570564027502,
+      "rmse": 13.201226853804624,
+      "bias": -2.203371009162275,
+      "corr": 0.21303785923510116
+    },
+    "home_dogs": {
+      "n": 281,
+      "mae": 10.636896082136749,
+      "rmse": 13.777777392417915,
+      "bias": 4.685542807029276,
+      "corr": 0.030198963606885135
+    },
+    "higher_sample": {
+      "n": 362,
+      "mae": 10.094113516554657,
+      "rmse": 13.080929066336724,
+      "bias": 1.348778306447508,
+      "corr": 0.28596000982444575
+    }
+  },
+  "research_only": true,
+  "play_enabled": false,
+  "generated_at": "2026-11-07T14:14:08.582844+00:00"
+}
