@@ -23,5 +23,6 @@ RUN mkdir -p /data/parquet
 
 EXPOSE 8000
 
-# Default: API. Cron services override the command.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form so ${PORT} works on Render (they inject PORT; local defaults to 8000).
+# Cron / one-off jobs override the command in the host config.
+CMD sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'
