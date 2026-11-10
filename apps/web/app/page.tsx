@@ -23,7 +23,10 @@ export default async function TodayPage({
   let error: string | null = null;
   try {
     days = await apiGet<SlateDays>(`/v1/days?league=${league}`);
-    const selectedDate = dateParam || days.today;
+    // If today is dark, land on the next day that actually has games.
+    const fallback =
+      days.dates.includes(days.today) ? days.today : (days.dates[0] ?? days.today);
+    const selectedDate = dateParam || fallback;
     const [slate, board] = await Promise.all([
       apiGet<SlateResponse>(`/v1/slate?league=${league}&date=${selectedDate}`),
       apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff`, 30000).catch(() => ({ rows: [] as AtsRow[] })),
@@ -34,7 +37,9 @@ export default async function TodayPage({
     error = e instanceof Error ? e.message : "API unavailable";
   }
   const today = days?.today ?? "";
-  const selected = dateParam || today;
+  const fallback =
+    days && days.dates.includes(today) ? today : (days?.dates[0] ?? today);
+  const selected = dateParam || fallback;
   const next = days?.dates.find((d) => d > selected) ?? null;
   const visible = [...(data?.games ?? [])].sort(byKick);
   const openCalls = calls.filter((row) => row.game_status !== "final");
