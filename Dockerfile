@@ -19,7 +19,12 @@ ENV PYTHONPATH=/app/packages/core:/app/services/api:/app/services/worker
 ENV PARQUET_DIR=/data/parquet
 ENV APP_ENV=prod
 
-RUN mkdir -p /data/parquet
+# Model weights + research/ATS board caches so cloud serves like local.
+# Fresh DB rows still come from Postgres; these files are the trained artifacts.
+COPY deploy/runtime-data/parquet /data/parquet
+COPY deploy/runtime-data/research /data/research
+COPY deploy/runtime-data/cache /data/cache
+RUN mkdir -p /data/parquet /data/research /data/cache
 
 EXPOSE 8000
 

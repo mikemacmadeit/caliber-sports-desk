@@ -1,0 +1,302 @@
+{
+  "status": "ok",
+  "as_of": "2026-11-07T03:44:49.281942+00:00",
+  "play_enabled": false,
+  "promoted": false,
+  "research_only": true,
+  "validated_play": false,
+  "1_data_problems_fixed": {
+    "fbs_2026_player_game_stats": {
+      "finals_2026": 629,
+      "finals_with_stats": 629,
+      "coverage_pct": 1.0,
+      "pgs_rows_2026": 14450,
+      "pgs_with_tds": 3202,
+      "flowing_into_db": true,
+      "root_cause_fixed": [
+        "DEFAULT_SEASONS previously excluded 2026 (range end exclusive)",
+        "CFBD box scores keyed as fbs:{id} while 2026 games stored as espn:fbs:{id}; mapper now bridges both",
+        "Final 2026 games stayed data_tier=upcoming; load_model_frame requires historical \u2014 ESPN scoreboard was demoting historical\u2192upcoming; fixed via board_tier + refresh_board_tiers"
+      ],
+      "remaining_gaps": [
+        "No 2026 FBS play-by-play yet \u2014 team_analytics / own_off_epa / opp_def_z remain empty for 2026 rows (not invented)",
+        "Production M5/Player TD artifacts not retrained on 2026 (research-only constraint)"
+      ],
+      "tier_promotions": 823,
+      "feature_frame_rows_2026": 13560
+    },
+    "sparse_fallback_oos": {
+      "nfl_report": "data\\research\\atd_unified\\sparse_fallback_oos_nfl.json",
+      "fbs_report": "data\\research\\atd_unified\\sparse_fallback_oos_fbs.json",
+      "retain_any_fallback_vs_own_base": true,
+      "beats_best_sparse_model": false,
+      "note": "FBS GBM hierarchical blends beat raw GBM on sparse rows but not Player TD v1 (still best). NFL fallbacks worsen Player TD v1. No production apply.",
+      "applied_to_production": false
+    }
+  },
+  "2_sparse_player_accuracy_improved": {
+    "improved_oos_vs_best_model": false,
+    "nfl": {
+      "sparse_best": "player_td_v1",
+      "sparse_n": 321,
+      "retain_any_vs_base": false,
+      "recommendation": "No fallback cleared the OOS bar \u2014 keep current models; continue flagging sparse rows."
+    },
+    "fbs": {
+      "sparse_best": "player_td_v1",
+      "sparse_n": 1983,
+      "retain_any_vs_base": true,
+      "gbm_fallback_helps_gbm_only": true,
+      "recommendation": "Keep Player TD v1 / M5 routing; optional research GBM\u2190hier blend does not beat v1 on sparse FBS."
+    }
+  },
+  "3_fbs_2026_stats_flowing": true,
+  "fbs_2026_detail": {
+    "finals_2026": 629,
+    "finals_with_stats": 629,
+    "coverage_pct": 1.0,
+    "pgs_rows_2026": 14450,
+    "pgs_with_tds": 3202,
+    "flowing_into_db": true,
+    "root_cause_fixed": [
+      "DEFAULT_SEASONS previously excluded 2026 (range end exclusive)",
+      "CFBD box scores keyed as fbs:{id} while 2026 games stored as espn:fbs:{id}; mapper now bridges both",
+      "Final 2026 games stayed data_tier=upcoming; load_model_frame requires historical \u2014 ESPN scoreboard was demoting historical\u2192upcoming; fixed via board_tier + refresh_board_tiers"
+    ],
+    "remaining_gaps": [
+      "No 2026 FBS play-by-play yet \u2014 team_analytics / own_off_epa / opp_def_z remain empty for 2026 rows (not invented)",
+      "Production M5/Player TD artifacts not retrained on 2026 (research-only constraint)"
+    ],
+    "feature_frame_rows_2026": 13560
+  },
+  "4_genuine_pregame_settled": {
+    "shadow_rows_captured": {
+      "player_td_v1": 51,
+      "m6_hist_gbm": 51,
+      "ensemble": 51,
+      "m5": 1419,
+      "m6_shrink": 1331,
+      "atd_sim_v1": 750,
+      "total_anytime": 9287
+    },
+    "settlement_by_result": {},
+    "settled_win_loss_research": 0,
+    "freeze_verification": {
+      "status": "ok",
+      "freeze_path": "data\\research\\atd_unified\\prospective\\latest_freeze.json",
+      "frozen_at": "2026-11-07T03:08:25.743821+00:00",
+      "n_games": 22,
+      "n_ok": 20,
+      "n_with_issues": 2,
+      "artifact_hashes": {
+        "nfl_m6_hist_gbm": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+        "fbs_m6_hist_gbm": "4aee8613847af674f66a3dedf55e9475eeb3e013debe4a321131592a63748bfc",
+        "nfl_m6_meta": "44b3ee855fab4fd0e8444fb47d73c8f23327afc4ddb4f1b4ce3ff04ba4fd0874",
+        "fbs_m6_meta": "49341a61dce16ef0ed09d8b041417a47d3c8967cf59ccede0cdb832af7a75086"
+      },
+      "m6_hist_gbm_version": "m6_hist_gbm_v1",
+      "issues": [
+        {
+          "game_id": "fbs-ala-lsu",
+          "league_id": "fbs",
+          "kickoff_utc": "2026-11-07T20:00:00+00:00",
+          "frozen_at": "2026-11-07T03:08:25.743821+00:00",
+          "holdout_tag": "prospective_unexamined",
+          "db_status": "scheduled",
+          "n_players": 4,
+          "n_priced_players": 0,
+          "price_coverage": 0.0,
+          "issues": [
+            "no_sportsbook_anytime_td_ticks_for_game"
+          ],
+          "immutable_file": true
+        },
+        {
+          "game_id": "fbs-ore-wash",
+          "league_id": "fbs",
+          "kickoff_utc": "2026-11-07T20:00:00+00:00",
+          "frozen_at": "2026-11-07T03:08:25.743821+00:00",
+          "holdout_tag": "prospective_unexamined",
+          "db_status": "scheduled",
+          "n_players": 2,
+          "n_priced_players": 0,
+          "price_coverage": 0.0,
+          "issues": [
+            "no_sportsbook_anytime_td_ticks_for_game"
+          ],
+          "immutable_file": true
+        }
+      ],
+      "shadow_connection": "use ingest_freeze_into_shadow to write append-only ShadowPrediction rows",
+      "settlement_connection": "existing settle_shadow_predictions grades shadow_predictions"
+    },
+    "ingest": {
+      "status": "skipped"
+    },
+    "settle": {
+      "settled": 0,
+      "already_settled": 0,
+      "blocked": 0,
+      "pending": 18839,
+      "by_result": {},
+      "blockers": {},
+      "status": "ok"
+    },
+    "note": "Only 0 settled win/loss rows \u2014 do not claim model superiority from this sample."
+  },
+  "5_best_model_identical_games": {
+    "prospective_settled": {
+      "nfl": null,
+      "fbs": null,
+      "n_settled_rows": 0,
+      "note": "No genuine pregame win/loss settlements yet."
+    },
+    "historical_oos_chronological_holdout": {
+      "nfl_full_best": "m6_hist_gbm",
+      "nfl_sparse_best": "player_td_v1",
+      "nfl_full_top": [
+        {
+          "model": "m6_hist_gbm",
+          "n": 2705.0,
+          "brier": 0.10368002931560343,
+          "log_loss": 0.3508426526139073,
+          "ece": 0.014517223589260634,
+          "base_rate": 0.14048059149722736,
+          "mean_p": 0.1302371098460083
+        },
+        {
+          "model": "gbm_blend_hier",
+          "n": 2705.0,
+          "brier": 0.10379820647685853,
+          "log_loss": 0.3405939945766194,
+          "ece": 0.011590142687365823,
+          "base_rate": 0.14048059149722736,
+          "mean_p": 0.14619105586873518
+        },
+        {
+          "model": "gbm_hard_sparse_hier",
+          "n": 2705.0,
+          "brier": 0.10409471247576763,
+          "log_loss": 0.34534229702847635,
+          "ece": 0.016367885119743585,
+          "base_rate": 0.14048059149722736,
+          "mean_p": 0.1439294725845124
+        }
+      ],
+      "nfl_sparse_top": [
+        {
+          "model": "player_td_v1",
+          "n": 321.0,
+          "brier": 0.057912054648507315,
+          "log_loss": 0.22196352538085998,
+          "ece": 0.02138126171822181,
+          "base_rate": 0.06230529595015576,
+          "mean_p": 0.06980339204926946
+        },
+        {
+          "model": "m6_hist_gbm",
+          "n": 321.0,
+          "brier": 0.06099871488603921,
+          "log_loss": 0.3101385542535567,
+          "ece": 0.04118432344168459,
+          "base_rate": 0.06230529595015576,
+          "mean_p": 0.021120972508471173
+        },
+        {
+          "model": "gbm_blend_hier",
+          "n": 321.0,
+          "brier": 0.061533499251471245,
+          "log_loss": 0.24999252829551194,
+          "ece": 0.049230436777070105,
+          "base_rate": 0.06230529595015576,
+          "mean_p": 0.11153573272722588
+        }
+      ],
+      "fbs_full_best": "player_td_v1",
+      "fbs_sparse_best": "player_td_v1",
+      "fbs_full_top": [
+        {
+          "model": "player_td_v1",
+          "n": 7588.0,
+          "brier": 0.17429701033985678,
+          "log_loss": 0.530224408911005,
+          "ece": 0.026240275790196155,
+          "base_rate": 0.23840274117026886,
+          "mean_p": 0.2620124660303777
+        },
+        {
+          "model": "v1_blend_hier",
+          "n": 7588.0,
+          "brier": 0.17450107463705194,
+          "log_loss": 0.5316275437803037,
+          "ece": 0.04308324408091394,
+          "base_rate": 0.23840274117026886,
+          "mean_p": 0.2708787408194856
+        },
+        {
+          "model": "gbm_blend_hier",
+          "n": 7588.0,
+          "brier": 0.17471853060920514,
+          "log_loss": 0.5329348741066832,
+          "ece": 0.07164202349580358,
+          "base_rate": 0.23840274117026886,
+          "mean_p": 0.3060075226513553
+        }
+      ],
+      "fbs_sparse_top": [
+        {
+          "model": "player_td_v1",
+          "n": 1983.0,
+          "brier": 0.13599301819609871,
+          "log_loss": 0.44307260922242536,
+          "ece": 0.05592139151134722,
+          "base_rate": 0.15632879475542108,
+          "mean_p": 0.21010037451865748
+        },
+        {
+          "model": "v1_blend_hier",
+          "n": 1983.0,
+          "brier": 0.14027200402348414,
+          "log_loss": 0.45722610649485984,
+          "ece": 0.10160332781916617,
+          "base_rate": 0.15632879475542108,
+          "mean_p": 0.25679774687554424
+        },
+        {
+          "model": "hierarchical_only",
+          "n": 1983.0,
+          "brier": 0.14143629792745685,
+          "log_loss": 0.4601026150572974,
+          "ece": 0.1064213140622043,
+          "base_rate": 0.15632879475542108,
+          "mean_p": 0.26125145806231703
+        }
+      ],
+      "includes_m5_sim": false,
+      "note": "On identical chronological holdout rows: NFL overall best = m6_hist_gbm; sparse NFL/FBS best = player_td_v1. M5/atd_sim_v1 need prospective settlements."
+    },
+    "caveat": "Do not claim superiority from prospective samples of size 0."
+  },
+  "6_biggest_remaining_obstacle": "Zero genuine settled pregame research predictions \u2014 cannot decide which model wins on disagreements (esp. sparse rookies). 2026 FBS stats now reach feature frames; need kickoffs to finalize and settle frozen shadows before promotion.",
+  "blockers_before_promotion": [
+    "Validated Play disabled",
+    "Sparse fallback not applied to production (no OOS win vs best sparse model)",
+    "Need larger settled prospective sample",
+    "Ingest 2026 FBS PBP so defense/EPA features populate"
+  ],
+  "3_fbs_2026_feature_flow": {
+    "db_pgs_rows_2026": 14450,
+    "tier_promotions": 823,
+    "involved_frame_rows_2026": 14181,
+    "feature_frame_rows_2026": 13560,
+    "feature_coverage_2026": {
+      "prior_td_rate": 0.8841445427728614,
+      "prior_carries": 0.8841445427728614,
+      "prior_team_td_share": 0.8710914454277287,
+      "opp_def_z": 0.0,
+      "own_off_epa": 0.0
+    },
+    "feature_pipeline": "atd_features_v1",
+    "production_models_retrained": false
+  }
+}

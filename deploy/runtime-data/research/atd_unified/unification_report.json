@@ -1,0 +1,754 @@
+{
+  "status": "ok",
+  "as_of": "2026-11-07T03:08:25.743821+00:00",
+  "play_enabled": false,
+  "promoted": false,
+  "research_only": true,
+  "validated_play": false,
+  "simulator_rebuilt": false,
+  "1_unified_architecture": {
+    "feature_pipeline": "atd_features_v1",
+    "team_scoring": "team_td_v1",
+    "nfl_primary": "player_td_v1",
+    "nfl_ensemble_candidate": "ens_m6_gbm_player_td (optional, research)",
+    "fbs_primary": "m5",
+    "correlated_sim": "atd_sim_v1 (available, not auto-combined)",
+    "m6_hist_gbm_artifact": "m6_hist_gbm_v1",
+    "served_m6_shrink": "preserved (*_m6_player_td.json)"
+  },
+  "2_duplicate_code_consolidated": [
+    {
+      "responsibility": "player_opportunity_features",
+      "canonical": "spe.research.atd_features \u2192 spe.models.player_td.features",
+      "consumers": [
+        "M5 prepare_td_frame",
+        "M6 study frame",
+        "Player TD v1 dataset"
+      ],
+      "removed_duplication": [
+        "rolling_td.prepare_td_frame now calls build_canonical_opportunity_frame",
+        "player_td.dataset.build_player_td_frame prefers canonical opportunity frame"
+      ]
+    },
+    {
+      "responsibility": "team_scoring",
+      "canonical": "team_td_v1",
+      "note": "unchanged; Player TD and sim continue to consume it"
+    },
+    {
+      "responsibility": "player_td_probability",
+      "canonical_nfl": "player_td_v1 (+ optional serialized m6_hist_gbm ensemble)",
+      "canonical_fbs": "m5"
+    },
+    {
+      "responsibility": "correlated_simulation",
+      "canonical": "existing atd_sim_v1 \u2014 not rebuilt"
+    }
+  ],
+  "3_serialized_model_verification": {
+    "nfl": {
+      "status": "ok",
+      "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+      "features": [
+        "prior_td_rate",
+        "roll3_td_rate",
+        "workload_delta",
+        "prior_target_share",
+        "prior_carry_share",
+        "prior_rz_targets",
+        "prior_gl_carries",
+        "own_off_epa",
+        "opp_adj_def",
+        "team_rz_td",
+        "team_points_per_opp",
+        "snap_roll3",
+        "usage_x_defense",
+        "is_home",
+        "roll5_td_rate",
+        "roll3_carries"
+      ],
+      "train_end": "2026-11-06T05:45:00+00:00",
+      "calibration": {
+        "platt_a": 0.1368509838174222,
+        "platt_b": 1.1013441899644256,
+        "method": "platt_global_train_only"
+      },
+      "training_config": {
+        "max_depth": 4,
+        "learning_rate": 0.05,
+        "max_iter": 120,
+        "l2_regularization": 0.1,
+        "early_stopping": true,
+        "validation_fraction": 0.1,
+        "random_state": 7
+      },
+      "shadow_brier": 0.10368002931560343,
+      "train_n": 80632,
+      "test_n": 2705,
+      "reload_verify": {
+        "ok": true,
+        "max_abs_diff": 0.0,
+        "n": 3,
+        "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+        "features": [
+          "prior_td_rate",
+          "roll3_td_rate",
+          "workload_delta",
+          "prior_target_share",
+          "prior_carry_share",
+          "prior_rz_targets",
+          "prior_gl_carries",
+          "own_off_epa",
+          "opp_adj_def",
+          "team_rz_td",
+          "team_points_per_opp",
+          "snap_roll3",
+          "usage_x_defense",
+          "is_home",
+          "roll5_td_rate",
+          "roll3_carries"
+        ],
+        "train_end": "2026-11-06T05:45:00+00:00",
+        "calibration": {
+          "platt_a": 0.1368509838174222,
+          "platt_b": 1.1013441899644256,
+          "method": "platt_global_train_only"
+        }
+      },
+      "served_m6_untouched": true,
+      "meta_path": "data\\parquet\\models\\player_td\\nfl_m6_hist_gbm_v1.json",
+      "model_path": "data\\parquet\\models\\player_td\\nfl_m6_hist_gbm_v1.joblib"
+    },
+    "fbs": {
+      "status": "ok",
+      "model_sha256": "4aee8613847af674f66a3dedf55e9475eeb3e013debe4a321131592a63748bfc",
+      "features": [
+        "prior_td_rate",
+        "roll3_td_rate",
+        "workload_delta",
+        "prior_carry_share",
+        "own_off_epa",
+        "opp_adj_def",
+        "team_rz_td",
+        "team_points_per_opp",
+        "usage_x_defense",
+        "is_home",
+        "prior_targets",
+        "prior_carries"
+      ],
+      "train_end": "2026-11-06T05:30:00+00:00",
+      "calibration": {
+        "platt_a": 0.08402343206631094,
+        "platt_b": 1.0863013521032308,
+        "method": "platt_global_train_only"
+      },
+      "training_config": {
+        "max_depth": 4,
+        "learning_rate": 0.05,
+        "max_iter": 120,
+        "l2_regularization": 0.1,
+        "early_stopping": true,
+        "validation_fraction": 0.1,
+        "random_state": 7
+      },
+      "shadow_brier": 0.1699974028330894,
+      "train_n": 152380,
+      "test_n": 5856,
+      "reload_verify": {
+        "ok": true,
+        "max_abs_diff": 0.0,
+        "n": 3,
+        "model_sha256": "4aee8613847af674f66a3dedf55e9475eeb3e013debe4a321131592a63748bfc",
+        "features": [
+          "prior_td_rate",
+          "roll3_td_rate",
+          "workload_delta",
+          "prior_carry_share",
+          "own_off_epa",
+          "opp_adj_def",
+          "team_rz_td",
+          "team_points_per_opp",
+          "usage_x_defense",
+          "is_home",
+          "prior_targets",
+          "prior_carries"
+        ],
+        "train_end": "2026-11-06T05:30:00+00:00",
+        "calibration": {
+          "platt_a": 0.08402343206631094,
+          "platt_b": 1.0863013521032308,
+          "method": "platt_global_train_only"
+        }
+      },
+      "served_m6_untouched": true,
+      "meta_path": "data\\parquet\\models\\player_td\\fbs_m6_hist_gbm_v1.json",
+      "model_path": "data\\parquet\\models\\player_td\\fbs_m6_hist_gbm_v1.joblib"
+    }
+  },
+  "4_nfl_research_forecast_examples": [
+    {
+      "game_id": "nfl:2026_09_CIN_ATL",
+      "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+      "player_name": "Bijan Robinson",
+      "position_group": "RB",
+      "p_player_td_v1": 0.4058914023429199,
+      "p_m6_hist_gbm": 0.389300409339059,
+      "p_ensemble": 0.39759590584098947,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_CIN_ATL",
+      "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+      "player_name": "Chase Brown",
+      "position_group": "RB",
+      "p_player_td_v1": 0.35300944576770027,
+      "p_m6_hist_gbm": 0.31442079414561663,
+      "p_ensemble": 0.3337151199566585,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_CIN_ATL",
+      "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+      "player_name": "Ja'Marr Chase",
+      "position_group": "WR",
+      "p_player_td_v1": 0.32583190521264244,
+      "p_m6_hist_gbm": 0.4795728346232369,
+      "p_ensemble": 0.4027023699179397,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_CIN_ATL",
+      "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+      "player_name": "Drake London",
+      "position_group": "WR",
+      "p_player_td_v1": 0.3118695344239497,
+      "p_m6_hist_gbm": 0.3861775007567558,
+      "p_ensemble": 0.34902351759035277,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_CIN_ATL",
+      "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+      "player_name": "Tee Higgins",
+      "position_group": "WR",
+      "p_player_td_v1": 0.24942583499547105,
+      "p_m6_hist_gbm": 0.4453265461101457,
+      "p_ensemble": 0.3473761905528084,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_CIN_ATL",
+      "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+      "player_name": "Brian Robinson",
+      "position_group": "RB",
+      "p_player_td_v1": 0.22616990945526735,
+      "p_m6_hist_gbm": 0.19120194275613736,
+      "p_ensemble": 0.20868592610570236,
+      "availability_status": "questionable"
+    },
+    {
+      "game_id": "nfl:2026_09_DEN_CAR",
+      "matchup": "Denver Broncos @ Carolina Panthers",
+      "player_name": "Chuba Hubbard",
+      "position_group": "RB",
+      "p_player_td_v1": 0.2985003401971133,
+      "p_m6_hist_gbm": 0.30821040427694724,
+      "p_ensemble": 0.30335537223703024,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_DEN_CAR",
+      "matchup": "Denver Broncos @ Carolina Panthers",
+      "player_name": "Jonah Coleman",
+      "position_group": "RB",
+      "p_player_td_v1": 0.28033061622999905,
+      "p_m6_hist_gbm": 0.006320096465215395,
+      "p_ensemble": 0.14332535634760724,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_DEN_CAR",
+      "matchup": "Denver Broncos @ Carolina Panthers",
+      "player_name": "J.K. Dobbins",
+      "position_group": "RB",
+      "p_player_td_v1": 0.26467765448013586,
+      "p_m6_hist_gbm": 0.3075617179708644,
+      "p_ensemble": 0.2861196862255001,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_DEN_CAR",
+      "matchup": "Denver Broncos @ Carolina Panthers",
+      "player_name": "Tetairoa McMillan",
+      "position_group": "WR",
+      "p_player_td_v1": 0.22187110285496892,
+      "p_m6_hist_gbm": 0.38679331563693525,
+      "p_ensemble": 0.30433220924595206,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_DEN_CAR",
+      "matchup": "Denver Broncos @ Carolina Panthers",
+      "player_name": "Courtland Sutton",
+      "position_group": "WR",
+      "p_player_td_v1": 0.21138187432019093,
+      "p_m6_hist_gbm": 0.31950629684227944,
+      "p_ensemble": 0.26544408558123517,
+      "availability_status": "probable"
+    },
+    {
+      "game_id": "nfl:2026_09_DEN_CAR",
+      "matchup": "Denver Broncos @ Carolina Panthers",
+      "player_name": "AJ Dillon",
+      "position_group": "RB",
+      "p_player_td_v1": 0.2076530360538495,
+      "p_m6_hist_gbm": 0.18984171487151197,
+      "p_ensemble": 0.19874737546268073,
+      "availability_status": "probable"
+    }
+  ],
+  "5_fbs_research_forecast_examples": [
+    {
+      "game_id": "espn:fbs:401856849",
+      "matchup": "BYU Cougars @ Utah",
+      "player_name": "Bear Bachmeier",
+      "position_group": "QB",
+      "p_m5": 0.43647569589684937,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856849",
+      "matchup": "BYU Cougars @ Utah",
+      "player_name": "Wayshawn Parker",
+      "position_group": "RB",
+      "p_m5": 0.42594134434322145,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856849",
+      "matchup": "BYU Cougars @ Utah",
+      "player_name": "Devon Dampier",
+      "position_group": "QB",
+      "p_m5": 0.6958371478683323,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856849",
+      "matchup": "BYU Cougars @ Utah",
+      "player_name": "NaQuari Rogers",
+      "position_group": "RB",
+      "p_m5": 0.5182066408890281,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856849",
+      "matchup": "BYU Cougars @ Utah",
+      "player_name": "Tiger Bachmeier",
+      "position_group": "WR",
+      "p_m5": 0.11752811122335498,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856849",
+      "matchup": "BYU Cougars @ Utah",
+      "player_name": "Carsen Ryan",
+      "position_group": "TE",
+      "p_m5": 0.1554693164524926,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856855",
+      "matchup": "TCU Horned Frogs @ Arizona",
+      "player_name": "Kevorian Barnes",
+      "position_group": "RB",
+      "p_m5": 0.36381466892321046,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856855",
+      "matchup": "TCU Horned Frogs @ Arizona",
+      "player_name": "Ismail Mahdi",
+      "position_group": "RB",
+      "p_m5": 0.49148535473415644,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856855",
+      "matchup": "TCU Horned Frogs @ Arizona",
+      "player_name": "Jon Denman",
+      "position_group": "RB",
+      "p_m5": 0.21471644907710716,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856855",
+      "matchup": "TCU Horned Frogs @ Arizona",
+      "player_name": "Jordan Dwyer",
+      "position_group": "WR",
+      "p_m5": 0.3856542084511741,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856855",
+      "matchup": "TCU Horned Frogs @ Arizona",
+      "player_name": "Ed Small",
+      "position_group": "WR",
+      "p_m5": 0.2409665514388672,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    },
+    {
+      "game_id": "espn:fbs:401856855",
+      "matchup": "TCU Horned Frogs @ Arizona",
+      "player_name": "Joseph Manjack IV",
+      "position_group": "WR",
+      "p_m5": 0.2449167973204479,
+      "m5_status": "ok",
+      "reject_reason": null,
+      "availability_status": "unknown"
+    }
+  ],
+  "6_remaining_bugs": [
+    "FBS availability_status frequently unknown (injury feed incomplete)",
+    "FBS live opp_def_z often missing \u2014 M5 uses documented z=0 league-average default (flagged opp_def_z_defaulted)",
+    "NFL ensemble uses live feature columns; some HistGBM schema cols may be NaN (native support, not invented)",
+    "Prospective settlement and sportsbook comparison not yet run"
+  ],
+  "7_prospective_tracking_readiness": {
+    "freeze_before_kickoff": true,
+    "examined_games_tagged": true,
+    "baselines_listed": true,
+    "settlement_pending": true,
+    "sportsbook_eval_pending": true,
+    "freeze_path": "data\\research\\atd_unified\\prospective\\freeze_20261107T030825Z.json",
+    "n_games": 22,
+    "n_prospective_unexamined": 22
+  },
+  "8_recommended_next_milestone": [
+    "Settle prospective freezes on genuinely new games; compare vs M3 and sportsbook prices.",
+    "Acquire receiver-vs-defender coverage and OL matchup features \u2014 only after the unified pipe is stable.",
+    "If NFL ensemble continues to win prospectively, decide whether to serve serialized m6_hist_gbm (still research-gated).",
+    "Do not promote; keep Validated Play disabled until prospective Brier/log-loss clear a pre-registered bar."
+  ],
+  "phases": {
+    "1_features": {
+      "nfl": {
+        "league_id": "nfl",
+        "identical": true,
+        "fingerprint": "5954fdca6da376231a7b59e519d7a7673bc55380815345d28598a7085252801d",
+        "rows": 83337,
+        "players": 2177,
+        "coverage_m5": {
+          "prior_td_rate": 0.9738771494054261,
+          "roll3_td_rate": 0.9738771494054261,
+          "workload_delta": 0.928363152021311,
+          "prior_target_share": 0.9723772154025223,
+          "prior_carry_share": 0.9723772154025223,
+          "prior_rz_targets": 0.9679614096979733,
+          "prior_gl_carries": 0.9679614096979733,
+          "own_off_epa": 0.9822047829895485,
+          "opp_adj_def": 0.9809088400110395,
+          "team_rz_td": 0.9819767930211071,
+          "team_points_per_opp": 0.9819767930211071,
+          "snap_roll3": 0.8426989212474651,
+          "usage_x_defense": 0.9576058653419249,
+          "is_home": 1.0
+        },
+        "meta_keys": [
+          "coverage",
+          "defense_features",
+          "eligibility",
+          "fbs_rz_gl_invented",
+          "feature_pipeline",
+          "identity_keys",
+          "injury_features",
+          "label",
+          "lane",
+          "league_id",
+          "leakage_policy",
+          "m5_candidates",
+          "opportunity_candidates",
+          "opportunity_features",
+          "pass_td_excluded",
+          "players",
+          "rows",
+          "td_rate",
+          "universe",
+          "year_max"
+        ],
+        "second_pass_rows": 83337,
+        "second_pass_meta_universe": "corrected",
+        "schema": {
+          "version": "atd_features_v1",
+          "league_id": "nfl",
+          "identity_keys": [
+            "game_id",
+            "player_id",
+            "team_id",
+            "opp_id",
+            "league_id",
+            "kickoff_utc",
+            "position_group"
+          ],
+          "skill_positions": [
+            "QB",
+            "RB",
+            "TE",
+            "WR"
+          ],
+          "m5_candidates": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home"
+          ],
+          "opportunity_candidates": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "roll5_td_rate",
+            "prior_targets",
+            "prior_carries",
+            "prior_receptions",
+            "prior_rec_yards",
+            "prior_rush_yards",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_rz_carries",
+            "prior_gl_carries",
+            "prior_rz_touches",
+            "prior_team_td_share",
+            "workload_delta",
+            "snap_roll3",
+            "snap_delta",
+            "depth_rank",
+            "starter",
+            "roster_active",
+            "own_off_epa",
+            "pace",
+            "team_rz_td",
+            "team_points_per_opp",
+            "is_home",
+            "opp_def_z",
+            "opp_adj_def",
+            "opp_rush_epa_allowed",
+            "opp_pass_epa_allowed",
+            "opp_rush_td_allowed",
+            "opp_rec_td_allowed",
+            "opp_rz_td_allowed",
+            "opp_explosive_allowed",
+            "usage_x_defense",
+            "rz_share_x_rz_def",
+            "carry_x_rush_def",
+            "target_x_pass_def",
+            "prior_inactive_rate",
+            "injury_designation_out",
+            "injury_designation_uncertain",
+            "prior_rush_td_rate",
+            "prior_rec_td_rate",
+            "roll3_rush_td",
+            "roll3_rec_td",
+            "roll3_carries",
+            "roll3_targets"
+          ],
+          "schema_json": "{\"identity\": [\"game_id\", \"player_id\", \"team_id\", \"opp_id\", \"league_id\", \"kickoff_utc\", \"position_group\"], \"m5\": [\"prior_td_rate\", \"roll3_td_rate\", \"workload_delta\", \"prior_target_share\", \"prior_carry_share\", \"prior_rz_targets\", \"prior_gl_carries\", \"own_off_epa\", \"opp_adj_def\", \"team_rz_td\", \"team_points_per_opp\", \"snap_roll3\", \"usage_x_defense\", \"is_home\"], \"opportunity\": [\"prior_td_rate\", \"roll3_td_rate\", \"roll5_td_rate\", \"prior_targets\", \"prior_carries\", \"prior_receptions\", \"prior_rec_yards\", \"prior_rush_yards\", \"prior_target_share\", \"prior_carry_share\", \"prior_rz_targets\", \"prior_rz_carries\", \"prior_gl_carries\", \"prior_rz_touches\", \"prior_team_td_share\", \"workload_delta\", \"snap_roll3\", \"snap_delta\", \"depth_rank\", \"starter\", \"roster_active\", \"own_off_epa\", \"pace\", \"team_rz_td\", \"team_points_per_opp\", \"is_home\", \"opp_def_z\", \"opp_adj_def\", \"opp_rush_epa_allowed\", \"opp_pass_epa_allowed\", \"opp_rush_td_allowed\", \"opp_rec_td_allowed\", \"opp_rz_td_allowed\", \"opp_explosive_allowed\", \"usage_x_defense\", \"rz_share_x_rz_def\", \"carry_x_rush_def\", \"target_x_pass_def\", \"prior_inactive_rate\", \"injury_designation_out\", \"injury_designation_uncertain\", \"prior_rush_td_rate\", \"prior_rec_td_rate\", \"roll3_rush_td\", \"roll3_rec_td\", \"roll3_carries\", \"roll3_targets\"]}"
+        }
+      },
+      "fbs": {
+        "league_id": "fbs",
+        "identical": true,
+        "fingerprint": "9216e86a70ad637477623172ef677f1b9027cf07d8d9127cf300d9af816a7dd7",
+        "rows": 158236,
+        "players": 14748,
+        "coverage_m5": {
+          "prior_td_rate": 0.9085859096539346,
+          "roll3_td_rate": 0.9067974417957987,
+          "workload_delta": 0.7798225435425566,
+          "prior_carry_share": 0.9085859096539346,
+          "own_off_epa": 0.9822733132788999,
+          "opp_adj_def": 0.9817171819307869,
+          "team_rz_td": 0.9811926489547258,
+          "team_points_per_opp": 0.9811926489547258,
+          "usage_x_defense": 0.9024431861270508,
+          "is_home": 1.0
+        },
+        "meta_keys": [
+          "coverage",
+          "defense_features",
+          "fbs_rz_gl_invented",
+          "feature_pipeline",
+          "identity_keys",
+          "injury_features",
+          "label",
+          "lane",
+          "league_id",
+          "leakage_policy",
+          "m5_candidates",
+          "opportunity_candidates",
+          "opportunity_features",
+          "pass_td_excluded",
+          "players",
+          "rows",
+          "td_rate",
+          "universe",
+          "year_max"
+        ],
+        "second_pass_rows": 158236,
+        "second_pass_meta_universe": "involved",
+        "schema": {
+          "version": "atd_features_v1",
+          "league_id": "fbs",
+          "identity_keys": [
+            "game_id",
+            "player_id",
+            "team_id",
+            "opp_id",
+            "league_id",
+            "kickoff_utc",
+            "position_group"
+          ],
+          "skill_positions": [
+            "QB",
+            "RB",
+            "TE",
+            "WR"
+          ],
+          "m5_candidates": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_carry_share",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "usage_x_defense",
+            "is_home"
+          ],
+          "opportunity_candidates": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "roll5_td_rate",
+            "prior_targets",
+            "prior_carries",
+            "prior_receptions",
+            "prior_rec_yards",
+            "prior_rush_yards",
+            "prior_carry_share",
+            "prior_team_td_share",
+            "workload_delta",
+            "own_off_epa",
+            "pace",
+            "team_rz_td",
+            "team_points_per_opp",
+            "is_home",
+            "opp_def_z",
+            "opp_adj_def",
+            "opp_rush_epa_allowed",
+            "opp_pass_epa_allowed",
+            "opp_rush_td_allowed",
+            "opp_rec_td_allowed",
+            "opp_rz_td_allowed",
+            "opp_explosive_allowed",
+            "usage_x_defense",
+            "carry_x_rush_def",
+            "prior_inactive_rate",
+            "injury_designation_out",
+            "injury_designation_uncertain",
+            "prior_rush_td_rate",
+            "prior_rec_td_rate",
+            "roll3_rush_td",
+            "roll3_rec_td",
+            "roll3_carries",
+            "roll3_targets"
+          ],
+          "schema_json": "{\"identity\": [\"game_id\", \"player_id\", \"team_id\", \"opp_id\", \"league_id\", \"kickoff_utc\", \"position_group\"], \"m5\": [\"prior_td_rate\", \"roll3_td_rate\", \"workload_delta\", \"prior_carry_share\", \"own_off_epa\", \"opp_adj_def\", \"team_rz_td\", \"team_points_per_opp\", \"usage_x_defense\", \"is_home\"], \"opportunity\": [\"prior_td_rate\", \"roll3_td_rate\", \"roll5_td_rate\", \"prior_targets\", \"prior_carries\", \"prior_receptions\", \"prior_rec_yards\", \"prior_rush_yards\", \"prior_carry_share\", \"prior_team_td_share\", \"workload_delta\", \"own_off_epa\", \"pace\", \"team_rz_td\", \"team_points_per_opp\", \"is_home\", \"opp_def_z\", \"opp_adj_def\", \"opp_rush_epa_allowed\", \"opp_pass_epa_allowed\", \"opp_rush_td_allowed\", \"opp_rec_td_allowed\", \"opp_rz_td_allowed\", \"opp_explosive_allowed\", \"usage_x_defense\", \"carry_x_rush_def\", \"prior_inactive_rate\", \"injury_designation_out\", \"injury_designation_uncertain\", \"prior_rush_td_rate\", \"prior_rec_td_rate\", \"roll3_rush_td\", \"roll3_rec_td\", \"roll3_carries\", \"roll3_targets\"]}"
+        }
+      }
+    },
+    "2_serialize": {
+      "nfl": {
+        "status": "skipped_serialize",
+        "artifact_present": true,
+        "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f"
+      },
+      "fbs": {
+        "status": "skipped_serialize",
+        "artifact_present": true,
+        "model_sha256": "4aee8613847af674f66a3dedf55e9475eeb3e013debe4a321131592a63748bfc"
+      }
+    },
+    "3_5_forecast": {
+      "status": "ok",
+      "routing": {
+        "nfl_primary": "player_td_v1",
+        "nfl_ensemble_candidate": "ens_m6_gbm_player_td",
+        "fbs_primary": "m5",
+        "team_scoring": "team_td_v1",
+        "correlated_sim": "available_not_auto_combined"
+      },
+      "nfl_games": 2,
+      "fbs_games": 2,
+      "n_rejected": 35,
+      "bugs": [],
+      "forecast_path": "data\\research\\atd_unified\\research_forecasts.json"
+    },
+    "4_consistency": {
+      "reject_policy": "omit non-finite player features; never invent RZ/GL; reject when no usable M5 feature betas; opp_def_z defaults to 0 with flag when defense prior missing",
+      "n_rejected": 35,
+      "reject_reasons": {
+        "missing_opp_def_z": 35
+      }
+    },
+    "6_prospective": {
+      "status": "ok",
+      "freeze_path": "data\\research\\atd_unified\\prospective\\freeze_20261107T030825Z.json",
+      "latest_path": "data\\research\\atd_unified\\prospective\\latest_freeze.json",
+      "n_games": 22,
+      "n_prospective_unexamined": 22,
+      "readiness": {
+        "freeze_before_kickoff": true,
+        "examined_games_tagged": true,
+        "baselines_listed": true,
+        "settlement_pending": true,
+        "sportsbook_eval_pending": true,
+        "freeze_path": "data\\research\\atd_unified\\prospective\\freeze_20261107T030825Z.json",
+        "n_games": 22,
+        "n_prospective_unexamined": 22
+      }
+    }
+  },
+  "protected_artifacts_unchanged": true,
+  "served_m6_shrink_unchanged": true
+}

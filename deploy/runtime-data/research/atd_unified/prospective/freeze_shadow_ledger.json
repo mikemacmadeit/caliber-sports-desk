@@ -1,0 +1,17 @@
+{
+  "status": "ok",
+  "written": 0,
+  "unchanged": 1285,
+  "skipped_no_price": 536,
+  "skipped_no_prob": 0,
+  "by_model": {},
+  "play_enabled": false,
+  "research_only": true,
+  "validated_play": false,
+  "recommendation_status": "no_bet",
+  "freeze_frozen_at": "2026-11-07T13:44:46.338918+00:00",
+  "artifact_hashes": {
+    "nfl_m6_hist_gbm": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+    "fbs_m6_hist_gbm": "4aee8613847af674f66a3dedf55e9475eeb3e013debe4a321131592a63748bfc"
+  }
+}

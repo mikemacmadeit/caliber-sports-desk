@@ -1,0 +1,2859 @@
+{
+  "status": "ok",
+  "as_of": "2026-11-07T03:21:53.070044+00:00",
+  "play_enabled": false,
+  "promoted": false,
+  "research_only": true,
+  "validated_play": false,
+  "1_largest_model_disagreements": {
+    "threshold": 0.1,
+    "n": 17,
+    "top": [
+      {
+        "player": "Jonah Coleman",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "RB",
+        "p_v1": 0.28033061622999905,
+        "p_gbm": 0.006320096465215395,
+        "delta": -0.27401051976478363,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Tee Higgins",
+        "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+        "position": "WR",
+        "p_v1": 0.24942583499547105,
+        "p_gbm": 0.4453265461101457,
+        "delta": 0.19590071111467466,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Jalen Coker",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "WR",
+        "p_v1": 0.15047748103098255,
+        "p_gbm": 0.327650121192061,
+        "delta": 0.17717264016107845,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Tommy Tremble",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "TE",
+        "p_v1": 0.07498539889745442,
+        "p_gbm": 0.24302489669136385,
+        "delta": 0.16803949779390942,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Tetairoa McMillan",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "WR",
+        "p_v1": 0.22187110285496892,
+        "p_gbm": 0.38679331563693525,
+        "delta": 0.16492221278196634,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Haynes King",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "QB",
+        "p_v1": 0.005716100911886363,
+        "p_gbm": 0.16453005192671308,
+        "delta": 0.1588139510148267,
+        "root_cause": "inconsistent_or_sparse_inputs"
+      },
+      {
+        "player": "Lil'Jordan Humphrey",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "WR",
+        "p_v1": 0.07725908235056128,
+        "p_gbm": 0.23569268932635304,
+        "delta": 0.15843360697579176,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Dallen Bentley",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "TE",
+        "p_v1": 0.012411646716098566,
+        "p_gbm": 0.17065468326202413,
+        "delta": 0.15824303654592556,
+        "root_cause": "inconsistent_or_sparse_inputs"
+      },
+      {
+        "player": "Ja'Marr Chase",
+        "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+        "position": "WR",
+        "p_v1": 0.32583190521264244,
+        "p_gbm": 0.4795728346232369,
+        "delta": 0.15374092941059447,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Ja'Tavion Sanders",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "TE",
+        "p_v1": 0.0889681352137873,
+        "p_gbm": 0.2229746998240701,
+        "delta": 0.1340065646102828,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Adam Trautman",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "TE",
+        "p_v1": 0.06980959492494997,
+        "p_gbm": 0.19525823635908035,
+        "delta": 0.12544864143413037,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "David Moore",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "WR",
+        "p_v1": 0.09174276154360327,
+        "p_gbm": 0.21567329842348817,
+        "delta": 0.12393053687988491,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Jaylen Waddle",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "WR",
+        "p_v1": 0.20400439030648762,
+        "p_gbm": 0.32277310626198297,
+        "delta": 0.11876871595549535,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Darren Waller",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "TE",
+        "p_v1": 0.19738724418711726,
+        "p_gbm": 0.31234984984832953,
+        "delta": 0.11496260566121227,
+        "root_cause": "legitimate_modeling_difference"
+      },
+      {
+        "player": "Nate Adkins",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "position": "TE",
+        "p_v1": 0.06044748747871544,
+        "p_gbm": 0.17277160488952717,
+        "delta": 0.11232411741081172,
+        "root_cause": "legitimate_modeling_difference"
+      }
+    ],
+    "all": [
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0041496",
+        "player_name": "Jonah Coleman",
+        "team_id": "nfl:DEN",
+        "team_name": "Denver Broncos",
+        "position_group": "RB",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.28033061622999905,
+        "p_m6_hist_gbm": 0.006320096465215395,
+        "delta_gbm_minus_v1": -0.27401051976478363,
+        "abs_delta": 0.27401051976478363,
+        "p_ensemble_reference_only": 0.14332535634760724,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "GBM reacts strongly to player TD/RZ/usage history; Player TD v1 is capped by team \u03bb \u00d7 receiver share so it cannot fully follow a hot individual signal without reallocating team TD mass.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.325 \u2192 ~Poisson 0.277 (after availability/calibration adjustments \u2192 0.280)",
+          "team scoring context: team_lambda_off_td=2.227",
+          "shares: rush_td_share=0.3702482334670247 rec_td_share=0.023684408302049362 (v1 probability mass comes from these; GBM does not use explicit shares)",
+          "GBM feature lean (higher p): high prior_td_rate=0.667"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "missing_information=['snap_roll3']",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:snap_roll3', 'non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Denver Broncos",
+          "lambda_off_td": 2.227057642384538,
+          "lambda_pass_td": 1.3848653963723567,
+          "lambda_rush_td": 0.8421922460121813,
+          "p_off_td": {
+            "0": 0.10784528314992788,
+            "1": 0.2401776620341713,
+            "2": 0.2674447488816259,
+            "3": 0.19853829063747952,
+            "4": 0.11053905436754033,
+            "5+": 0.07545496092925508
+          }
+        },
+        "workload": {
+          "exp_carries": 10.0,
+          "exp_targets": 3.3333333333333335,
+          "exp_receptions": 3.0,
+          "exp_rz_targets": 0.3333333333333333,
+          "exp_gl_carries": 1.6666666666666667,
+          "prior_td_rate": 0.6666666666666666,
+          "roll3_td_rate": 0.6666666666666666,
+          "sample_size": 3.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.6666666666666666,
+            "roll3_td_rate": 0.6666666666666666,
+            "workload_delta": 0.0,
+            "prior_target_share": 0.06114942528735632,
+            "prior_carry_share": 0.2344322344322344,
+            "prior_rz_targets": 0.3333333333333333,
+            "prior_gl_carries": 1.6666666666666667,
+            "own_off_epa": -0.05162960801738615,
+            "opp_adj_def": 0.008062445522054498,
+            "team_rz_td": 0.21889567109567679,
+            "team_points_per_opp": 4.016293449310203,
+            "usage_x_defense": 0.00822102439317973,
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:snap_roll3",
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 13,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "large_model_disagreement",
+            "extreme_model_disagreement"
+          ],
+          "sample_size": 3,
+          "abs_disagreement": 0.27401051976478363,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0036410",
+        "player_name": "Tee Higgins",
+        "team_id": "nfl:CIN",
+        "team_name": "Cincinnati Bengals",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_CIN_ATL",
+        "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+        "p_player_td_v1": 0.24942583499547105,
+        "p_m6_hist_gbm": 0.4453265461101457,
+        "delta_gbm_minus_v1": 0.19590071111467466,
+        "abs_delta": 0.19590071111467466,
+        "p_ensemble_reference_only": 0.3473761905528084,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "GBM reacts strongly to player TD/RZ/usage history; Player TD v1 is capped by team \u03bb \u00d7 receiver share so it cannot fully follow a hot individual signal without reallocating team TD mass.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.313 \u2192 ~Poisson 0.268 (after availability/calibration adjustments \u2192 0.249)",
+          "team scoring context: team_lambda_off_td=2.412",
+          "shares: rush_td_share=0.0060077816851422695 rec_td_share=0.2058350323770481 (v1 probability mass comes from these; GBM does not use explicit shares)",
+          "GBM feature lean (higher p): high prior_td_rate=0.542; hot roll3_td_rate=1.000; elevated prior_rz_targets=1.094"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Cincinnati Bengals",
+          "lambda_off_td": 2.4123894663894676,
+          "lambda_pass_td": 1.6531397115901483,
+          "lambda_rush_td": 0.7592497547993192,
+          "p_off_td": {
+            "0": 0.08960094014294817,
+            "1": 0.21615236417944136,
+            "2": 0.2607218432408322,
+            "3": 0.20965420943060986,
+            "4": 0.12644190160365365,
+            "5+": 0.09742874140251478
+          }
+        },
+        "workload": {
+          "exp_carries": 0.052083333333333336,
+          "exp_targets": 7.520833333333333,
+          "exp_receptions": 4.822916666666667,
+          "exp_rz_targets": 1.09375,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.5416666666666666,
+          "roll3_td_rate": 1.0,
+          "sample_size": 96.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.5416666666666666,
+            "roll3_td_rate": 1.0,
+            "workload_delta": 0.03633725891790413,
+            "prior_target_share": 0.2145991907840492,
+            "prior_carry_share": 0.0017976927613150523,
+            "prior_rz_targets": 1.09375,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.0288612545817483,
+            "opp_adj_def": -0.006708361700496973,
+            "team_rz_td": 0.24008377635621522,
+            "team_points_per_opp": 4.162119941763035,
+            "snap_roll3": 0.31434200038667376,
+            "usage_x_defense": -0.01549087369192195,
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 96,
+          "abs_disagreement": 0.19590071111467466,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0039491",
+        "player_name": "Jalen Coker",
+        "team_id": "nfl:CAR",
+        "team_name": "Carolina Panthers",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.15047748103098255,
+        "p_m6_hist_gbm": 0.327650121192061,
+        "delta_gbm_minus_v1": 0.17717264016107845,
+        "abs_delta": 0.17717264016107845,
+        "p_ensemble_reference_only": 0.23906380111152176,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "Models optimize different objectives (team-coherent allocation vs marginal classification).",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.168 \u2192 ~Poisson 0.155 (after availability/calibration adjustments \u2192 0.150)",
+          "team scoring context: team_lambda_off_td=2.243",
+          "shares: rush_td_share=0.004219040288371391 rec_td_share=0.13076485897407103 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Carolina Panthers",
+          "lambda_off_td": 2.242833364164446,
+          "lambda_pass_td": 1.33976960431538,
+          "lambda_rush_td": 0.903063759849066,
+          "p_off_td": {
+            "0": 0.10615729558655125,
+            "1": 0.2380931243909842,
+            "2": 0.2670016015811275,
+            "3": 0.19961336677049843,
+            "4": 0.1119248797315171,
+            "5+": 0.07720973193932146
+          }
+        },
+        "workload": {
+          "exp_carries": 0.0,
+          "exp_targets": 5.0,
+          "exp_receptions": 3.4827586206896552,
+          "exp_rz_targets": 0.6896551724137931,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.3103448275862069,
+          "roll3_td_rate": 0.3333333333333333,
+          "sample_size": 29.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.3103448275862069,
+            "roll3_td_rate": 0.3333333333333333,
+            "workload_delta": 0.6868437118437118,
+            "prior_target_share": 0.1711707372346549,
+            "prior_carry_share": 0.0,
+            "prior_rz_targets": 0.6896551724137931,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.0637143421837825,
+            "opp_adj_def": -0.007675219441166372,
+            "team_rz_td": 0.2113623387941403,
+            "team_points_per_opp": 3.927013443363457,
+            "snap_roll3": 0.2702520414511074,
+            "usage_x_defense": -0.006594756350605864,
+            "is_home": 1.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 29,
+          "abs_disagreement": 0.17717264016107845,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0037005",
+        "player_name": "Tommy Tremble",
+        "team_id": "nfl:CAR",
+        "team_name": "Carolina Panthers",
+        "position_group": "TE",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.07498539889745442,
+        "p_m6_hist_gbm": 0.24302489669136385,
+        "delta_gbm_minus_v1": 0.16803949779390942,
+        "abs_delta": 0.16803949779390942,
+        "p_ensemble_reference_only": 0.15900514779440914,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "Models optimize different objectives (team-coherent allocation vs marginal classification).",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.061 \u2192 ~Poisson 0.059 (after availability/calibration adjustments \u2192 0.075)",
+          "team scoring context: team_lambda_off_td=2.243",
+          "shares: rush_td_share=0.004327254257947801 rec_td_share=0.047108246398368026 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Carolina Panthers",
+          "lambda_off_td": 2.242833364164446,
+          "lambda_pass_td": 1.33976960431538,
+          "lambda_rush_td": 0.903063759849066,
+          "p_off_td": {
+            "0": 0.10615729558655125,
+            "1": 0.2380931243909842,
+            "2": 0.2670016015811275,
+            "3": 0.19961336677049843,
+            "4": 0.1119248797315171,
+            "5+": 0.07720973193932146
+          }
+        },
+        "workload": {
+          "exp_carries": 0.04054054054054054,
+          "exp_targets": 2.635135135135135,
+          "exp_receptions": 1.7837837837837838,
+          "exp_rz_targets": 0.3783783783783784,
+          "exp_gl_carries": 0.013513513513513514,
+          "prior_td_rate": 0.1891891891891892,
+          "roll3_td_rate": 0.6666666666666666,
+          "sample_size": 74.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.1891891891891892,
+            "roll3_td_rate": 0.6666666666666666,
+            "workload_delta": 0.10189594356261021,
+            "prior_target_share": 0.08356272890034958,
+            "prior_carry_share": 0.0014576990861575841,
+            "prior_rz_targets": 0.3783783783783784,
+            "prior_gl_carries": 0.013513513513513514,
+            "own_off_epa": -0.05195114998959836,
+            "opp_adj_def": 8.437398749801787e-06,
+            "team_rz_td": 0.21362236684009497,
+            "team_points_per_opp": 3.9452579694872627,
+            "snap_roll3": 0.28090641114251363,
+            "usage_x_defense": 0.00792519594713334,
+            "is_home": 1.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 74,
+          "abs_disagreement": 0.16803949779390942,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0040124",
+        "player_name": "Tetairoa McMillan",
+        "team_id": "nfl:CAR",
+        "team_name": "Carolina Panthers",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.22187110285496892,
+        "p_m6_hist_gbm": 0.38679331563693525,
+        "delta_gbm_minus_v1": 0.16492221278196634,
+        "abs_delta": 0.16492221278196634,
+        "p_ensemble_reference_only": 0.30433220924595206,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "GBM reacts strongly to player TD/RZ/usage history; Player TD v1 is capped by team \u03bb \u00d7 receiver share so it cannot fully follow a hot individual signal without reallocating team TD mass.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.270 \u2192 ~Poisson 0.237 (after availability/calibration adjustments \u2192 0.222)",
+          "team scoring context: team_lambda_off_td=2.243",
+          "shares: rush_td_share=0.004219040288371391 rec_td_share=0.22385432515939566 (v1 probability mass comes from these; GBM does not use explicit shares)",
+          "GBM feature lean (higher p): high prior_target_share=0.254"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Carolina Panthers",
+          "lambda_off_td": 2.242833364164446,
+          "lambda_pass_td": 1.33976960431538,
+          "lambda_rush_td": 0.903063759849066,
+          "p_off_td": {
+            "0": 0.10615729558655125,
+            "1": 0.2380931243909842,
+            "2": 0.2670016015811275,
+            "3": 0.19961336677049843,
+            "4": 0.1119248797315171,
+            "5+": 0.07720973193932146
+          }
+        },
+        "workload": {
+          "exp_carries": 0.0,
+          "exp_targets": 7.76,
+          "exp_receptions": 4.68,
+          "exp_rz_targets": 0.92,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.36,
+          "roll3_td_rate": 0.0,
+          "sample_size": 25.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.36,
+            "roll3_td_rate": 0.0,
+            "workload_delta": 0.0683441558441559,
+            "prior_target_share": 0.2544236916628809,
+            "prior_carry_share": 0.0,
+            "prior_rz_targets": 0.92,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.0618346655356422,
+            "opp_adj_def": -0.005245106604433943,
+            "team_rz_td": 0.21152850840028653,
+            "team_points_per_opp": 3.947151463412894,
+            "snap_roll3": 0.3558756263435107,
+            "usage_x_defense": -0.005600452825216268,
+            "is_home": 1.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 25,
+          "abs_disagreement": 0.16492221278196634,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0041149",
+        "player_name": "Haynes King",
+        "team_id": "nfl:CAR",
+        "team_name": "Carolina Panthers",
+        "position_group": "QB",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.005716100911886363,
+        "p_m6_hist_gbm": 0.16453005192671308,
+        "delta_gbm_minus_v1": 0.1588139510148267,
+        "abs_delta": 0.1588139510148267,
+        "p_ensemble_reference_only": 0.08512307641929973,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "inconsistent_or_sparse_inputs",
+        "root_detail": "GBM saw few usable features relative to its schema; disagreement may reflect missing inputs.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.003 \u2192 ~Poisson 0.003 (after availability/calibration adjustments \u2192 0.006)",
+          "team scoring context: team_lambda_off_td=2.243",
+          "shares: rush_td_share=0.004219040288371391 rec_td_share=0.0 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "missing_information=['player_no_prior_games']",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:prior_td_rate', 'non_numeric:roll3_td_rate', 'non_numeric:workload_delta', 'non_numeric:prior_target_share', 'non_numeric:prior_carry_share', 'non_numeric:prior_rz_targets', 'non_numeric:prior_gl_carries', 'non_numeric:own_off_epa', 'non_numeric:opp_adj_def', 'non_numeric:team_rz_td', 'non_numeric:team_points_per_opp', 'non_numeric:snap_roll3', 'non_numeric:usage_x_defense', 'non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Carolina Panthers",
+          "lambda_off_td": 2.242833364164446,
+          "lambda_pass_td": 1.33976960431538,
+          "lambda_rush_td": 0.903063759849066,
+          "p_off_td": {
+            "0": 0.10615729558655125,
+            "1": 0.2380931243909842,
+            "2": 0.2670016015811275,
+            "3": 0.19961336677049843,
+            "4": 0.1119248797315171,
+            "5+": 0.07720973193932146
+          }
+        },
+        "workload": {
+          "exp_carries": null,
+          "exp_targets": null,
+          "exp_receptions": null,
+          "exp_rz_targets": null,
+          "exp_gl_carries": null,
+          "prior_td_rate": null,
+          "roll3_td_rate": null,
+          "sample_size": 0.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "is_home": 1.0
+          },
+          "missing_or_nan": [
+            "non_numeric:prior_td_rate",
+            "non_numeric:roll3_td_rate",
+            "non_numeric:workload_delta",
+            "non_numeric:prior_target_share",
+            "non_numeric:prior_carry_share",
+            "non_numeric:prior_rz_targets",
+            "non_numeric:prior_gl_carries",
+            "non_numeric:own_off_epa",
+            "non_numeric:opp_adj_def",
+            "non_numeric:team_rz_td",
+            "non_numeric:team_points_per_opp",
+            "non_numeric:snap_roll3",
+            "non_numeric:usage_x_defense",
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 1,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "missing_or_defaulted_defense",
+            "missing_current_season_td_signal",
+            "large_model_disagreement"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": 0.1588139510148267,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0035406",
+        "player_name": "Lil'Jordan Humphrey",
+        "team_id": "nfl:DEN",
+        "team_name": "Denver Broncos",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.07725908235056128,
+        "p_m6_hist_gbm": 0.23569268932635304,
+        "delta_gbm_minus_v1": 0.15843360697579176,
+        "abs_delta": 0.15843360697579176,
+        "p_ensemble_reference_only": 0.15647588583845717,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "Models optimize different objectives (team-coherent allocation vs marginal classification).",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.077 \u2192 ~Poisson 0.074 (after availability/calibration adjustments \u2192 0.077)",
+          "team scoring context: team_lambda_off_td=2.227",
+          "shares: rush_td_share=0.0037204308450535183 rec_td_share=0.056229406452607524 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Denver Broncos",
+          "lambda_off_td": 2.227057642384538,
+          "lambda_pass_td": 1.3848653963723567,
+          "lambda_rush_td": 0.8421922460121813,
+          "p_off_td": {
+            "0": 0.10784528314992788,
+            "1": 0.2401776620341713,
+            "2": 0.2674447488816259,
+            "3": 0.19853829063747952,
+            "4": 0.11053905436754033,
+            "5+": 0.07545496092925508
+          }
+        },
+        "workload": {
+          "exp_carries": 0.0,
+          "exp_targets": 2.519230769230769,
+          "exp_receptions": 1.5769230769230769,
+          "exp_rz_targets": 0.34615384615384615,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.17307692307692307,
+          "roll3_td_rate": 0.0,
+          "sample_size": 52.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.17307692307692307,
+            "roll3_td_rate": 0.0,
+            "workload_delta": 0.09505183025591185,
+            "prior_target_share": 0.08188613817133594,
+            "prior_carry_share": 0.0,
+            "prior_rz_targets": 0.34615384615384615,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.026698285539954684,
+            "opp_adj_def": 0.002557544786516625,
+            "team_rz_td": 0.22161834164255126,
+            "team_points_per_opp": 4.104577085522799,
+            "snap_roll3": 0.17787623061824,
+            "usage_x_defense": 0.010734688136304564,
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 52,
+          "abs_disagreement": 0.15843360697579176,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0041133",
+        "player_name": "Dallen Bentley",
+        "team_id": "nfl:DEN",
+        "team_name": "Denver Broncos",
+        "position_group": "TE",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.012411646716098566,
+        "p_m6_hist_gbm": 0.17065468326202413,
+        "delta_gbm_minus_v1": 0.15824303654592556,
+        "abs_delta": 0.15824303654592556,
+        "p_ensemble_reference_only": 0.09153316498906135,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "inconsistent_or_sparse_inputs",
+        "root_detail": "GBM saw few usable features relative to its schema; disagreement may reflect missing inputs.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.009 \u2192 ~Poisson 0.009 (after availability/calibration adjustments \u2192 0.012)",
+          "team scoring context: team_lambda_off_td=2.227",
+          "shares: rush_td_share=0.0037204308450535183 rec_td_share=0.004558066502928402 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "missing_information=['player_no_prior_games']",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:prior_td_rate', 'non_numeric:roll3_td_rate', 'non_numeric:workload_delta', 'non_numeric:prior_target_share', 'non_numeric:prior_carry_share', 'non_numeric:prior_rz_targets', 'non_numeric:prior_gl_carries', 'non_numeric:own_off_epa', 'non_numeric:opp_adj_def', 'non_numeric:team_rz_td', 'non_numeric:team_points_per_opp', 'non_numeric:snap_roll3', 'non_numeric:usage_x_defense', 'non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Denver Broncos",
+          "lambda_off_td": 2.227057642384538,
+          "lambda_pass_td": 1.3848653963723567,
+          "lambda_rush_td": 0.8421922460121813,
+          "p_off_td": {
+            "0": 0.10784528314992788,
+            "1": 0.2401776620341713,
+            "2": 0.2674447488816259,
+            "3": 0.19853829063747952,
+            "4": 0.11053905436754033,
+            "5+": 0.07545496092925508
+          }
+        },
+        "workload": {
+          "exp_carries": null,
+          "exp_targets": null,
+          "exp_receptions": null,
+          "exp_rz_targets": null,
+          "exp_gl_carries": null,
+          "prior_td_rate": null,
+          "roll3_td_rate": null,
+          "sample_size": 0.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:prior_td_rate",
+            "non_numeric:roll3_td_rate",
+            "non_numeric:workload_delta",
+            "non_numeric:prior_target_share",
+            "non_numeric:prior_carry_share",
+            "non_numeric:prior_rz_targets",
+            "non_numeric:prior_gl_carries",
+            "non_numeric:own_off_epa",
+            "non_numeric:opp_adj_def",
+            "non_numeric:team_rz_td",
+            "non_numeric:team_points_per_opp",
+            "non_numeric:snap_roll3",
+            "non_numeric:usage_x_defense",
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 1,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "missing_or_defaulted_defense",
+            "missing_current_season_td_signal",
+            "large_model_disagreement"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": 0.15824303654592556,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0036900",
+        "player_name": "Ja'Marr Chase",
+        "team_id": "nfl:CIN",
+        "team_name": "Cincinnati Bengals",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_CIN_ATL",
+        "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+        "p_player_td_v1": 0.32583190521264244,
+        "p_m6_hist_gbm": 0.4795728346232369,
+        "delta_gbm_minus_v1": 0.15374092941059447,
+        "abs_delta": 0.15374092941059447,
+        "p_ensemble_reference_only": 0.4027023699179397,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "GBM reacts strongly to player TD/RZ/usage history; Player TD v1 is capped by team \u03bb \u00d7 receiver share so it cannot fully follow a hot individual signal without reallocating team TD mass.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.441 \u2192 ~Poisson 0.357 (after availability/calibration adjustments \u2192 0.326)",
+          "team scoring context: team_lambda_off_td=2.412",
+          "shares: rush_td_share=0.0061442679023820295 rec_td_share=0.2980671044109516 (v1 probability mass comes from these; GBM does not use explicit shares)",
+          "GBM feature lean (higher p): high prior_td_rate=0.685; hot roll3_td_rate=1.000; elevated prior_rz_targets=1.489; high prior_target_share=0.271"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Cincinnati Bengals",
+          "lambda_off_td": 2.4123894663894676,
+          "lambda_pass_td": 1.6531397115901483,
+          "lambda_rush_td": 0.7592497547993192,
+          "p_off_td": {
+            "0": 0.08960094014294817,
+            "1": 0.21615236417944136,
+            "2": 0.2607218432408322,
+            "3": 0.20965420943060986,
+            "4": 0.12644190160365365,
+            "5+": 0.09742874140251478
+          }
+        },
+        "workload": {
+          "exp_carries": 0.30434782608695654,
+          "exp_targets": 9.684782608695652,
+          "exp_receptions": 6.608695652173913,
+          "exp_rz_targets": 1.4891304347826086,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.6847826086956522,
+          "roll3_td_rate": 1.0,
+          "sample_size": 92.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.6847826086956522,
+            "roll3_td_rate": 1.0,
+            "workload_delta": 0.04530943463527715,
+            "prior_target_share": 0.2710102906780091,
+            "prior_carry_share": 0.012997272052481884,
+            "prior_rz_targets": 1.4891304347826086,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.024639401458836252,
+            "opp_adj_def": -0.008405012908325474,
+            "team_rz_td": 0.23922531061369454,
+            "team_points_per_opp": 4.1799683120623685,
+            "snap_roll3": 0.37912999457023455,
+            "usage_x_defense": -0.024318653135109218,
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 92,
+          "abs_disagreement": 0.15374092941059447,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0039356",
+        "player_name": "Ja'Tavion Sanders",
+        "team_id": "nfl:CAR",
+        "team_name": "Carolina Panthers",
+        "position_group": "TE",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.0889681352137873,
+        "p_m6_hist_gbm": 0.2229746998240701,
+        "delta_gbm_minus_v1": 0.1340065646102828,
+        "abs_delta": 0.1340065646102828,
+        "p_ensemble_reference_only": 0.15597141751892868,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "Models optimize different objectives (team-coherent allocation vs marginal classification).",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.074 \u2192 ~Poisson 0.071 (after availability/calibration adjustments \u2192 0.089)",
+          "team scoring context: team_lambda_off_td=2.243",
+          "shares: rush_td_share=0.004219040288371391 rec_td_share=0.057457420567140594 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Carolina Panthers",
+          "lambda_off_td": 2.242833364164446,
+          "lambda_pass_td": 1.33976960431538,
+          "lambda_rush_td": 0.903063759849066,
+          "p_off_td": {
+            "0": 0.10615729558655125,
+            "1": 0.2380931243909842,
+            "2": 0.2670016015811275,
+            "3": 0.19961336677049843,
+            "4": 0.1119248797315171,
+            "5+": 0.07720973193932146
+          }
+        },
+        "workload": {
+          "exp_carries": 0.0,
+          "exp_targets": 2.9615384615384617,
+          "exp_receptions": 2.3846153846153846,
+          "exp_rz_targets": 0.6153846153846154,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.07692307692307693,
+          "roll3_td_rate": 0.3333333333333333,
+          "sample_size": 26.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.07692307692307693,
+            "roll3_td_rate": 0.3333333333333333,
+            "workload_delta": 0.046946169772256796,
+            "prior_target_share": 0.09922476381920402,
+            "prior_carry_share": 0.0,
+            "prior_rz_targets": 0.6153846153846154,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.06533290721698345,
+            "opp_adj_def": -0.0019278768803318326,
+            "team_rz_td": 0.2120485859843163,
+            "team_points_per_opp": 3.914775342928749,
+            "snap_roll3": 0.27132547901170406,
+            "usage_x_defense": 0.006145215783649891,
+            "is_home": 1.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 26,
+          "abs_disagreement": 0.1340065646102828,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0036422",
+        "player_name": "Adam Trautman",
+        "team_id": "nfl:DEN",
+        "team_name": "Denver Broncos",
+        "position_group": "TE",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.06980959492494997,
+        "p_m6_hist_gbm": 0.19525823635908035,
+        "delta_gbm_minus_v1": 0.12544864143413037,
+        "abs_delta": 0.12544864143413037,
+        "p_ensemble_reference_only": 0.13253391564201517,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "Models optimize different objectives (team-coherent allocation vs marginal classification).",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.056 \u2192 ~Poisson 0.055 (after availability/calibration adjustments \u2192 0.070)",
+          "team scoring context: team_lambda_off_td=2.227",
+          "shares: rush_td_share=0.0037204308450535183 rec_td_share=0.04205979301852606 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Denver Broncos",
+          "lambda_off_td": 2.227057642384538,
+          "lambda_pass_td": 1.3848653963723567,
+          "lambda_rush_td": 0.8421922460121813,
+          "p_off_td": {
+            "0": 0.10784528314992788,
+            "1": 0.2401776620341713,
+            "2": 0.2674447488816259,
+            "3": 0.19853829063747952,
+            "4": 0.11053905436754033,
+            "5+": 0.07545496092925508
+          }
+        },
+        "workload": {
+          "exp_carries": 0.0,
+          "exp_targets": 2.175,
+          "exp_receptions": 1.5125,
+          "exp_rz_targets": 0.4375,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.125,
+          "roll3_td_rate": 0.0,
+          "sample_size": 80.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.125,
+            "roll3_td_rate": 0.0,
+            "workload_delta": 0.03347247990105133,
+            "prior_target_share": 0.06958023951563404,
+            "prior_carry_share": 0.0,
+            "prior_rz_targets": 0.4375,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.00487153135907918,
+            "opp_adj_def": 0.0043938146490729284,
+            "team_rz_td": 0.22698494320055934,
+            "team_points_per_opp": 4.211190422308812,
+            "snap_roll3": 0.26566374572620993,
+            "usage_x_defense": 0.01259422023561152,
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 80,
+          "abs_disagreement": 0.12544864143413037,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0033589",
+        "player_name": "David Moore",
+        "team_id": "nfl:CAR",
+        "team_name": "Carolina Panthers",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.09174276154360327,
+        "p_m6_hist_gbm": 0.21567329842348817,
+        "delta_gbm_minus_v1": 0.12393053687988491,
+        "abs_delta": 0.12393053687988491,
+        "p_ensemble_reference_only": 0.1537080299835457,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "Models optimize different objectives (team-coherent allocation vs marginal classification).",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.094 \u2192 ~Poisson 0.090 (after availability/calibration adjustments \u2192 0.092)",
+          "team scoring context: team_lambda_off_td=2.243",
+          "shares: rush_td_share=0.004314323791399041 rec_td_share=0.07318599272137283 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Carolina Panthers",
+          "lambda_off_td": 2.242833364164446,
+          "lambda_pass_td": 1.33976960431538,
+          "lambda_rush_td": 0.903063759849066,
+          "p_off_td": {
+            "0": 0.10615729558655125,
+            "1": 0.2380931243909842,
+            "2": 0.2670016015811275,
+            "3": 0.19961336677049843,
+            "4": 0.1119248797315171,
+            "5+": 0.07720973193932146
+          }
+        },
+        "workload": {
+          "exp_carries": 0.21621621621621623,
+          "exp_targets": 2.891891891891892,
+          "exp_receptions": 1.662162162162162,
+          "exp_rz_targets": 0.5675675675675675,
+          "exp_gl_carries": 0.013513513513513514,
+          "prior_td_rate": 0.24324324324324326,
+          "roll3_td_rate": 0.0,
+          "sample_size": 74.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.24324324324324326,
+            "roll3_td_rate": 0.0,
+            "workload_delta": -0.004722781131231822,
+            "prior_target_share": 0.0942068652774973,
+            "prior_carry_share": 0.007573582381274689,
+            "prior_rz_targets": 0.5675675675675675,
+            "prior_gl_carries": 0.013513513513513514,
+            "own_off_epa": 0.0029646465818161495,
+            "opp_adj_def": -0.014394671277537583,
+            "team_rz_td": 0.23648740366034124,
+            "team_points_per_opp": 4.103051753236866,
+            "snap_roll3": 0.18899252393431307,
+            "usage_x_defense": -0.01601358318396002,
+            "is_home": 1.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 74,
+          "abs_disagreement": 0.12393053687988491,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0036613",
+        "player_name": "Jaylen Waddle",
+        "team_id": "nfl:DEN",
+        "team_name": "Denver Broncos",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.20400439030648762,
+        "p_m6_hist_gbm": 0.32277310626198297,
+        "delta_gbm_minus_v1": 0.11876871595549535,
+        "abs_delta": 0.11876871595549535,
+        "p_ensemble_reference_only": 0.2633887482842353,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "Models optimize different objectives (team-coherent allocation vs marginal classification).",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.243 \u2192 ~Poisson 0.216 (after availability/calibration adjustments \u2192 0.204)",
+          "team scoring context: team_lambda_off_td=2.227",
+          "shares: rush_td_share=0.0038044536700229505 rec_td_share=0.19102493192462375 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Denver Broncos",
+          "lambda_off_td": 2.227057642384538,
+          "lambda_pass_td": 1.3848653963723567,
+          "lambda_rush_td": 0.8421922460121813,
+          "p_off_td": {
+            "0": 0.10784528314992788,
+            "1": 0.2401776620341713,
+            "2": 0.2674447488816259,
+            "3": 0.19853829063747952,
+            "4": 0.11053905436754033,
+            "5+": 0.07545496092925508
+          }
+        },
+        "workload": {
+          "exp_carries": 0.20454545454545456,
+          "exp_targets": 6.8977272727272725,
+          "exp_receptions": 4.625,
+          "exp_rz_targets": 0.7386363636363636,
+          "exp_gl_carries": 0.011363636363636364,
+          "prior_td_rate": 0.32954545454545453,
+          "roll3_td_rate": 0.3333333333333333,
+          "sample_size": 88.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.32954545454545453,
+            "roll3_td_rate": 0.3333333333333333,
+            "workload_delta": -0.046923436041083136,
+            "prior_target_share": 0.21709650638775724,
+            "prior_carry_share": 0.00908604958105059,
+            "prior_rz_targets": 0.7386363636363636,
+            "prior_gl_carries": 0.011363636363636364,
+            "own_off_epa": -0.048878097509669295,
+            "opp_adj_def": -0.003276241589005807,
+            "team_rz_td": 0.2279849674358478,
+            "team_points_per_opp": 4.18354309127021,
+            "snap_roll3": 0.3098430271907569,
+            "usage_x_defense": -7.553001319823423e-05,
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 88,
+          "abs_disagreement": 0.11876871595549535,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0031610",
+        "player_name": "Darren Waller",
+        "team_id": "nfl:CAR",
+        "team_name": "Carolina Panthers",
+        "position_group": "TE",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.19738724418711726,
+        "p_m6_hist_gbm": 0.31234984984832953,
+        "delta_gbm_minus_v1": 0.11496260566121227,
+        "abs_delta": 0.11496260566121227,
+        "p_ensemble_reference_only": 0.2548685470177234,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "GBM reacts strongly to player TD/RZ/usage history; Player TD v1 is capped by team \u03bb \u00d7 receiver share so it cannot fully follow a hot individual signal without reallocating team TD mass.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.185 \u2192 ~Poisson 0.169 (after availability/calibration adjustments \u2192 0.197)",
+          "team scoring context: team_lambda_off_td=2.243",
+          "shares: rush_td_share=0.004235094690678163 rec_td_share=0.14858579576212713 (v1 probability mass comes from these; GBM does not use explicit shares)",
+          "GBM feature lean (higher p): elevated prior_rz_targets=1.085"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Carolina Panthers",
+          "lambda_off_td": 2.242833364164446,
+          "lambda_pass_td": 1.33976960431538,
+          "lambda_rush_td": 0.903063759849066,
+          "p_off_td": {
+            "0": 0.10615729558655125,
+            "1": 0.2380931243909842,
+            "2": 0.2670016015811275,
+            "3": 0.19961336677049843,
+            "4": 0.1119248797315171,
+            "5+": 0.07720973193932146
+          }
+        },
+        "workload": {
+          "exp_carries": 0.014084507042253521,
+          "exp_targets": 6.23943661971831,
+          "exp_receptions": 4.197183098591549,
+          "exp_rz_targets": 1.0845070422535212,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.36619718309859156,
+          "roll3_td_rate": 0.3333333333333333,
+          "sample_size": 71.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.36619718309859156,
+            "roll3_td_rate": 0.3333333333333333,
+            "workload_delta": 0.18297052154195012,
+            "prior_target_share": 0.18303159342777733,
+            "prior_carry_share": 0.0003341129301703976,
+            "prior_rz_targets": 1.0845070422535212,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.03402957159347559,
+            "opp_adj_def": -0.0010965718803509685,
+            "team_rz_td": 0.21064192425339565,
+            "team_points_per_opp": 3.9202574456616994,
+            "snap_roll3": 0.2828195531433745,
+            "usage_x_defense": -0.003984548897310977,
+            "is_home": 1.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 71,
+          "abs_disagreement": 0.11496260566121227,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0038783",
+        "player_name": "Nate Adkins",
+        "team_id": "nfl:DEN",
+        "team_name": "Denver Broncos",
+        "position_group": "TE",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.06044748747871544,
+        "p_m6_hist_gbm": 0.17277160488952717,
+        "delta_gbm_minus_v1": 0.11232411741081172,
+        "abs_delta": 0.11232411741081172,
+        "p_ensemble_reference_only": 0.11660954618412131,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "GBM reacts strongly to player TD/RZ/usage history; Player TD v1 is capped by team \u03bb \u00d7 receiver share so it cannot fully follow a hot individual signal without reallocating team TD mass.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.048 \u2192 ~Poisson 0.047 (after availability/calibration adjustments \u2192 0.060)",
+          "team scoring context: team_lambda_off_td=2.227",
+          "shares: rush_td_share=0.0037591328801783804 rec_td_share=0.03385391512071543 (v1 probability mass comes from these; GBM does not use explicit shares)",
+          "GBM feature lean (higher p): hot roll3_td_rate=1.000"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Denver Broncos",
+          "lambda_off_td": 2.227057642384538,
+          "lambda_pass_td": 1.3848653963723567,
+          "lambda_rush_td": 0.8421922460121813,
+          "p_off_td": {
+            "0": 0.10784528314992788,
+            "1": 0.2401776620341713,
+            "2": 0.2674447488816259,
+            "3": 0.19853829063747952,
+            "4": 0.11053905436754033,
+            "5+": 0.07545496092925508
+          }
+        },
+        "workload": {
+          "exp_carries": 0.038461538461538464,
+          "exp_targets": 1.5,
+          "exp_receptions": 1.1923076923076923,
+          "exp_rz_targets": 0.38461538461538464,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.2692307692307692,
+          "roll3_td_rate": 1.0,
+          "sample_size": 26.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.2692307692307692,
+            "roll3_td_rate": 1.0,
+            "workload_delta": 0.09999999999999999,
+            "prior_target_share": 0.037057972568583446,
+            "prior_carry_share": 0.001152073732718894,
+            "prior_rz_targets": 0.38461538461538464,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.06299300988627864,
+            "opp_adj_def": 0.005380950684717272,
+            "team_rz_td": 0.21855458809747175,
+            "team_points_per_opp": 3.9603390344864065,
+            "snap_roll3": 0.17016037171513881,
+            "usage_x_defense": 0.00679961747286858,
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 26,
+          "abs_disagreement": 0.11232411741081172,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0034348",
+        "player_name": "Courtland Sutton",
+        "team_id": "nfl:DEN",
+        "team_name": "Denver Broncos",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.21138187432019093,
+        "p_m6_hist_gbm": 0.31950629684227944,
+        "delta_gbm_minus_v1": 0.10812442252208851,
+        "abs_delta": 0.10812442252208851,
+        "p_ensemble_reference_only": 0.26544408558123517,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "GBM reacts strongly to player TD/RZ/usage history; Player TD v1 is capped by team \u03bb \u00d7 receiver share so it cannot fully follow a hot individual signal without reallocating team TD mass.",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.254 \u2192 ~Poisson 0.225 (after availability/calibration adjustments \u2192 0.211)",
+          "team scoring context: team_lambda_off_td=2.227",
+          "shares: rush_td_share=0.0037338324290147732 rec_td_share=0.20035318700901236 (v1 probability mass comes from these; GBM does not use explicit shares)",
+          "GBM feature lean (higher p): elevated prior_rz_targets=1.016"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Denver Broncos",
+          "lambda_off_td": 2.227057642384538,
+          "lambda_pass_td": 1.3848653963723567,
+          "lambda_rush_td": 0.8421922460121813,
+          "p_off_td": {
+            "0": 0.10784528314992788,
+            "1": 0.2401776620341713,
+            "2": 0.2674447488816259,
+            "3": 0.19853829063747952,
+            "4": 0.11053905436754033,
+            "5+": 0.07545496092925508
+          }
+        },
+        "workload": {
+          "exp_carries": 0.04,
+          "exp_targets": 6.64,
+          "exp_receptions": 3.88,
+          "exp_rz_targets": 1.016,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.328,
+          "roll3_td_rate": 0.0,
+          "sample_size": 125.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.328,
+            "roll3_td_rate": 0.0,
+            "workload_delta": -0.005240046838407475,
+            "prior_target_share": 0.21416594231422242,
+            "prior_carry_share": 0.0014508158238647315,
+            "prior_rz_targets": 1.016,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.06775459738854755,
+            "opp_adj_def": 0.003149526684053443,
+            "team_rz_td": 0.20570097460665274,
+            "team_points_per_opp": 3.791434511982017,
+            "snap_roll3": 0.3435023836737531,
+            "usage_x_defense": 0.032886968994279175,
+            "is_home": 0.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 125,
+          "abs_disagreement": 0.10812442252208851,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      },
+      {
+        "status": "ok",
+        "player_id": "nfl:00-0037614",
+        "player_name": "John Metchie III",
+        "team_id": "nfl:CAR",
+        "team_name": "Carolina Panthers",
+        "position_group": "WR",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "matchup": "Denver Broncos @ Carolina Panthers",
+        "p_player_td_v1": 0.09490970541027074,
+        "p_m6_hist_gbm": 0.2001284562557358,
+        "delta_gbm_minus_v1": 0.10521875084546506,
+        "abs_delta": 0.10521875084546506,
+        "p_ensemble_reference_only": 0.14751908083300327,
+        "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+        "root_cause": "legitimate_modeling_difference",
+        "root_detail": "Models optimize different objectives (team-coherent allocation vs marginal classification).",
+        "causes": [
+          "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+          "player_td_v1 maps \u03bb_player=0.098 \u2192 ~Poisson 0.093 (after availability/calibration adjustments \u2192 0.095)",
+          "team scoring context: team_lambda_off_td=2.243",
+          "shares: rush_td_share=0.004262263030583175 rec_td_share=0.07451474796198393 (v1 probability mass comes from these; GBM does not use explicit shares)"
+        ],
+        "consistency_checks": [
+          "player/team identity present",
+          "availability=probable (prob=0.92)",
+          "no missing_information flags on forecast row",
+          "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+        ],
+        "team_expectations": {
+          "team_name": "Carolina Panthers",
+          "lambda_off_td": 2.242833364164446,
+          "lambda_pass_td": 1.33976960431538,
+          "lambda_rush_td": 0.903063759849066,
+          "p_off_td": {
+            "0": 0.10615729558655125,
+            "1": 0.2380931243909842,
+            "2": 0.2670016015811275,
+            "3": 0.19961336677049843,
+            "4": 0.1119248797315171,
+            "5+": 0.07720973193932146
+          }
+        },
+        "workload": {
+          "exp_carries": 0.11363636363636363,
+          "exp_targets": 3.3636363636363638,
+          "exp_receptions": 2.1363636363636362,
+          "exp_rz_targets": 0.4772727272727273,
+          "exp_gl_carries": 0.0,
+          "prior_td_rate": 0.09090909090909091,
+          "roll3_td_rate": 0.0,
+          "sample_size": 44.0
+        },
+        "gbm_features": {
+          "status": "ok",
+          "feature_schema": [
+            "prior_td_rate",
+            "roll3_td_rate",
+            "workload_delta",
+            "prior_target_share",
+            "prior_carry_share",
+            "prior_rz_targets",
+            "prior_gl_carries",
+            "own_off_epa",
+            "opp_adj_def",
+            "team_rz_td",
+            "team_points_per_opp",
+            "snap_roll3",
+            "usage_x_defense",
+            "is_home",
+            "roll5_td_rate",
+            "roll3_carries"
+          ],
+          "observed": {
+            "prior_td_rate": 0.09090909090909091,
+            "roll3_td_rate": 0.0,
+            "workload_delta": 0.18965350367789394,
+            "prior_target_share": 0.10662375682506876,
+            "prior_carry_share": 0.003965247715247715,
+            "prior_rz_targets": 0.4772727272727273,
+            "prior_gl_carries": 0.0,
+            "own_off_epa": -0.06050595124215433,
+            "opp_adj_def": -0.0002251677819201955,
+            "team_rz_td": 0.20735671791171556,
+            "team_points_per_opp": 3.7388567142366793,
+            "snap_roll3": 0.19115490973016533,
+            "usage_x_defense": 0.0016973250961012,
+            "is_home": 1.0
+          },
+          "missing_or_nan": [
+            "non_numeric:roll5_td_rate",
+            "missing_col:roll3_carries"
+          ],
+          "n_observed": 14,
+          "n_schema": 16,
+          "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+          "platt": [
+            0.1368509838174222,
+            1.1013441899644256
+          ]
+        },
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 44,
+          "abs_disagreement": 0.10521875084546506,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        },
+        "calibration_note": {
+          "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+          "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+        }
+      }
+    ]
+  },
+  "2_causes_of_disagreements": {
+    "by_root_cause": {
+      "legitimate_modeling_difference": 15,
+      "inconsistent_or_sparse_inputs": 2
+    },
+    "chase_example": {
+      "status": "ok",
+      "player_id": "nfl:00-0036900",
+      "player_name": "Ja'Marr Chase",
+      "team_id": "nfl:CIN",
+      "team_name": "Cincinnati Bengals",
+      "position_group": "WR",
+      "game_id": "nfl:2026_09_CIN_ATL",
+      "matchup": "Cincinnati Bengals @ Atlanta Falcons",
+      "p_player_td_v1": 0.32583190521264244,
+      "p_m6_hist_gbm": 0.4795728346232369,
+      "delta_gbm_minus_v1": 0.15374092941059447,
+      "abs_delta": 0.15374092941059447,
+      "p_ensemble_reference_only": 0.4027023699179397,
+      "ensemble_note": "Shown for reference only \u2014 not used to hide disagreement",
+      "root_cause": "legitimate_modeling_difference",
+      "root_detail": "GBM reacts strongly to player TD/RZ/usage history; Player TD v1 is capped by team \u03bb \u00d7 receiver share so it cannot fully follow a hot individual signal without reallocating team TD mass.",
+      "causes": [
+        "architecture: player_td_v1 = team_td_v1 \u03bb \u00d7 opportunity shares (team-budget constrained); m6_hist_gbm = marginal classifier on player features (not forced to sum to team TD mass)",
+        "player_td_v1 maps \u03bb_player=0.441 \u2192 ~Poisson 0.357 (after availability/calibration adjustments \u2192 0.326)",
+        "team scoring context: team_lambda_off_td=2.412",
+        "shares: rush_td_share=0.0061442679023820295 rec_td_share=0.2980671044109516 (v1 probability mass comes from these; GBM does not use explicit shares)",
+        "GBM feature lean (higher p): high prior_td_rate=0.685; hot roll3_td_rate=1.000; elevated prior_rz_targets=1.489; high prior_target_share=0.271"
+      ],
+      "consistency_checks": [
+        "player/team identity present",
+        "availability=probable (prob=0.92)",
+        "no missing_information flags on forecast row",
+        "GBM schema gaps (NaN, not invented): ['non_numeric:roll5_td_rate', 'missing_col:roll3_carries']"
+      ],
+      "team_expectations": {
+        "team_name": "Cincinnati Bengals",
+        "lambda_off_td": 2.4123894663894676,
+        "lambda_pass_td": 1.6531397115901483,
+        "lambda_rush_td": 0.7592497547993192,
+        "p_off_td": {
+          "0": 0.08960094014294817,
+          "1": 0.21615236417944136,
+          "2": 0.2607218432408322,
+          "3": 0.20965420943060986,
+          "4": 0.12644190160365365,
+          "5+": 0.09742874140251478
+        }
+      },
+      "workload": {
+        "exp_carries": 0.30434782608695654,
+        "exp_targets": 9.684782608695652,
+        "exp_receptions": 6.608695652173913,
+        "exp_rz_targets": 1.4891304347826086,
+        "exp_gl_carries": 0.0,
+        "prior_td_rate": 0.6847826086956522,
+        "roll3_td_rate": 1.0,
+        "sample_size": 92.0
+      },
+      "gbm_features": {
+        "status": "ok",
+        "feature_schema": [
+          "prior_td_rate",
+          "roll3_td_rate",
+          "workload_delta",
+          "prior_target_share",
+          "prior_carry_share",
+          "prior_rz_targets",
+          "prior_gl_carries",
+          "own_off_epa",
+          "opp_adj_def",
+          "team_rz_td",
+          "team_points_per_opp",
+          "snap_roll3",
+          "usage_x_defense",
+          "is_home",
+          "roll5_td_rate",
+          "roll3_carries"
+        ],
+        "observed": {
+          "prior_td_rate": 0.6847826086956522,
+          "roll3_td_rate": 1.0,
+          "workload_delta": 0.04530943463527715,
+          "prior_target_share": 0.2710102906780091,
+          "prior_carry_share": 0.012997272052481884,
+          "prior_rz_targets": 1.4891304347826086,
+          "prior_gl_carries": 0.0,
+          "own_off_epa": -0.024639401458836252,
+          "opp_adj_def": -0.008405012908325474,
+          "team_rz_td": 0.23922531061369454,
+          "team_points_per_opp": 4.1799683120623685,
+          "snap_roll3": 0.37912999457023455,
+          "usage_x_defense": -0.024318653135109218,
+          "is_home": 0.0
+        },
+        "missing_or_nan": [
+          "non_numeric:roll5_td_rate",
+          "missing_col:roll3_carries"
+        ],
+        "n_observed": 14,
+        "n_schema": 16,
+        "model_sha256": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+        "platt": [
+          0.1368509838174222,
+          1.1013441899644256
+        ]
+      },
+      "reliability": {
+        "level": "medium",
+        "flags": [
+          "large_model_disagreement"
+        ],
+        "sample_size": 92,
+        "abs_disagreement": 0.15374092941059447,
+        "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+      },
+      "calibration_note": {
+        "player_td_v1": "Phase-3 availability-adjusted / position Platt on \u03bb path",
+        "m6_hist_gbm": "Global Platt [0.1368509838174222, 1.1013441899644256] on HistGBM scores"
+      }
+    },
+    "summary": "Most NFL gaps \u226510pp are legitimate architecture differences: team-\u03bb\u00d7share allocation vs marginal HistGBM \u2014 not swapped player IDs."
+  },
+  "3_data_quality_problems": {
+    "disagreement_root_causes": {
+      "legitimate_modeling_difference": 15,
+      "inconsistent_or_sparse_inputs": 2
+    },
+    "reliability_levels": {
+      "high": 37,
+      "medium": 371,
+      "medium-high": 7,
+      "low": 9
+    },
+    "freeze_issues_n": 2,
+    "common_problems": [
+      "low_reliability_predictions_present",
+      "some_freeze_games_missing_sportsbook_or_identity_fields"
+    ]
+  },
+  "4_forecast_reliability_assessment": {
+    "n_predictions": 424,
+    "by_level": {
+      "high": 37,
+      "medium": 371,
+      "medium-high": 7,
+      "low": 9
+    },
+    "low_reliability": [
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0041496",
+        "player_name": "Jonah Coleman",
+        "position_group": "RB",
+        "p_primary": 0.28033061622999905,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "large_model_disagreement",
+            "extreme_model_disagreement"
+          ],
+          "sample_size": 3,
+          "abs_disagreement": 0.27401051976478363,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0041133",
+        "player_name": "Dallen Bentley",
+        "position_group": "TE",
+        "p_primary": 0.012411646716098566,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "missing_or_defaulted_defense",
+            "missing_current_season_td_signal",
+            "large_model_disagreement"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": 0.15824303654592556,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0041149",
+        "player_name": "Haynes King",
+        "position_group": "QB",
+        "p_primary": 0.005716100911886363,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "missing_or_defaulted_defense",
+            "missing_current_season_td_signal",
+            "large_model_disagreement"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": 0.1588139510148267,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "fbs",
+        "game_id": "fbs-ala-lsu",
+        "player_id": "p-bernard",
+        "player_name": "Jam Miller",
+        "position_group": "RB",
+        "p_primary": 0.32017539056233435,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "unknown_availability",
+            "injury_info_gap",
+            "missing_current_season_td_signal"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": null,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "fbs",
+        "game_id": "fbs-ala-lsu",
+        "player_id": "p-harvey",
+        "player_name": "Caden Durham",
+        "position_group": "RB",
+        "p_primary": 0.303087950353052,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "unknown_availability",
+            "injury_info_gap",
+            "missing_current_season_td_signal"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": null,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "fbs",
+        "game_id": "fbs-ala-lsu",
+        "player_id": "p-milroe",
+        "player_name": "Ty Simpson",
+        "position_group": "QB",
+        "p_primary": 0.2290140761510806,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "unknown_availability",
+            "injury_info_gap",
+            "missing_current_season_td_signal"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": null,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "fbs",
+        "game_id": "fbs-ala-lsu",
+        "player_id": "p-nuss",
+        "player_name": "Nussmeier",
+        "position_group": "QB",
+        "p_primary": 0.21496890009002362,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "unknown_availability",
+            "injury_info_gap",
+            "missing_current_season_td_signal"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": null,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "fbs",
+        "game_id": "fbs-ore-wash",
+        "player_id": "p-jeanty",
+        "player_name": "Noah Whittington",
+        "position_group": "RB",
+        "p_primary": 0.32017539056233435,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "unknown_availability",
+            "injury_info_gap",
+            "missing_current_season_td_signal"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": null,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "fbs",
+        "game_id": "fbs-ore-wash",
+        "player_id": "p-te",
+        "player_name": "Kenyon Sadiq",
+        "position_group": "TE",
+        "p_primary": 0.17035637468004783,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "unknown_availability",
+            "injury_info_gap",
+            "missing_current_season_td_signal"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": null,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      }
+    ],
+    "medium_with_disagreement": [
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_CIN_ATL",
+        "player_id": "nfl:00-0036900",
+        "player_name": "Ja'Marr Chase",
+        "position_group": "WR",
+        "p_primary": 0.32583190521264244,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 92,
+          "abs_disagreement": 0.15374092941059447,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_CIN_ATL",
+        "player_id": "nfl:00-0036410",
+        "player_name": "Tee Higgins",
+        "position_group": "WR",
+        "p_primary": 0.24942583499547105,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 96,
+          "abs_disagreement": 0.19590071111467466,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0041496",
+        "player_name": "Jonah Coleman",
+        "position_group": "RB",
+        "p_primary": 0.28033061622999905,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "large_model_disagreement",
+            "extreme_model_disagreement"
+          ],
+          "sample_size": 3,
+          "abs_disagreement": 0.27401051976478363,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0040124",
+        "player_name": "Tetairoa McMillan",
+        "position_group": "WR",
+        "p_primary": 0.22187110285496892,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 25,
+          "abs_disagreement": 0.16492221278196634,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0034348",
+        "player_name": "Courtland Sutton",
+        "position_group": "WR",
+        "p_primary": 0.21138187432019093,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 125,
+          "abs_disagreement": 0.10812442252208851,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0036613",
+        "player_name": "Jaylen Waddle",
+        "position_group": "WR",
+        "p_primary": 0.20400439030648762,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 88,
+          "abs_disagreement": 0.11876871595549535,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0031610",
+        "player_name": "Darren Waller",
+        "position_group": "TE",
+        "p_primary": 0.19738724418711726,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 71,
+          "abs_disagreement": 0.11496260566121227,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0039491",
+        "player_name": "Jalen Coker",
+        "position_group": "WR",
+        "p_primary": 0.15047748103098255,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 29,
+          "abs_disagreement": 0.17717264016107845,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0037614",
+        "player_name": "John Metchie III",
+        "position_group": "WR",
+        "p_primary": 0.09490970541027074,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 44,
+          "abs_disagreement": 0.10521875084546506,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0033589",
+        "player_name": "David Moore",
+        "position_group": "WR",
+        "p_primary": 0.09174276154360327,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 74,
+          "abs_disagreement": 0.12393053687988491,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0039356",
+        "player_name": "Ja'Tavion Sanders",
+        "position_group": "TE",
+        "p_primary": 0.0889681352137873,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 26,
+          "abs_disagreement": 0.1340065646102828,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0035406",
+        "player_name": "Lil'Jordan Humphrey",
+        "position_group": "WR",
+        "p_primary": 0.07725908235056128,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 52,
+          "abs_disagreement": 0.15843360697579176,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0037005",
+        "player_name": "Tommy Tremble",
+        "position_group": "TE",
+        "p_primary": 0.07498539889745442,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 74,
+          "abs_disagreement": 0.16803949779390942,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0036422",
+        "player_name": "Adam Trautman",
+        "position_group": "TE",
+        "p_primary": 0.06980959492494997,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 80,
+          "abs_disagreement": 0.12544864143413037,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0038783",
+        "player_name": "Nate Adkins",
+        "position_group": "TE",
+        "p_primary": 0.06044748747871544,
+        "reliability": {
+          "level": "medium",
+          "flags": [
+            "large_model_disagreement"
+          ],
+          "sample_size": 26,
+          "abs_disagreement": 0.11232411741081172,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0041133",
+        "player_name": "Dallen Bentley",
+        "position_group": "TE",
+        "p_primary": 0.012411646716098566,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "missing_or_defaulted_defense",
+            "missing_current_season_td_signal",
+            "large_model_disagreement"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": 0.15824303654592556,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      },
+      {
+        "league_id": "nfl",
+        "game_id": "nfl:2026_09_DEN_CAR",
+        "player_id": "nfl:00-0041149",
+        "player_name": "Haynes King",
+        "position_group": "QB",
+        "p_primary": 0.005716100911886363,
+        "reliability": {
+          "level": "low",
+          "flags": [
+            "limited_player_history",
+            "no_prior_games",
+            "missing_or_defaulted_defense",
+            "missing_current_season_td_signal",
+            "large_model_disagreement"
+          ],
+          "sample_size": 0,
+          "abs_disagreement": 0.1588139510148267,
+          "note": "Research triage only \u2014 does not invent CIs or modify probabilities"
+        }
+      }
+    ],
+    "method": "flag-based research triage; no invented confidence intervals"
+  },
+  "5_prospective_freeze_verification": {
+    "status": "ok",
+    "freeze_path": "data\\research\\atd_unified\\prospective\\latest_freeze.json",
+    "frozen_at": "2026-11-07T03:08:25.743821+00:00",
+    "n_games": 22,
+    "n_ok": 20,
+    "n_with_issues": 2,
+    "artifact_hashes": {
+      "nfl_m6_hist_gbm": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+      "fbs_m6_hist_gbm": "4aee8613847af674f66a3dedf55e9475eeb3e013debe4a321131592a63748bfc",
+      "nfl_m6_meta": "44b3ee855fab4fd0e8444fb47d73c8f23327afc4ddb4f1b4ce3ff04ba4fd0874",
+      "fbs_m6_meta": "49341a61dce16ef0ed09d8b041417a47d3c8967cf59ccede0cdb832af7a75086"
+    },
+    "m6_hist_gbm_version": "m6_hist_gbm_v1",
+    "issues": [
+      {
+        "game_id": "fbs-ala-lsu",
+        "league_id": "fbs",
+        "kickoff_utc": "2026-11-07T20:00:00+00:00",
+        "frozen_at": "2026-11-07T03:08:25.743821+00:00",
+        "holdout_tag": "prospective_unexamined",
+        "db_status": "scheduled",
+        "n_players": 4,
+        "n_priced_players": 0,
+        "price_coverage": 0.0,
+        "issues": [
+          "no_sportsbook_anytime_td_ticks_for_game"
+        ],
+        "immutable_file": true
+      },
+      {
+        "game_id": "fbs-ore-wash",
+        "league_id": "fbs",
+        "kickoff_utc": "2026-11-07T20:00:00+00:00",
+        "frozen_at": "2026-11-07T03:08:25.743821+00:00",
+        "holdout_tag": "prospective_unexamined",
+        "db_status": "scheduled",
+        "n_players": 2,
+        "n_priced_players": 0,
+        "price_coverage": 0.0,
+        "issues": [
+          "no_sportsbook_anytime_td_ticks_for_game"
+        ],
+        "immutable_file": true
+      }
+    ],
+    "shadow_connection": "use ingest_freeze_into_shadow to write append-only ShadowPrediction rows",
+    "settlement_connection": "existing settle_shadow_predictions grades shadow_predictions"
+  },
+  "6_settlement_status": {
+    "ingest_into_shadow": {
+      "status": "ok",
+      "written": 241,
+      "unchanged": 0,
+      "skipped_no_price": 556,
+      "skipped_no_prob": 12,
+      "by_model": {
+        "player_td_v1": 51,
+        "m6_hist_gbm": 51,
+        "ens_m6_gbm_player_td": 51,
+        "m5": 88
+      },
+      "play_enabled": false,
+      "research_only": true,
+      "validated_play": false,
+      "recommendation_status": "no_bet",
+      "freeze_frozen_at": "2026-11-07T03:08:25.743821+00:00",
+      "artifact_hashes": {
+        "nfl_m6_hist_gbm": "c2557953888db865e6bf458fe21cc9c169b5fa981da0e15f0fbba50605b5812f",
+        "fbs_m6_hist_gbm": "4aee8613847af674f66a3dedf55e9475eeb3e013debe4a321131592a63748bfc"
+      }
+    },
+    "settle": {
+      "settled": 0,
+      "already_settled": 0,
+      "blocked": 0,
+      "pending": 17176,
+      "by_result": {},
+      "blockers": {},
+      "status": "ok"
+    },
+    "ledger_path": "data\\research\\atd_unified\\prospective\\freeze_shadow_ledger.json"
+  },
+  "7_actual_accuracy_results": {
+    "nfl": {},
+    "fbs": {},
+    "n_settled_rows": 0,
+    "note": "Only 0 settled win/loss rows \u2014 do not claim model superiority from this sample."
+  },
+  "8_remaining_blockers_before_promotion": [
+    "Validated Play remains disabled by design",
+    "No model promotion until prospective settled sample is large enough",
+    "Sportsbook price coverage incomplete for some FBS freeze players",
+    "Settlement pending until frozen games reach official final status",
+    "Insufficient settled prospective sample for superiority claims"
+  ]
+}
