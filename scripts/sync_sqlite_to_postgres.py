@@ -38,6 +38,7 @@ SERVING_TABLES: list[str] = [
     "bookmakers",
     "games",
     "rosters",
+    "roster_weeks",
     "outcomes",
     "closing_lines",
     "odds_ticks",
@@ -149,12 +150,18 @@ def sync_table(src: Engine, dest: Engine, table: str) -> int:
     placeholders = ", ".join(f":{c}" for c in cols)
     insert_sql = text(f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders})')
 
+    # Free Postgres cannot hold every historical roster_week row. Keep the current
+    # season (plus prior year for late-season lookup) so NFL props can resolve.
+    where_sql = ""
+    if table == "roster_weeks":
+        where_sql = " WHERE season_year >= 2025"
+
     t0 = time.time()
     total = 0
     with src.connect() as sconn, dest.begin() as dconn:
         # Replace just this table so --continue can resume after a failure.
         dconn.execute(text(f'TRUNCATE "{table}" CASCADE'))
-        result = sconn.execute(text(f'SELECT {col_list} FROM "{table}"'))
+        result = sconn.execute(text(f'SELECT {col_list} FROM "{table}"{where_sql}'))
         batch: list[dict] = []
         while True:
             rows = result.fetchmany(BATCH)
@@ -203,10 +210,18 @@ def main() -> int:
         present = [t for t in present if t in only]
     if continue_from:
         if continue_from not in present:
-            # allow continuing even if earlier tables were already loaded
-            present = [t for t in SERVING_TABLES if t in inspect(src).get_table_names()]
-        idx = present.index(continue_from) if continue_from in present else 0
-        present = present[idx:]
+            if only:
+                print(
+                    f"SYNC_CONTINUE_FROM={continue_from} not in SYNC_ONLY={sorted(only)}; "
+                    "ignoring continue cursor",
+                    flush=True,
+                )
+            else:
+                # allow continuing even if earlier tables were already loaded
+                present = [t for t in SERVING_TABLES if t in inspect(src).get_table_names()]
+        if continue_from in present:
+            present = present[present.index(continue_from) :]
+
     print(f"source={src.url.render_as_string(hide_password=True)}", flush=True)
     print(f"dest={dest.url.render_as_string(hide_password=True)}", flush=True)
     print(f"tables={len(present)} start={present[0] if present else None}", flush=True)

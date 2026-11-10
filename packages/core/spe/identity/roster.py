@@ -123,6 +123,16 @@ def _nfl_week_roster(
         )
         .all()
     )
+    # Upcoming kickoffs often land before nflverse publishes that week's file.
+    # Prefer an exact week when present; otherwise use the latest published week
+    # for these clubs so live props can still resolve names.
+    if not rows:
+        return _latest_nfl_roster(
+            session,
+            participant_ids,
+            year,
+            include_inactive_for_props=include_inactive_for_props,
+        )
     labels = _nfl_eligibility_labels(session, year, week) if apply_eligibility_audit else {}
     seen: set[str] = set()
     out: list[EligiblePlayer] = []

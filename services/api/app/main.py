@@ -956,19 +956,62 @@ def atd_desk_status(session: Session = Depends(db_session)) -> dict[str, Any]:
     import json
     from pathlib import Path
 
-    from spe.shadow.atd_desk_takes import is_desk_take
+    from spe.shadow.atd_desk_takes import DESK_TAKE_KIND, is_desk_take
     from spe.shadow.fbs_atd_production_readiness import evaluate_production_readiness
     from spe.db.models import ShadowPrediction, ShadowSettlement
 
     ready = evaluate_production_readiness(session)
-    preds = session.query(ShadowPrediction).filter(ShadowPrediction.market_id == "anytime_td").all()
-    settled_ids = {
-        s.shadow_id
-        for s in session.query(ShadowSettlement.shadow_id).filter(
-            ShadowSettlement.shadow_id.in_([p.shadow_id for p in preds] or ["__none__"])
-        )
-    }
-    open_takes = sum(1 for p in preds if is_desk_take(p) and p.shadow_id not in settled_ids)
+    # Avoid loading the full anytime_td shadow table into RAM (free-tier OOM).
+    # Prefer JSON key filters when the dialect supports them; otherwise stream.
+    open_takes = 0
+    try:
+        from sqlalchemy import or_, text
+
+        dialect = session.get_bind().dialect.name
+        if dialect == "postgresql":
+            open_takes = int(
+                session.execute(
+                    text(
+                        """
+                        SELECT COUNT(*) FROM shadow_predictions p
+                        WHERE p.market_id = 'anytime_td'
+                          AND (
+                            p.components->>'desk_take' IN (:k1, :k2)
+                            OR p.components->>'desk_take_kind' IN (:k1, :k2)
+                          )
+                          AND NOT EXISTS (
+                            SELECT 1 FROM shadow_settlements s WHERE s.shadow_id = p.shadow_id
+                          )
+                        """
+                    ),
+                    {"k1": DESK_TAKE_KIND, "k2": "at_this_price"},
+                ).scalar()
+                or 0
+            )
+        else:
+            # SQLite: only rows that look like desk takes, then verify + unsettled.
+            candidates = (
+                session.query(ShadowPrediction)
+                .filter(ShadowPrediction.market_id == "anytime_td")
+                .filter(
+                    or_(
+                        ShadowPrediction.components.contains({"desk_take": DESK_TAKE_KIND}),
+                        ShadowPrediction.components.contains({"desk_take": "at_this_price"}),
+                        ShadowPrediction.components.contains({"desk_take_kind": DESK_TAKE_KIND}),
+                        ShadowPrediction.components.contains({"desk_take_kind": "at_this_price"}),
+                    )
+                )
+                .all()
+            )
+            settled_ids = {
+                sid
+                for (sid,) in session.query(ShadowSettlement.shadow_id)
+                .filter(ShadowSettlement.shadow_id.in_([p.shadow_id for p in candidates] or ["__none__"]))
+                .all()
+            }
+            open_takes = sum(1 for p in candidates if is_desk_take(p) and p.shadow_id not in settled_ids)
+    except Exception:
+        open_takes = 0
 
     odds = None
     ops_path = Path("data") / "atd_sim_dev" / "live_weekend" / "do_now_ops_report.json"
