@@ -1,9 +1,9 @@
-# Caliber cloud stack — API + Postgres + one hourly worker chore.
-# Cost-minded: one web (starter) + one cron (starter) + free/basic Postgres.
-# Netlify points API_URL at the caliber-api service URL.
+# Caliber cloud API + Postgres (free tier).
+# Hourly scoreboard/odds stay on the Windows Task Scheduler for $0 until a
+# Render payment method is added (cron requires billing). Then add caliber-hourly.
 #
-# After first deploy, set in the dashboard (or CLI):
-#   WEB_ORIGIN, ODDS_API_KEY, CFBD_API_KEY
+# After deploy, set WEB_ORIGIN / ODDS_API_KEY / CFBD_API_KEY, then point Netlify
+# API_URL at this service.
 
 databases:
   - name: caliber-db
@@ -15,7 +15,7 @@ services:
   - type: web
     name: caliber-api
     runtime: docker
-    plan: starter
+    plan: free
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
@@ -40,37 +40,5 @@ services:
         value: "2000"
       - key: DISCLAIMER
         value: Research forecast only. Not betting advice. No wagering, no automated placement.
-      - key: PYTHONPATH
-        value: /app/packages/core:/app/services/api:/app/services/worker
-
-  # Once an hour: ESPN finals, then light ops (odds/settle when due).
-  # Keeps one paid cron instead of three.
-  - type: cron
-    name: caliber-hourly
-    runtime: docker
-    plan: starter
-    region: oregon
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    schedule: "15 * * * *"
-    dockerCommand: >
-      sh -c "python -m worker.main ingest-scoreboard
-      && python -m worker.main cfb-atd-ops-cycle --skip-boxes
-      && python -m worker.main ingest-odds-live"
-    envVars:
-      - key: APP_ENV
-        value: prod
-      - key: DATABASE_URL
-        fromDatabase:
-          name: caliber-db
-          property: connectionString
-      - key: PARQUET_DIR
-        value: /data/parquet
-      - key: ODDS_API_KEY
-        sync: false
-      - key: CFBD_API_KEY
-        sync: false
-      - key: ODDS_CREDIT_BUDGET_PER_DAY
-        value: "2000"
       - key: PYTHONPATH
         value: /app/packages/core:/app/services/api:/app/services/worker
