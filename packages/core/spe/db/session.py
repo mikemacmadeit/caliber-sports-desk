@@ -88,10 +88,11 @@ def init_db() -> None:
 
     engine = get_engine()
     try:
-        # A long ingest can hold the write lock. Fail that attempt quickly and
-        # keep serving the tables that are already there.
+        # A long SQLite ingest can hold the write lock. Fail that attempt quickly
+        # and keep serving the tables that are already there. Skip on Postgres.
         with engine.begin() as conn:
-            conn.exec_driver_sql("PRAGMA busy_timeout=2500")
+            if engine.dialect.name == "sqlite":
+                conn.exec_driver_sql("PRAGMA busy_timeout=2500")
             Base.metadata.create_all(bind=conn)
         ensure_schema(engine)
     except OperationalError:
