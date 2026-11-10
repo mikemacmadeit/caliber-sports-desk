@@ -6,7 +6,7 @@
 
 [build]
   command = "npm run build -w web"
-  # Do not set publish — @netlify/plugin-nextjs owns it on Linux cloud builds.
+  publish = "apps/web/.next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
