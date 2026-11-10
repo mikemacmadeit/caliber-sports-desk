@@ -257,6 +257,7 @@ def cmd_ingest_odds_live(
 ) -> None:
     init_db()
     s = session_factory()
+    result: dict = {}
     try:
         set_busy_timeout(s, 120000)
         result = ingest_odds_live(
@@ -272,6 +273,19 @@ def cmd_ingest_odds_live(
         raise
     finally:
         s.close()
+    # Website boards read a saved props file. Rewrite it after prices/forecasts move.
+    if int(result.get("ticks_upserted") or 0) > 0 or int(result.get("events_fetched") or 0) > 0:
+        from spe.props.board_cache import refresh_near_slate
+
+        board = session_factory()
+        try:
+            set_busy_timeout(board, 300000)
+            warmed = refresh_near_slate(board)
+            print(json.dumps({"props_board_cached": warmed}, default=str))
+        except Exception as exc:
+            print(json.dumps({"props_board_cached": 0, "props_board_error": type(exc).__name__}))
+        finally:
+            board.close()
 
 
 def cmd_compare_research_models() -> None:

@@ -1,11 +1,36 @@
 const API = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/** Short in-process reuse so flipping league/date/back does not refetch cold boards. */
+const GET_CACHE_TTL_MS = 45_000;
+const getCache = new Map<string, { expires: number; value: unknown }>();
+
+function cacheableGetPath(path: string): boolean {
+  return (
+    path.startsWith("/v1/props") ||
+    path.startsWith("/v1/ats") ||
+    path.startsWith("/v1/anytime-td") ||
+    path.startsWith("/v1/days") ||
+    path.startsWith("/v1/atd/desk-status")
+  );
+}
+
 export async function apiGet<T>(path: string, timeoutMs = 15000): Promise<T> {
+  const useCache = cacheableGetPath(path);
+  if (useCache) {
+    const hit = getCache.get(path);
+    if (hit && hit.expires > Date.now()) {
+      return hit.value as T;
+    }
+  }
   const res = await fetch(`${API}${path}`, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) {
     throw new Error(`${path} failed: ${res.status}`);
   }
-  return res.json() as Promise<T>;
+  const value = (await res.json()) as T;
+  if (useCache) {
+    getCache.set(path, { expires: Date.now() + GET_CACHE_TTL_MS, value });
+  }
+  return value;
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {

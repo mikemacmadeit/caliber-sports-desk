@@ -325,7 +325,11 @@ def props(
     date: str | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
-    rows = list_props(session, market, min_odds, min_ev, league, date)
+    # Serve the saved board when present. A stale file still returns while one
+    # background rebuild refreshes it — same pattern as /v1/ats.
+    from spe.props.board_cache import load_props
+
+    rows = load_props(session, market, min_odds, min_ev, league, date)
     return {"market": market or "all", "date": date or "all", "rows": rows, "disclaimer": disclaimer()}
 
 
@@ -950,11 +954,22 @@ def shadow_track_record_endpoint(session: Session = Depends(db_session)) -> dict
     return payload
 
 
+_DESK_STATUS_CACHE: tuple[float, dict[str, Any]] | None = None
+_DESK_STATUS_TTL_S = 60.0
+
+
 @app.get("/v1/atd/desk-status")
 def atd_desk_status(session: Session = Depends(db_session)) -> dict[str, Any]:
     """Compact Anytime TD desk health for the product UI. Play stays off."""
     import json
     from pathlib import Path
+
+    global _DESK_STATUS_CACHE
+    now = time.monotonic()
+    if _DESK_STATUS_CACHE is not None:
+        cached_at, cached_payload = _DESK_STATUS_CACHE
+        if now - cached_at < _DESK_STATUS_TTL_S:
+            return cached_payload
 
     from spe.shadow.atd_desk_takes import DESK_TAKE_KIND, is_desk_take
     from spe.shadow.fbs_atd_production_readiness import evaluate_production_readiness
@@ -1022,7 +1037,7 @@ def atd_desk_status(session: Session = Depends(db_session)) -> dict[str, Any]:
         except (OSError, json.JSONDecodeError):
             odds = None
 
-    return {
+    payload = {
         "mode": "official" if ready.get("play_enabled") else "research",
         "play_enabled": bool(ready.get("play_enabled")),
         "validated_play": bool(ready.get("validated_play")),
@@ -1035,6 +1050,8 @@ def atd_desk_status(session: Session = Depends(db_session)) -> dict[str, Any]:
         "note": ready.get("note"),
         "disclaimer": disclaimer(),
     }
+    _DESK_STATUS_CACHE = (now, payload)
+    return payload
 
 
 @app.get("/v1/ats")
@@ -1142,10 +1159,10 @@ def ats_game_research(
     use_ai: bool = Query(False),
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
-    from spe.models.ats.predict import predict_upcoming_ats
+    from spe.models.ats.board_cache import load_board
     from spe.models.ats.research import explain_ats_matchup
 
-    board = predict_upcoming_ats(session, include_simulation=False)
+    board = load_board(session)
     prediction = next((r for r in board.get("rows") or [] if r["game_id"] == game_id), None)
     if prediction is None:
         raise HTTPException(status_code=404, detail="No ATS research row for this game")
