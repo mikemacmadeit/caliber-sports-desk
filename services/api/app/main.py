@@ -423,7 +423,9 @@ def anytime_td_research(
     if needs_rebuild:
         session = session_factory()
         try:
-            session.connection().exec_driver_sql("PRAGMA busy_timeout=120000")
+            from spe.db.session import set_busy_timeout
+
+            set_busy_timeout(session, 120_000)
             payload = build_finder_payload(session, refresh_fbs_c_recent=True)
             session.rollback()
         except OperationalError:

@@ -70,7 +70,9 @@ def settle_all_eligible(session: Session) -> dict[str, Any]:
         session.rollback()
         if "locked" not in str(exc).lower():
             raise
-        session.connection().exec_driver_sql("PRAGMA busy_timeout=300000")
+        from spe.db.session import set_busy_timeout
+
+        set_busy_timeout(session, 300_000)
         step = {
             "job_name": "shadow_settle_direct",
             "status": "ok",
