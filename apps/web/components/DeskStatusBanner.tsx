@@ -41,7 +41,7 @@ export function DeskStatusBanner({ status }: { status: DeskStatus | null }) {
         <p className="mt-2 font-display text-2xl uppercase leading-none tracking-wide text-paper">
           {status.remaining?.[0] ? "Keep freezing" : status.production_ready ? "Manual unlock" : "Build live N"}
         </p>
-        <p className="mt-2 truncate text-sm text-mute">
+        <p className="mt-2 text-sm leading-relaxed text-mute">
           {status.note || "Official Play does not flip on by itself."}{" "}
           <Link href="/track-record" className="text-gold">
             Ledger →
@@ -56,8 +56,8 @@ function StatusCell({ label, value, hint }: { label: string; value: string; hint
   return (
     <div className="min-w-0">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-mute">{label}</p>
-      <p className="mt-2 truncate font-display text-2xl uppercase leading-none tracking-wide text-paper">{value}</p>
-      <p className="mt-2 truncate font-mono text-[10px] uppercase tracking-[0.16em] text-mute">{hint}</p>
+      <p className="mt-2 font-display text-xl uppercase leading-tight tracking-wide text-paper sm:text-2xl">{value}</p>
+      <p className="mt-2 font-mono text-[10px] uppercase leading-relaxed tracking-[0.16em] text-mute">{hint}</p>
     </div>
   );
 }

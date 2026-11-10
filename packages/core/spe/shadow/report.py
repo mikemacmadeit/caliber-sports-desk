@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from sqlalchemy.orm import Session
 
-from spe.db.models import JobRun, ShadowPrediction, ShadowSettlement
+from spe.db.models import Game, JobRun, ShadowPrediction, ShadowSettlement
 from spe.models.metrics import brier_score, expected_calibration_error, log_loss
 
 
@@ -95,6 +95,7 @@ def shadow_track_record(session: Session) -> dict[str, Any]:
     m3_vs_m4 = _paired_comparison(preds, settles)
     independence = _independence_counts(preds, settles)
     atd_scorecard = _atd_scorecard(preds, settles)
+    _attach_take_slate(session, atd_scorecard)
     from spe.ops.freshness import operations_health
     from spe.shadow.ats import ats_track_record
 
@@ -147,6 +148,51 @@ def shadow_track_record(session: Session) -> dict[str, Any]:
             "M3/M4 pairs and repeated captures of the same outcome are not independent evidence."
         ),
     }
+
+
+def _utc_iso(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        iso = value.isoformat()
+        if getattr(value, "tzinfo", None) is None and not iso.endswith("Z"):
+            return iso + "Z"
+        return iso
+    text = value.strip().replace(" ", "T")
+    tail = text[10:]
+    if text.endswith("Z") or "+" in tail or "-" in tail:
+        return text
+    return text + "Z"
+
+
+def _attach_take_slate(session: Session, scorecard: dict[str, Any]) -> None:
+    """Add the game's kickoff and clubs so the page can track picks by slate."""
+    takes = scorecard.get("open_and_settled_takes") or []
+    ids = {row.get("game_id") for row in takes if row.get("game_id")}
+    if not ids:
+        return
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    games = session.scalars(
+        select(Game)
+        .where(Game.game_id.in_(ids))
+        .options(selectinload(Game.away_team), selectinload(Game.home_team))
+    ).all()
+    by_id = {game.game_id: game for game in games}
+    for take in takes:
+        game = by_id.get(take.get("game_id"))
+        if game is None:
+            continue
+        kick = game.kickoff_utc
+        take["kickoff_utc"] = _utc_iso(kick)
+        take["week"] = game.week
+        away = game.away_team.abbreviation if game.away_team is not None else None
+        home = game.home_team.abbreviation if game.home_team is not None else None
+        take["away_abbr"] = away
+        take["home_abbr"] = home
+        if game.away_score is not None and game.home_score is not None and away and home:
+            take["final_score"] = f"{away} {game.away_score}, {home} {game.home_score}"
 
 
 def _family(model_version_id: str) -> str:
@@ -265,9 +311,8 @@ def _atd_scorecard(
         "primary_rows": [r for r in take_rows if r["family"] in primary],
         "open_and_settled_takes": open_takes,
         "note": (
-            "Anytime TD pick score counts only desk takes — one multifactor pick per game "
-            "(chance, edge, freshness, availability), marked before kickoff. Not highest % "
-            "alone and not every research row. Validated Play stays off."
+            "Anytime TD pick score counts only desk takes — one player per game, "
+            "the one most likely to score, marked before kickoff. Validated Play stays off."
         ),
         "research_universe_note": (
             "all_research_rows is the full shadow universe for diagnostics; "

@@ -18,8 +18,9 @@ const SLATE_TZ = "America/Chicago";
 
 /** API datetimes are UTC. A stamp with no zone is still UTC, not local. */
 function parseUtc(iso: string): Date {
-  const hasZone = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(iso);
-  return new Date(hasZone ? iso : `${iso}Z`);
+  const normalized = iso.includes("T") ? iso : iso.replace(" ", "T");
+  const hasZone = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(normalized);
+  return new Date(hasZone ? normalized : `${normalized}Z`);
 }
 
 export function kickoffParts(iso: string): { day: string; time: string } {

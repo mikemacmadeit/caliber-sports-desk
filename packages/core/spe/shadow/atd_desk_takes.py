@@ -461,6 +461,104 @@ def lock_finished_desk_picks(
     }
 
 
+_DESK_KEYS = (
+    "desk_take",
+    "desk_take_at",
+    "desk_take_kind",
+    "desk_take_ev_after_haircut",
+    "desk_pick_score",
+    "desk_pick_parts",
+    "desk_take_source",
+    "desk_take_id",
+    "board_p",
+)
+
+
+def assign_unsettled_board_call(
+    session: Session,
+    *,
+    game_id: str,
+    player_id: str,
+    called_at: datetime,
+    board_p: float | None = None,
+    model_prefix: str = "player_td_v1-",
+) -> dict[str, Any]:
+    """Move an unsettled desk flag onto the player the board called before kickoff.
+
+    A settled take stays put. The call time has to be before kickoff.
+    """
+    game = session.get(Game, game_id)
+    if game is None:
+        return {"status": "missing_game"}
+    kick = as_utc(game.kickoff_utc)
+    called = as_utc(called_at)
+    if kick is None or called is None or called >= kick:
+        return {"status": "call_not_before_kickoff"}
+    if str(game.status or "").lower() not in {"final", "post"}:
+        return {"status": "game_not_final"}
+
+    preds = (
+        session.query(ShadowPrediction)
+        .filter(
+            ShadowPrediction.game_id == game_id,
+            ShadowPrediction.market_id == "anytime_td",
+        )
+        .all()
+    )
+    settled = {
+        row.shadow_id: row.result
+        for row in session.query(ShadowSettlement).filter(
+            ShadowSettlement.shadow_id.in_([pred.shadow_id for pred in preds] or ["__none__"])
+        )
+    }
+    desk = [pred for pred in preds if is_desk_take(pred)]
+    graded = {"win", "loss", "push", "void"}
+    if any(settled.get(pred.shadow_id) in graded for pred in desk):
+        return {"status": "already_graded"}
+
+    chosen: ShadowPrediction | None = None
+    for pred in preds:
+        if pred.player_id != player_id:
+            continue
+        if not (pred.model_version_id or "").startswith(model_prefix):
+            continue
+        frozen = as_utc(pred.forecast_as_of)
+        if frozen is None or frozen >= kick:
+            continue
+        if chosen is None or frozen > (as_utc(chosen.forecast_as_of) or frozen):
+            chosen = pred
+    if chosen is None:
+        return {"status": "no_pregame_row"}
+
+    cleared: list[str] = []
+    for pred in desk:
+        if pred.shadow_id == chosen.shadow_id:
+            continue
+        comps = dict(pred.components or {})
+        for key in _DESK_KEYS:
+            comps.pop(key, None)
+        pred.components = comps
+        attributes.flag_modified(pred, "components")
+        cleared.append(pred.shadow_id)
+
+    comps = dict(chosen.components or {})
+    comps["desk_take"] = DESK_TAKE_KIND
+    comps["desk_take_kind"] = DESK_TAKE_KIND
+    comps["desk_take_at"] = called.isoformat()
+    comps["desk_take_source"] = "tonight_board"
+    if board_p is not None:
+        comps["board_p"] = float(board_p)
+    comps["desk_take_id"] = comps.get("desk_take_id") or new_id()
+    chosen.components = comps
+    attributes.flag_modified(chosen, "components")
+    return {
+        "status": "ok",
+        "shadow_id": chosen.shadow_id,
+        "player_id": player_id,
+        "cleared": cleared,
+    }
+
+
 def is_desk_take(pred: ShadowPrediction) -> bool:
     comps = pred.components or {}
     kind = comps.get("desk_take") or comps.get("desk_take_kind")

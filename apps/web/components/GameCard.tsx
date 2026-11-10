@@ -33,8 +33,8 @@ export function GameCard({ game, featured = false }: { game: SlateGame; featured
       />
 
       <div className="relative">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             {featured ? (
               <span className={game.status === "in_progress" ? "kicker kicker-signal" : "kicker"}>
                 {game.status === "in_progress" ? "Live" : "Next kickoff"}
@@ -65,7 +65,7 @@ export function GameCard({ game, featured = false }: { game: SlateGame; featured
             </div>
           </div>
         ) : (
-          <div className="mt-5 grid grid-cols-[auto_1fr_auto_1fr_auto] items-center gap-3">
+          <div className="mt-5 grid grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-3">
             <TeamMark team={away} />
             <TeamSide abbr={away.abbr} nick={away.nick} />
             <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-signal">at</div>
@@ -117,7 +117,7 @@ function TeamSide({
     <div className={`min-w-0 ${align === "right" ? "text-right" : ""}`}>
       <div
         className={`truncate font-display uppercase leading-none tracking-tight text-paper ${
-          featured ? "text-6xl sm:text-8xl" : "text-5xl sm:text-6xl"
+          featured ? "text-5xl sm:text-8xl" : "text-4xl sm:text-6xl"
         }`}
       >
         {abbr}

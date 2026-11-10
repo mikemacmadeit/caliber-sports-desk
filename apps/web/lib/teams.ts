@@ -122,6 +122,17 @@ const NICK_TO_ABBR: Array<[string, string]> = [
   ["washington", "WAS"],
 ];
 
+/** A short name for a ticket. Known clubs use the mascot. Everyone else keeps the school name. */
+export function ticketName(name: string | null | undefined): string {
+  const text = (name || "").trim();
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  for (const [nick] of NICK_TO_ABBR) {
+    if (lower.endsWith(nick)) return nick.replace(/(^|\s)\w/g, (letter) => letter.toUpperCase());
+  }
+  return text;
+}
+
 /** A schedule name is enough for a club color when the card has no abbreviation. */
 export function clubFromName(name: string | null | undefined): Club {
   const text = (name || "").toLowerCase();

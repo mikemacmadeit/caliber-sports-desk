@@ -20,6 +20,7 @@ from spe.db.models import (
     OddsTick,
     Outcome,
     Player,
+    PlayerGameStat,
     Recommendation,
     Settlement,
     SimulationRun,
@@ -431,15 +432,20 @@ def prop_row(
     roster_index: dict[str, Any] | None = None,
     stat_logs: dict[str, list] | None = None,
     ruled_out: set[tuple[str, str]] | None = None,
+    include_started: bool = False,
 ) -> dict[str, Any] | None:
     game = session.get(Game, outcome.game_id)
-    if not game or game.data_tier in {"demo", "historical", "season", "alias"}:
+    if not game or game.data_tier in {"demo", "alias"}:
+        return None
+    if not include_started and game.data_tier in {"historical", "season"}:
         return None
     # Pregame desk only — live/final games are not priced opportunities here.
-    if game.status in {"final", "canceled", "cancelled", "in_progress"}:
+    if not include_started and game.status in {"final", "canceled", "cancelled", "in_progress"}:
         return None
     kick = as_utc(game.kickoff_utc)
-    if kick is not None and kick <= datetime.now(UTC):
+    if not include_started and kick is not None and kick <= datetime.now(UTC):
+        return None
+    if include_started and game.status in {"canceled", "cancelled"}:
         return None
     player = session.get(Player, outcome.player_id) if outcome.player_id else None
     roster = roster_index if roster_index is not None else eligible_roster_index(session, game)
@@ -481,6 +487,8 @@ def prop_row(
         from spe.models.player_td.tonight import apply_tonight_chance, tables_ready
 
         weather = _game_weather(session, game)
+        started = kick is not None and kick <= datetime.now(UTC)
+        through_week = (game.week - 1) if started and game.week else None
         if tables_ready():
             payload = apply_tonight_chance(
                 payload,
@@ -490,6 +498,7 @@ def prop_row(
                 opponent=opp.abbreviation if opp else None,
                 weather=weather,
                 availability=payload.get("availability_status"),
+                through_week=through_week,
             )
         else:
             depth, touches, defense = load_current_role_tables()
@@ -632,6 +641,112 @@ def list_props(
         )
     )
     return rows
+
+
+def list_called_scorers(
+    session: Session,
+    league: str | None,
+    date: str | None,
+) -> list[dict[str, Any]]:
+    """The scorer we called for a game that has already kicked off.
+
+    The live board drops those games. This keeps last night's call on the page,
+    using only weeks before that game so the result cannot change the name.
+    """
+    from datetime import timedelta
+
+    from spe.shadow.atd_desk_takes import select_desk_takes
+
+    day = date or slate_today()
+    days = {day}
+    if day == slate_today():
+        prior = (datetime.fromisoformat(day).date() - timedelta(days=1)).isoformat()
+        days.add(prior)
+    start = datetime.fromisoformat(min(days)).replace(tzinfo=SLATE_TZ)
+    end = datetime.fromisoformat(max(days)).replace(tzinfo=SLATE_TZ) + timedelta(days=1)
+    now = datetime.now(UTC)
+    stmt = select(Game).where(
+        Game.kickoff_utc >= start.astimezone(UTC).replace(tzinfo=None),
+        Game.kickoff_utc < end.astimezone(UTC).replace(tzinfo=None),
+        Game.data_tier.notin_(("demo", "alias")),
+    )
+    if league and league not in {"all", ""}:
+        stmt = stmt.where(Game.league_id == league)
+    games = [
+        game
+        for game in session.scalars(stmt)
+        if kickoff_day(game.kickoff_utc) in days
+        and game.status not in {"canceled", "cancelled"}
+        and as_utc(game.kickoff_utc) is not None
+        and as_utc(game.kickoff_utc) <= now
+    ]
+    if not games:
+        return []
+    game_ids = [game.game_id for game in games]
+    outcomes = list(
+        session.scalars(
+            select(Outcome).where(Outcome.game_id.in_(game_ids), Outcome.market_id == "anytime_td")
+        )
+    )
+    roster_cache: dict[str, dict[str, Any]] = {}
+    rows: list[dict[str, Any]] = []
+    for outcome in outcomes:
+        if outcome.game_id not in roster_cache:
+            game = session.get(Game, outcome.game_id)
+            roster_cache[outcome.game_id] = eligible_roster_index(session, game) if game else {}
+        row = prop_row(
+            session,
+            outcome,
+            roster_index=roster_cache[outcome.game_id],
+            include_started=True,
+        )
+        if row:
+            rows.append(row)
+    called = select_desk_takes(rows)
+    by_game = {game.game_id: game for game in games}
+    for row in called:
+        game = by_game.get(row.get("game_id"))
+        chance = (row.get("forecast") or {}).get("p_estimate")
+        tonight = (row.get("forecast") or {}).get("tonight") or {}
+        summary = str(tonight.get("summary") or "")
+        if isinstance(chance, (int, float)):
+            shown = f"{round(float(chance) * 100)}% to score tonight."
+            called_at = f"Called at {round(float(chance) * 100)}% before kickoff."
+            summary = summary.replace(shown, called_at)
+            if tonight:
+                tonight = dict(tonight)
+                tonight["summary"] = summary
+                row["forecast"] = dict(row["forecast"])
+                row["forecast"]["tonight"] = tonight
+        row["game_status"] = game.status if game else None
+        row["final_score"] = _final_score(game) if game else None
+        row["result"] = _anytime_result(
+            session, str(row.get("game_id") or ""), row.get("player_id")
+        )
+    called.sort(key=lambda row: str(row.get("kickoff_utc") or ""))
+    return called
+
+
+def _final_score(game: Game) -> str | None:
+    if game.home_score is None or game.away_score is None:
+        return None
+    away = game.away_team.abbreviation if game.away_team else "Away"
+    home = game.home_team.abbreviation if game.home_team else "Home"
+    return f"{away} {game.away_score}, {home} {game.home_score}"
+
+
+def _anytime_result(session: Session, game_id: str, player_id: str | None) -> str:
+    if not player_id:
+        return "pending"
+    stats = (
+        session.query(PlayerGameStat)
+        .filter(PlayerGameStat.game_id == game_id, PlayerGameStat.player_id == player_id)
+        .all()
+    )
+    if not stats:
+        return "pending"
+    scored = any(int(row.rush_td or 0) + int(row.rec_td or 0) > 0 for row in stats)
+    return "scored" if scored else "blank"
 
 
 def _attach_td_usage(session: Session, rows: list[dict[str, Any]]) -> None:

@@ -1,5 +1,6 @@
 import { BackLink } from "@/components/BackLink";
 import { GameMarkets } from "@/components/GameMarkets";
+import { PickPair } from "@/components/CallCard";
 import { MarginBar } from "@/components/MarginBar";
 import { ModelGaps } from "@/components/ModelGaps";
 import { ResearchPanel } from "@/components/ResearchPanel";
@@ -8,7 +9,6 @@ import { TeamMark } from "@/components/TeamMark";
 import { TodayPropPicks } from "@/components/TodayPropPicks";
 import { UsagePanel } from "@/components/UsagePanel";
 import { apiGet, type GameDetail } from "@/lib/api";
-import { callCopy, ledgerLines } from "@/lib/calls";
 import { cToF, kickoff, kickoffDate, mpsToMph } from "@/lib/format";
 import { recommendationCopy, reasonLabel } from "@/lib/labels";
 import { presentTeam } from "@/lib/teams";
@@ -37,11 +37,11 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
           </span>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-5">
+        <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-5">
           <div className="flex items-center gap-4">
             <TeamMark team={away} size="lg" />
             <div>
-              <div className="font-display text-6xl uppercase leading-none tracking-tight sm:text-8xl">
+              <div className="font-display text-5xl uppercase leading-none tracking-tight sm:text-8xl">
                 {away.abbr}
               </div>
               <div className="mt-2 text-sm text-mute">
@@ -53,7 +53,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
           <div className="flex items-center gap-4">
             <TeamMark team={home} size="lg" />
             <div>
-              <div className="font-display text-6xl uppercase leading-none tracking-tight sm:text-8xl">
+              <div className="font-display text-5xl uppercase leading-none tracking-tight sm:text-8xl">
                 {home.abbr}
               </div>
               <div className="mt-2 text-sm text-mute">
@@ -319,6 +319,8 @@ type CardRow = {
   pick_result?: "correct" | "miss" | "push" | null;
   ats_pick_label?: string | null;
   ats_side?: "home" | "away" | null;
+  ats_team?: string | null;
+  ats_line?: number | null;
   ats_cover_margin?: number | null;
   ats_pick_result?: "correct" | "miss" | "push" | null;
   game_status?: string | null;
@@ -353,39 +355,25 @@ function CardReadout({
   awayColor: string;
   homeColor: string;
 }) {
-  const copy = callCopy(row);
-  const graded = ledgerLines(row);
   const settled = row.game_status === "final";
   return (
     <div className="plate relative mt-6 overflow-hidden px-4 py-4 sm:px-5">
       <span aria-hidden className="absolute bottom-0 left-0 top-0 w-1.5" style={{ background: awayColor }} />
       <span aria-hidden className="absolute bottom-0 right-0 top-0 w-1.5" style={{ background: homeColor }} />
-      {settled ? (
-        <div className="space-y-1">
-          <p className={row.pick_result === "miss" ? "text-base text-heat" : "text-base text-gold"}>{graded.win}</p>
-          {graded.cover ? <p className="text-base text-paper/80">{graded.cover}</p> : null}
-          {row.away_score != null && row.home_score != null ? (
-            <p className="font-mono text-[11px] uppercase tracking-wider text-mute">
-              Final {row.away_score}–{row.home_score}
-            </p>
-          ) : null}
-        </div>
+      <PickPair row={row} />
+      {settled && row.away_score != null && row.home_score != null ? (
+        <p className="mt-3 font-mono text-[11px] uppercase tracking-wider text-mute">
+          Final {row.away_score}–{row.home_score}
+        </p>
       ) : (
-        <div className="space-y-2">
-          <p className="font-display text-3xl uppercase leading-none tracking-wide text-paper sm:text-4xl">{copy.winSentence}</p>
-          {copy.score ? <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-mute">{copy.score}</p> : null}
-          {copy.coverSentence ? (
-            <p className={copy.loud ? "text-sm leading-relaxed text-gold" : "text-sm leading-relaxed text-mute"}>{copy.coverSentence}</p>
-          ) : null}
-          <MarginBar
-            margin={row.predicted_margin}
-            handicap={row.home_handicap}
-            awayColor={awayColor}
-            homeColor={homeColor}
-            awayName={row.away_team}
-            homeName={row.home_team}
-          />
-        </div>
+        <MarginBar
+          margin={row.predicted_margin}
+          handicap={row.home_handicap}
+          awayColor={awayColor}
+          homeColor={homeColor}
+          awayName={row.away_team}
+          homeName={row.home_team}
+        />
       )}
     </div>
   );

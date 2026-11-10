@@ -45,17 +45,16 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
 
   const toolbar = (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        <div className="w-56 shrink-0">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Find a player"
-            className="field-input"
-            aria-label="Find a player"
-          />
-        </div>
-        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-mute">
+      <div className="space-y-3">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find a player"
+          className="field-input"
+          aria-label="Find a player"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-mute">
           {visible.length} of {rows.length}
         </span>
         {SORTS.map((item) => (
@@ -75,11 +74,10 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
             {sort === item.id ? (dir === "asc" ? " ↑" : " ↓") : ""}
           </TextChip>
         ))}
+        </div>
       </div>
       {visible.length > 0 && visible.every((row) => row.book_price == null) ? (
-        <p className="max-w-xl text-sm text-mute">
-          Price, EV, and the haircut need a posted book number. These rows have a research probability and no locked price, so those columns stay empty and the call is no bet.
-        </p>
+        <p className="max-w-xl text-sm text-mute">Odds are not posted yet, so these cards show the chance only.</p>
       ) : null}
     </div>
   );
@@ -166,14 +164,9 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
       {mode === "calls" && visible.length > 0 ? (
         <>
           {toolbar}
-          <div className="grid gap-3 sm:grid-cols-3">
-            <CallStat label="Desk picks" value={String(plays.length).padStart(2, "0")} hint="One player per game" />
-            <CallStat label="No pick" value={String(noPickGames.length).padStart(2, "0")} hint="Games with no scorer call" />
-            <CallStat label="Research rows" value={String(abstain.length).padStart(2, "0")} hint="Not a take — stay off" />
-          </div>
-          <Section title="Desk picks" count={plays.length} accent="flare" />
+          <Section title="Most likely to score" count={plays.length} accent="flare" />
           <p className="max-w-xl text-sm text-mute">
-            One player per game: whoever is most likely to score tonight. The price is a separate question. Research only — Official Play stays off.
+            One name per game. The percentage is how often we expect a touchdown — not a promise, and not a bet.
           </p>
           {plays.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-2">
@@ -182,18 +175,18 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
               ))}
             </div>
           ) : (
-            <p className="plate px-5 py-6 text-sm text-mute">Nobody on this board has a real chance to score tonight.</p>
+            <p className="plate px-5 py-6 text-sm text-mute">No one on this board has a real chance to score.</p>
           )}
           {noPickGames.length > 0 ? (
             <div className="space-y-2">
-              <Section title="No pick this game" count={noPickGames.length} />
+              <Section title="No one stood out" count={noPickGames.length} />
               <p className="max-w-xl text-sm text-mute">
-                These games have players on the board, but nobody has a real chance to score tonight. That is a no-bet, not a miss.
+                These games are on the slate, but we are not naming a scorer.
               </p>
               <div className="grid gap-2 md:grid-cols-2">
                 {noPickGames.map((game) => (
                   <div key={`nopick-${game.id}`} className="plate px-4 py-3">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-mute">No pick</p>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-mute">Passing</p>
                     <p className="mt-1 font-display text-2xl uppercase leading-none tracking-wide">
                       {game.away} at {game.home}
                     </p>
@@ -202,31 +195,31 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
               </div>
             </div>
           ) : null}
-          <Section title="At this price" count={priced.length} accent="gold" />
-          <p className="max-w-xl text-sm text-mute">
-            Fresh book and edge after haircut. Useful when it differs from the desk pick.
-          </p>
           {priced.length > 0 ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              {priced.map((row) => (
-                <ScorerCard key={`price-${row.outcome_id}`} row={row} />
-              ))}
-            </div>
-          ) : (
-            <p className="plate px-5 py-6 text-sm text-mute">No fresh price beats the chance.</p>
-          )}
+            <>
+              <Section title="Better than the odds" count={priced.length} accent="gold" />
+              <p className="max-w-xl text-sm text-mute">
+                The sportsbook number is better than the chance, and the price is current. It can be a different player than the one above.
+              </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                {priced.map((row) => (
+                  <ScorerCard key={`price-${row.outcome_id}`} row={row} />
+                ))}
+              </div>
+            </>
+          ) : null}
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-2">
-            <h2 className="font-display text-4xl uppercase leading-none tracking-wide">No bet</h2>
+            <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Everyone else</h2>
             <button
               type="button"
               onClick={() => setShowNoBet((v) => !v)}
               className="font-display text-lg uppercase tracking-wide text-gold"
             >
-              {showNoBet ? "Hide rows" : `Show ${abstain.length} rows`}
+              {showNoBet ? "Hide players" : `Show ${abstain.length} players`}
             </button>
           </div>
           {showNoBet ? <PropTable rows={abstain} /> : (
-            <p className="text-sm text-mute">Hidden by default so the page stays on the calls.</p>
+            <p className="text-sm text-mute">The rest of the board stays tucked away. These are not the pick.</p>
           )}
         </>
       ) : null}
@@ -238,10 +231,10 @@ type SortId = "prob" | "name" | "ev" | "price" | "team" | "kick";
 type Dir = "asc" | "desc";
 
 const SORTS: { id: SortId; label: string }[] = [
-  { id: "prob", label: "Probability" },
+  { id: "prob", label: "Chance" },
   { id: "name", label: "Name" },
-  { id: "ev", label: "Profit" },
-  { id: "price", label: "Price" },
+  { id: "ev", label: "Value" },
+  { id: "price", label: "Odds" },
   { id: "team", label: "Team" },
   { id: "kick", label: "Kickoff" },
 ];
@@ -318,7 +311,7 @@ function TextChip({
     <button
       type="button"
       onClick={onClick}
-      className={`shrink-0 px-3 py-1.5 font-display text-lg uppercase tracking-wide ${
+      className={`inline-flex min-h-11 items-center px-3 font-display text-lg uppercase tracking-wide ${
         active ? "bg-gold text-ink-950" : "border border-white/15 text-mute hover:text-paper"
       }`}
     >
@@ -348,7 +341,7 @@ function ScorerCard({ row }: { row: PropRow }) {
       </p>
       <p className="mt-3 text-sm leading-relaxed text-paper/80">{deskPickReason(row)}</p>
       <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-mute">
-        {price ? `${price} · ` : "Needs price · "}Anytime TD
+        {price ? `Pays ${price}` : "Odds not posted yet"}
       </p>
       <PriceFreshnessBadge freshness={row.price_freshness || row.forecast.price_freshness} />
     </Link>
@@ -363,16 +356,6 @@ function Section({ title, count, accent }: { title: string; count: number; accen
         {title}
       </h2>
       <span className={`font-mono text-sm ${tone}`}>{String(count).padStart(2, "0")}</span>
-    </div>
-  );
-}
-
-function CallStat({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="plate px-4 py-4">
-      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-mute">{label}</p>
-      <p className="mt-2 font-display text-4xl uppercase leading-none tracking-wide text-paper">{value}</p>
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-mute">{hint}</p>
     </div>
   );
 }

@@ -20,7 +20,14 @@ export type AtdTake = {
   league_id: string;
   game_id: string;
   player_name?: string | null;
+  family?: string | null;
   settlement?: string | null;
+  p?: number | null;
+  kickoff_utc?: string | null;
+  week?: number | null;
+  away_abbr?: string | null;
+  home_abbr?: string | null;
+  final_score?: string | null;
 };
 
 export function AnytimeTdScorecard({
@@ -67,7 +74,33 @@ export function AnytimeTdScorecard({
           />
         </div>
       ) : null}
-      <div className="plate overflow-x-auto">
+      <div className="space-y-2 md:hidden">
+        {filtered.length === 0 ? (
+          <p className="plate px-4 py-6 text-sm text-mute">
+            No settled anytime TD picks yet. Freeze before kickoff; grade after finals.
+          </p>
+        ) : (
+          filtered.map((row) => (
+            <div key={`atd-mobile-${row.league_id}-${row.family}`} className={`plate px-4 py-4 ${row.primary ? "border-gold/40" : ""}`}>
+              <div className="flex items-center justify-between gap-3">
+                <LeagueBadge league={row.league_id} />
+                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-gold">
+                  {row.family}
+                  {row.primary ? " · primary" : ""}
+                </span>
+              </div>
+              <p className="mt-3 font-display text-3xl uppercase leading-none tracking-wide">
+                {row.wins}-{row.losses}
+              </p>
+              <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-mute">
+                {row.games} games · Hit {pct(row.hit_rate)} · Brier {row.brier == null ? "—" : row.brier.toFixed(3)} · ROI{" "}
+                {row.flat_stake_roi == null ? "—" : evPct(row.flat_stake_roi)}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="plate hidden overflow-x-auto md:block">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="font-mono text-[10px] uppercase tracking-[0.18em] text-mute">
             <tr className="border-b border-white/10 bg-black/30">

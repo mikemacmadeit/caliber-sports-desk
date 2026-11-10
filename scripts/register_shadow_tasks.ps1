@@ -14,6 +14,7 @@ if (-not (Test-Path $python)) { throw "Missing venv python at $python" }
 
 $tasks = @(
   @{ Name = "CaliberShadowOdds";        Job = "odds";          Minutes = 5;   Description = "Caliber odds refresh every few minutes; near-kickoff prices stay fresh" },
+  @{ Name = "CaliberShadowScoreboard";  Job = "scoreboard";    Minutes = 30;  Description = "Caliber ESPN scoreboard — free; marks finals so the board stays current" },
   @{ Name = "CaliberShadowInjuries";    Job = "injuries";      Minutes = 60;  Description = "Caliber nflverse injury refresh" },
   @{ Name = "CaliberShadowFbsInjuries"; Job = "fbs-injuries";  Minutes = 60;  Description = "Caliber API-Sports FBS injury refresh" },
   @{ Name = "CaliberShadowInactives";   Job = "inactives";     Minutes = 10;  Description = "Caliber ESPN inactive lists inside the NFL kickoff window" },

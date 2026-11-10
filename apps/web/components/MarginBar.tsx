@@ -43,14 +43,16 @@ export function MarginBar({
         />
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-mute">
-        <span className="truncate" style={{ color: awayColor }}>
+        <span className="min-w-0 truncate" style={{ color: awayColor }}>
           {shortName(awayName)}
         </span>
-        <span className="shrink-0">{number == null ? "Projected margin" : "Score against the number"}</span>
-        <span className="truncate text-right" style={{ color: homeColor }}>
+        <span className="min-w-0 truncate text-right" style={{ color: homeColor }}>
           {shortName(homeName)}
         </span>
       </div>
+      <p className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-mute">
+        {number == null ? "Projected margin" : "Score against the number"}
+      </p>
     </div>
   );
 }

@@ -39,6 +39,7 @@ from app.queries import (
     latest_forecast,
     latest_tick,
     latest_weather,
+    list_called_scorers,
     list_props,
     prop_row,
     ruled_out_keys,
@@ -326,6 +327,16 @@ def props(
 ) -> dict[str, Any]:
     rows = list_props(session, market, min_odds, min_ev, league, date)
     return {"market": market or "all", "date": date or "all", "rows": rows, "disclaimer": disclaimer()}
+
+
+@app.get("/v1/anytime-td/called")
+def anytime_td_called(
+    league: str | None = Query(default="all"),
+    date: str | None = None,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    rows = list_called_scorers(session, league, date)
+    return {"date": date or slate_today(), "rows": rows, "disclaimer": disclaimer()}
 
 
 _PROP_PICK_CACHE: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}

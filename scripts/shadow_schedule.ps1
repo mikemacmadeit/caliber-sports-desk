@@ -1,8 +1,8 @@
-# Prospective shadow jobs. Restart-safe. Does not enable Validated Play.
+﻿# Prospective shadow jobs. Restart-safe. Does not enable Validated Play.
 # Example Task Scheduler action:
 #   powershell -File "C:\dev\Sports bet\scripts\shadow_schedule.ps1" -Job cycle
 param(
-  [ValidateSet("odds", "injuries", "fbs-injuries", "inactives", "portal", "capture", "settle", "cycle", "report", "ats")]
+  [ValidateSet("odds", "injuries", "fbs-injuries", "inactives", "portal", "capture", "settle", "cycle", "report", "ats", "scoreboard")]
   [string]$Job = "cycle"
 )
 
@@ -61,7 +61,16 @@ switch ($Job) {
     # Spreads may already be refreshed by odds job; skip duplicate props spend.
     Invoke-CaliberWorker ats-cycle --skip-odds
   }
+  "scoreboard" {
+    # Free ESPN pull — marks finals so the board stops saying "still to come".
+    if (Test-WorkerRunning "ingest-scoreboard") { exit 0 }
+    Invoke-CaliberWorker ingest-scoreboard --year $year
+  }
   "settle" {
+    # Scoreboard first so finished games are final before settlement.
+    if (-not (Test-WorkerRunning "ingest-scoreboard")) {
+      Invoke-CaliberWorker ingest-scoreboard --year $year
+    }
     Invoke-CaliberWorker shadow-settle
     Invoke-CaliberWorker ats-shadow-settle
   }

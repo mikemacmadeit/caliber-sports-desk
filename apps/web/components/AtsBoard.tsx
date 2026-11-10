@@ -32,6 +32,8 @@ export type AtsRow = {
   pick_result?: "correct" | "miss" | "push" | null;
   ats_pick_label?: string | null;
   ats_side?: "home" | "away" | null;
+  ats_team?: string | null;
+  ats_line?: number | null;
   ats_cover_margin?: number | null;
   ats_pick_result?: "correct" | "miss" | "push" | null;
   projection_withheld?: boolean;

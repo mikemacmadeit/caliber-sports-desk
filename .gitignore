@@ -34,3 +34,6 @@ infra/alembic/versions/__pycache__/
 research/.ipynb_checkpoints/
 parquet/
 storage/
+
+# Local Netlify folder
+.netlify

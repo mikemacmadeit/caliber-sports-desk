@@ -115,6 +115,7 @@ def ingest_final_box_scores(
     league_id: str = "nfl",
     now: datetime | None = None,
     lookback_days: int = 8,
+    game_id: str | None = None,
     fetch=_fetch_summary,
 ) -> dict[str, Any]:
     """Write listed touchdowns for recent finals. Players absent from the box are left blank."""
@@ -138,6 +139,8 @@ def ingest_final_box_scores(
         "no_event": 0,
     }
     for game in games:
+        if game_id and game.game_id != game_id:
+            continue
         event_id = _espn_event_id(session, game)
         if not event_id:
             summary["no_event"] += 1

@@ -53,7 +53,47 @@ export function PropTable({ rows, call }: { rows: PropRow[]; call?: "scorer" }) 
     );
   }
   return (
-    <div className="plate overflow-x-auto">
+    <>
+    <div className="space-y-3 md:hidden">
+      {rows.map((r) => {
+        const club = presentTeam({ abbreviation: r.team, mark: r.team_mark });
+        const pick = r.pick || `${marketLabel(r.market_id)} ${r.side}${r.line != null ? ` ${r.line}` : ""}`;
+        return (
+          <Link key={r.outcome_id} href={`/games/${r.game_id}`} className="plate block px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <TeamMark team={club} size="sm" />
+                <div className="min-w-0">
+                  <p className="truncate font-display text-2xl uppercase leading-none tracking-wide">{r.player_name}</p>
+                  <p className="mt-1 truncate text-sm text-mute">
+                    {r.team} vs {r.opponent}
+                  </p>
+                </div>
+              </div>
+              <RecChip status={call ?? r.forecast.recommendation_status} />
+            </div>
+            <p className={`mt-3 font-display text-xl uppercase leading-none tracking-wide ${r.model_lean ? "text-gold" : "text-paper"}`}>
+              {pick}
+            </p>
+            <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+              <Interval
+                p={r.forecast.p_estimate}
+                lo={r.forecast.confidence_interval[0]}
+                hi={r.forecast.confidence_interval[1]}
+              />
+              <div className="text-right">
+                {r.book_price == null ? (
+                  <NeedsPrice />
+                ) : (
+                  <p className="font-mono text-base text-paper">{american(r.book_price)}</p>
+                )}
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+    <div className="plate hidden overflow-x-auto md:block">
       <table className="w-full min-w-[980px] text-left text-sm">
         <thead className="font-mono text-[10px] uppercase tracking-[0.18em] text-mute">
           <tr className="border-b border-white/10 bg-black/30">
@@ -177,5 +217,6 @@ export function PropTable({ rows, call }: { rows: PropRow[]; call?: "scorer" }) 
         </tbody>
       </table>
     </div>
+    </>
   );
 }

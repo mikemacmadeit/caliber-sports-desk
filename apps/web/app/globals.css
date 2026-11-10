@@ -20,6 +20,7 @@ html,
 body {
   background: var(--void);
   color: var(--paper);
+  overflow-x: clip;
 }
 
 body {
@@ -169,7 +170,7 @@ a.plate:hover {
   border: 1px solid rgba(244, 246, 251, 0.12);
   background: var(--void);
   padding: 0.7rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: var(--paper);
   outline: none;
   transition: border-color 150ms ease;

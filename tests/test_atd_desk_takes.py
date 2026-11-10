@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from spe.shadow.atd_desk_takes import desk_pick_score, frozen_desk_row, select_desk_takes
+from spe.shadow.atd_desk_takes import frozen_desk_row, select_desk_takes
 
 
 def _row(
@@ -102,6 +102,98 @@ def _frozen(game_id: str, name: str, p: float, price: int):
             "components": {"player_name": name},
         },
     )()
+
+
+def test_unsettled_flag_moves_to_the_board_call(db):
+    from datetime import UTC, datetime, timedelta
+
+    from spe.db.models import Game, League, Season, ShadowPrediction, Sport, Team, Venue
+    from spe.shadow.atd_desk_takes import assign_unsettled_board_call, is_desk_take
+
+    kick = datetime(2026, 11, 10, 1, 15, tzinfo=UTC)
+    db.add(Sport(sport_id="football", name="Football"))
+    db.flush()
+    db.add(League(league_id="nfl", sport_id="football", name="NFL", classification="pro"))
+    db.flush()
+    db.add(
+        Season(
+            season_id="nfl-2026",
+            league_id="nfl",
+            year=2026,
+            start_at=kick - timedelta(days=30),
+            end_at=kick + timedelta(days=60),
+        )
+    )
+    db.add(Venue(venue_id="v", name="Field", lat=0.0, lon=0.0, roof_type="open", surface="grass"))
+    db.add(Team(team_id="nfl:KC", league_id="nfl", name="Chiefs", abbreviation="KC"))
+    db.add(Team(team_id="nfl:BAL", league_id="nfl", name="Ravens", abbreviation="BAL"))
+    db.flush()
+    called = kick - timedelta(hours=1)
+    frozen = kick - timedelta(days=2)
+    db.add(
+        Game(
+            game_id="g-buf",
+            season_id="nfl-2026",
+            league_id="nfl",
+            week=9,
+            kickoff_utc=kick,
+            home_team_id="nfl:KC",
+            away_team_id="nfl:BAL",
+            venue_id="v",
+            status="final",
+            data_tier="historical",
+        )
+    )
+    db.flush()
+
+    def shadow(shadow_id: str, player_id: str, desk: bool) -> None:
+        db.add(
+            ShadowPrediction(
+                shadow_id=shadow_id,
+                player_id=player_id,
+                game_id="g-buf",
+                league_id="nfl",
+                market_id="anytime_td",
+                outcome_id=f"out-{shadow_id}",
+                bookmaker_id="draftkings",
+                line=None,
+                side="yes",
+                price_american=-110,
+                odds_tick_id=None,
+                forecast_probability=0.4,
+                market_implied_raw=0.52,
+                market_implied_novig=None,
+                expected_value=None,
+                model_version_id="player_td_v1-nfl-anytime_td",
+                forecast_as_of=frozen,
+                data_quality_status="ok",
+                abstain_reasons=[],
+                recommendation_status="no_bet",
+                components={"desk_take": "game_scorer"} if desk else {"player_name": player_id},
+                research_only=True,
+                play_enabled=False,
+                created_at=frozen,
+            )
+        )
+
+    shadow("jones", "jones", True)
+    shadow("cook", "cook", False)
+    db.flush()
+    moved = assign_unsettled_board_call(
+        db,
+        game_id="g-buf",
+        player_id="cook",
+        called_at=called,
+        board_p=0.61,
+    )
+    assert moved["status"] == "ok"
+    assert moved["shadow_id"] == "cook"
+    assert moved["cleared"] == ["jones"]
+    db.flush()
+    db.expire_all()
+    assert is_desk_take(db.get(ShadowPrediction, "cook"))
+    assert not is_desk_take(db.get(ShadowPrediction, "jones"))
+    assert db.get(ShadowPrediction, "cook").components["board_p"] == 0.61
 
 
 def test_stale_price_still_gets_a_pick():

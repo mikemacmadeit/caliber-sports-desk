@@ -10,15 +10,15 @@ export function ParlayBoard({ tickets }: { tickets: ParlayTicket[] }) {
         const tone = ticketTone(ticket.kind);
         return (
           <article key={ticket.id} className={`plate px-5 py-5 ${tone.shell}`}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-mute">
                   {String(index + 1).padStart(2, "0")} · {ticket.legs.length} legs
                 </p>
-                <h2 className={`mt-2 font-display uppercase leading-none tracking-wide ${tone.title}`}>{ticket.title}</h2>
+                <h2 className={`mt-2 font-display uppercase leading-[0.92] tracking-wide ${tone.title}`}>{ticket.title}</h2>
               </div>
-              <div className="text-right">
-                <p className={`max-w-[14rem] font-display uppercase leading-none tracking-wide ${tone.chance}`}>
+              <div>
+                <p className={`font-display uppercase leading-none tracking-wide ${tone.chance}`}>
                   {ticketLine(ticket.joint_probability, ticket.price_american)}
                 </p>
               </div>
@@ -69,13 +69,13 @@ function ticketTone(kind: string) {
   }
   if (kind === "best_chance" || kind === "spread") {
     return {
-      title: "text-5xl text-paper",
-      chance: "text-3xl text-gold",
+      title: "text-3xl text-paper sm:text-5xl",
+      chance: "text-2xl text-gold sm:text-3xl",
       shell: "border-gold/40",
     };
   }
   return {
-    title: "text-4xl text-paper",
+    title: "text-3xl text-paper sm:text-4xl",
     chance: "text-2xl text-paper",
     shell: "",
   };

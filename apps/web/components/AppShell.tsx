@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen lg:pl-64">
+    <div className="min-h-screen min-w-0 lg:pl-64">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-hidden border-r border-white/10 bg-ink-950/95 backdrop-blur lg:flex">
         <Link href="/" className="flex items-center gap-3 px-5 pb-5 pt-6">
           <span className="grid h-10 w-10 place-items-center bg-gold font-display text-2xl leading-none text-ink-950">
@@ -114,15 +114,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="sticky top-0 z-20 border-b border-white/10 bg-ink-950/90 backdrop-blur lg:hidden">
+      <div className="sticky top-0 z-20 border-b border-white/10 bg-ink-950/95 pt-[env(safe-area-inset-top)] backdrop-blur lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex min-h-11 items-center gap-2">
             <span className="grid h-8 w-8 place-items-center bg-gold font-display text-xl leading-none text-ink-950">C</span>
             <span className="font-display text-2xl uppercase tracking-wide">Caliber</span>
           </Link>
           <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">Live</span>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-2">
+        <nav aria-label="Sections" className="flex flex-wrap gap-1 px-3 pb-2">
           {PRIMARY.map((item) => {
             const active = isActive(pathname, item.href);
             return (
@@ -130,7 +130,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={hrefFor(item.href)}
                 aria-current={active ? "page" : undefined}
-                className={`shrink-0 px-3 py-1.5 font-display text-lg uppercase tracking-wide ${
+                className={`inline-flex min-h-11 items-center px-3 font-display text-lg uppercase tracking-wide ${
                   active ? "bg-gold text-ink-950" : "text-paper/70"
                 }`}
               >
@@ -139,8 +139,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <nav className="flex items-center gap-1 overflow-x-auto px-3 pb-3">
-          <span className="shrink-0 px-2 font-mono text-[10px] uppercase tracking-[0.18em] text-mute">Desk</span>
+        <nav aria-label="Desk" className="flex flex-wrap items-center gap-1 px-3 pb-3">
+          <span className="px-2 font-mono text-[10px] uppercase tracking-[0.18em] text-mute">Desk</span>
           {DESK.map((item) => {
             const active = isActive(pathname, item.href);
             return (
@@ -148,7 +148,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={hrefFor(item.href)}
                 aria-current={active ? "page" : undefined}
-                className={`shrink-0 px-2 py-1 font-display text-base uppercase tracking-wide ${
+                className={`inline-flex min-h-11 items-center px-3 font-display text-base uppercase tracking-wide ${
                   active ? "bg-gold text-ink-950" : "text-paper/45"
                 }`}
               >
@@ -159,7 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </div>
 
-      <div className="border-b border-white/10 bg-ink-900/70">
+      <div className="hidden border-b border-white/10 bg-ink-900/70 md:block">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5 text-[13px] text-paper/70 lg:px-10">
           <span
             className={`font-mono text-[10px] uppercase tracking-[0.22em] ${
@@ -191,7 +191,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </p>
       </div>
 
-      <main className="px-5 py-8 lg:px-10 lg:py-10">{children}</main>
+      <main className="min-w-0 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-8 lg:px-10 lg:py-10">{children}</main>
     </div>
   );
 }

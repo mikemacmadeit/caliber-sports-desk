@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from math import exp
 
 import pandas as pd
 
@@ -52,7 +53,9 @@ class TonightChance:
 
 def tables_ready() -> bool:
     root = _cache_dir()
-    return (root / "depth_charts_2026.parquet").exists() and (root / "stats_player_week_2026.parquet").exists()
+    depth = root / "depth_charts_2026.parquet"
+    stats = root / "stats_player_week_2026.parquet"
+    return depth.exists() and stats.exists()
 
 
 def score_players(
@@ -90,8 +93,6 @@ def _poisson(lam: float) -> float:
     if lam <= 0:
         return 0.0
     # 1 - exp(-λ), capped so one hot month cannot read as a certainty.
-    from math import exp
-
     return min(0.85, max(0.0, 1.0 - exp(-lam)))
 
 
@@ -121,6 +122,7 @@ def apply_tonight_chance(
     opponent: str | None = None,
     weather: dict | None = None,
     availability: str | None = None,
+    through_week: int | None = None,
 ) -> dict:
     """Replace a career rate with tonight's chance. Missing chart → no chance."""
     pos = str(position or "").upper()
@@ -129,7 +131,10 @@ def apply_tonight_chance(
         return out
     status = str(availability or out.get("availability_status") or "").lower()
     if status in {"out", "doubtful"}:
-        label = "Doubtful tonight, so he is off the card." if status == "doubtful" else "Ruled out tonight."
+        if status == "doubtful":
+            label = "Doubtful tonight, so he is off the card."
+        else:
+            label = "Ruled out tonight."
         return _write(out, TonightChance(0.0, None, 0.0, 0.0, 0.0, 0.0, label))
     scored = _chance_for(
         player_name=player_name,
@@ -137,6 +142,7 @@ def apply_tonight_chance(
         position=pos,
         opponent=opponent,
         weather=weather,
+        through_week=through_week,
     )
     if status in {"questionable", "uncertain"}:
         p = scored.p * 0.7
@@ -184,8 +190,9 @@ def _chance_for(
     position: str,
     opponent: str | None,
     weather: dict | None,
+    through_week: int | None = None,
 ) -> TonightChance:
-    depth, form, team_rates, defense = load_tonight_tables()
+    depth, form, team_rates, defense = load_tonight_tables(through_week)
     team = _team(team_abbr)
     pos = "RB" if position == "FB" else position
     person = _person(player_name)
@@ -264,7 +271,10 @@ def _per(total: float, games: float) -> float:
     return total / games
 
 
-def _defense_factors(defense: dict[str, dict[str, float]], opponent: str | None) -> tuple[float, float]:
+def _defense_factors(
+    defense: dict[str, dict[str, float]],
+    opponent: str | None,
+) -> tuple[float, float]:
     row = defense.get(_team(opponent)) or {}
     return (
         defense_factor("RB", row.get("rush"), row.get("league_rush")),
@@ -286,7 +296,15 @@ def _weather_split(weather: dict | None) -> tuple[float, float]:
     return rush, recv
 
 
-def _summary(pos: str, rank: int, line: FormLine, p: float, kind: str, factor: float, weather: dict | None) -> str:
+def _summary(
+    pos: str,
+    rank: int,
+    line: FormLine,
+    p: float,
+    kind: str,
+    factor: float,
+    weather: dict | None,
+) -> str:
     role = _role_name(pos, rank)
     bits = [role + "."]
     work = []
@@ -304,7 +322,7 @@ def _summary(pos: str, rank: int, line: FormLine, p: float, kind: str, factor: f
     elif scores >= 0.45:
         bits.append("He has a recent score in this stretch.")
     elif line.games >= 0.8 and (carries >= 0.8 or targets >= 0.8):
-        bits.append("No score in this stretch. The work is the case for tonight.")
+        bits.append("No score in this stretch. Tonight follows the carries and targets.")
     if factor >= 1.04:
         bits.append(f"This defense has allowed more {kind}ing scores than usual.")
     elif factor <= 0.96:
@@ -336,21 +354,34 @@ def _num(value: float) -> str:
     return f"{rounded:.1f}"
 
 
-@lru_cache(maxsize=1)
-def load_tonight_tables() -> tuple[
+@lru_cache(maxsize=4)
+def load_tonight_tables(through_week: int | None = None) -> tuple[
     dict[tuple[str, str, str], int],
     dict[tuple[str, str], FormLine],
     dict[str, tuple[float, float]],
     dict[str, dict[str, float]],
 ]:
-    depth, _touches, defense = load_current_role_tables()
+    depth, _touches, _defense = load_current_role_tables()
     stats = pd.read_parquet(
         _cache_dir() / "stats_player_week_2026.parquet",
-        columns=["player_display_name", "position", "team", "week", "carries", "targets", "rushing_tds", "receiving_tds"],
+        columns=[
+            "player_display_name",
+            "position",
+            "team",
+            "opponent_team",
+            "week",
+            "carries",
+            "targets",
+            "rushing_tds",
+            "receiving_tds",
+        ],
     )
     week = pd.to_numeric(stats["week"], errors="coerce")
     latest = int(week.max())
-    recent = stats[week.ge(latest - LOOKBACK + 1)].copy()
+    if through_week is not None:
+        latest = min(latest, int(through_week))
+    defense = _defense_from(stats, week, latest)
+    recent = stats[week.ge(latest - LOOKBACK + 1) & week.le(latest)].copy()
     recent["week"] = pd.to_numeric(recent["week"], errors="coerce")
     recent["decay"] = DECAY ** (latest - recent["week"])
     form: dict[tuple[str, str], list[float]] = {}
@@ -395,3 +426,29 @@ def load_tonight_tables() -> tuple[
             (SHRINK_GAMES * league_rec + games * rec) / (SHRINK_GAMES + games),
         )
     return depth, lines, rates, defense
+
+
+def _defense_from(stats: pd.DataFrame, week: pd.Series, latest: int) -> dict[str, dict[str, float]]:
+    """Scores allowed over the three weeks that existed when this call was made."""
+    window = stats[week.ge(latest - 2) & week.le(latest)]
+    scored = window.groupby(["team", "opponent_team"], dropna=False)[
+        ["rushing_tds", "receiving_tds"]
+    ].sum()
+    allowed: dict[str, list[float]] = {}
+    for (_offense, defense_team), row in scored.iterrows():
+        bucket = allowed.setdefault(_team(defense_team), [0.0, 0.0])
+        bucket[0] += float(row["rushing_tds"] or 0)
+        bucket[1] += float(row["receiving_tds"] or 0)
+    if not allowed:
+        return {}
+    league_rush = sum(pair[0] for pair in allowed.values()) / len(allowed)
+    league_pass = sum(pair[1] for pair in allowed.values()) / len(allowed)
+    return {
+        team: {
+            "rush": pair[0],
+            "pass": pair[1],
+            "league_rush": league_rush,
+            "league_pass": league_pass,
+        }
+        for team, pair in allowed.items()
+    }

@@ -1,13 +1,16 @@
 import Link from "next/link";
+import { AnytimeTdRecord } from "@/components/AnytimeTdRecord";
 import { AnytimeTdResearchBoard, type ResearchFinderPayload } from "@/components/AnytimeTdResearchBoard";
-import { AnytimeTdScorecard, type AtdScoreRow, type AtdTake } from "@/components/AnytimeTdScorecard";
+import type { AtdScoreRow, AtdTake } from "@/components/AnytimeTdScorecard";
 import { DayStrip, EmptyDay } from "@/components/DayStrip";
-import { DeskStatusBanner, type DeskStatus } from "@/components/DeskStatusBanner";
 import { LeagueToggle } from "@/components/LeagueToggle";
 import { PageHeader } from "@/components/PageHeader";
 import { PropExplorer } from "@/components/PropExplorer";
+import { TeamMark } from "@/components/TeamMark";
 import { apiGet, type PropRow } from "@/lib/api";
 import { dayParts, type SlateDays, withQuery } from "@/lib/days";
+import { kickoffParts, pct } from "@/lib/format";
+import { presentTeam } from "@/lib/teams";
 
 export default async function AnytimeTdPage({
   searchParams,
@@ -17,9 +20,7 @@ export default async function AnytimeTdPage({
   const params = await searchParams;
   const league = params.league || "all";
   const dateParam = params.date;
-  // FBS research board defaults to C_recent finder (experimental). Priced board still available.
-  const view = params.view || (league === "fbs" ? "research" : "board");
-  const researchView = view === "research";
+  const researchView = params.view === "research";
 
   let days: SlateDays | null = null;
   let daysError: string | null = null;
@@ -46,21 +47,35 @@ export default async function AnytimeTdPage({
     }
   }
 
+  let called: { rows: CalledRow[] } | null = null;
+  if (!researchView) {
+    try {
+      called = await apiGet<{ rows: CalledRow[] }>(
+        `/v1/anytime-td/called?league=${league}&date=${selected}`,
+        45000,
+      );
+    } catch {
+      called = null;
+    }
+  }
+  const calledRows = called?.rows ?? [];
+
   let research: ResearchFinderPayload | null = null;
   let researchError: string | null = null;
-  try {
-    research = await apiGet<ResearchFinderPayload>(`/v1/anytime-td/research?league=${league}`, 20000);
-  } catch (e) {
-    researchError = e instanceof Error ? e.message : "research unavailable";
-    research = null;
+  if (researchView) {
+    try {
+      research = await apiGet<ResearchFinderPayload>(`/v1/anytime-td/research?league=${league}`, 20000);
+    } catch (e) {
+      researchError = e instanceof Error ? e.message : "research unavailable";
+      research = null;
+    }
   }
 
-  const [scorecard, deskStatus] = await Promise.all([
-    apiGet<{
-      atd_scorecard?: { rows: AtdScoreRow[]; note?: string; open_and_settled_takes?: AtdTake[] };
-    }>("/v1/shadow/track-record", 45000).catch(() => null),
-    apiGet<DeskStatus>("/v1/atd/desk-status", 30000).catch(() => null),
-  ]);
+  const scorecard = researchView
+    ? null
+    : await apiGet<{
+        atd_scorecard?: { rows: AtdScoreRow[]; note?: string; open_and_settled_takes?: AtdTake[] };
+      }>("/v1/shadow/track-record", 45000).catch(() => null);
   const scoreRows = scorecard?.atd_scorecard?.rows || [];
   const gradedTakes = scorecard?.atd_scorecard?.open_and_settled_takes || [];
 
@@ -74,7 +89,6 @@ export default async function AnytimeTdPage({
   const boardHref = withQuery("/anytime-td", {
     league: league === "all" ? undefined : league,
     date: days && selected === days.today ? undefined : selected,
-    view: "board",
   });
 
   const loadFailure = researchView
@@ -86,11 +100,7 @@ export default async function AnytimeTdPage({
       <PageHeader
         kicker={days && selected === days.today ? `Today · ${dayParts(selected).monthDay}` : dayParts(selected).monthDay}
         title="Anytime TD"
-        lede={
-          league === "fbs"
-            ? "FBS desk picks the player most likely to score in each game. Research primary is a blend (experimental). Official Play stays off."
-            : "One scorer per game: the player most likely to score tonight, from the depth chart, recent carries and targets, recent scores, the defense, the weather, and injuries."
-        }
+        lede="One player in each game — the one most likely to score a touchdown. The percentage is a chance, not a promise."
         accent="flare"
         action={
           <LeagueToggle
@@ -102,58 +112,30 @@ export default async function AnytimeTdPage({
           />
         }
       />
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href={boardHref}
-          className={`px-3 py-1.5 font-display text-lg uppercase tracking-wide ${
-            !researchView ? "bg-gold text-ink-950" : "border border-white/15 text-mute"
-          }`}
-        >
-          Priced board
-        </Link>
-        <Link
-          href={researchHref}
-          className={`px-3 py-1.5 font-display text-lg uppercase tracking-wide ${
-            researchView ? "bg-gold text-ink-950" : "border border-white/15 text-mute"
-          }`}
-        >
-          Research finder
-        </Link>
-      </div>
-
-      <DeskStatusBanner status={deskStatus} />
-
-      <AnytimeTdScorecard
-        rows={scoreRows}
-        note={scorecard?.atd_scorecard?.note}
-        league={league}
-        takes={gradedTakes}
-      />
-
       {loadFailure ? (
         <div className="plate px-6 py-8">
-          <p className="font-display text-4xl uppercase leading-none">Desk temporarily busy</p>
+          <p className="font-display text-4xl uppercase leading-none">Picks did not load</p>
           <p className="mt-3 max-w-xl text-sm text-mute">
-            The Anytime TD API did not answer in time — usually because an ingest or capture job is
-            holding the database. This is not an empty slate and not a successful refresh. Retry in a
-            minute; freshness labels stay honest when data returns.
-          </p>
-          <p className="mt-3 font-mono text-xs text-mute">
-            {[daysError, propsError, researchError].filter(Boolean).join(" · ")}
+            Try again in a minute. This is not an empty slate.
           </p>
         </div>
       ) : researchView ? (
-        research && (research.games || []).length > 0 ? (
-          <AnytimeTdResearchBoard payload={research} />
-        ) : (
-          <div className="plate px-6 py-8">
-            <p className="font-display text-4xl uppercase leading-none">Research payload not ready</p>
-            <p className="mt-3 max-w-xl text-sm text-mute">
-              Run <span className="font-mono text-paper">python -m worker.main atd-reliability-guardrails</span> to
-              build dual-model warnings for the finder. Official board forecasts stay untouched.
-            </p>
-          </div>
-        )
+        <div className="space-y-4">
+          <Link href={boardHref} className="font-display text-xl uppercase tracking-wide text-gold">
+            ← Back to picks
+          </Link>
+          <p className="max-w-xl text-sm text-mute">
+            This view compares the models. It is not the pick list.
+          </p>
+          {research && (research.games || []).length > 0 ? (
+            <AnytimeTdResearchBoard payload={research} />
+          ) : (
+            <div className="plate px-6 py-8">
+              <p className="font-display text-4xl uppercase leading-none">Model notes are not ready</p>
+              <p className="mt-3 max-w-xl text-sm text-mute">The pick list is still the page to use.</p>
+            </div>
+          )}
+        </div>
       ) : (
         <>
           {days ? (
@@ -162,9 +144,9 @@ export default async function AnytimeTdPage({
           {(data?.rows.length ?? 0) === 0 ? (
             days && days.dates.includes(selected) ? (
               <div className="plate px-6 py-8">
-                <p className="font-display text-4xl uppercase leading-none">No prices {when}</p>
+                <p className="font-display text-4xl uppercase leading-none">No odds posted {when}</p>
                 <p className="mt-3 max-w-xl text-sm text-mute">
-                  The games are on the board. This market has no locked number for them yet.
+                  The games are on the slate. Sportsbooks have not posted a touchdown price yet.
                 </p>
                 <Link
                   href={withQuery("/", { league, date: selected === days.today ? undefined : selected })}
@@ -184,8 +166,100 @@ export default async function AnytimeTdPage({
           ) : (
             <PropExplorer rows={data!.rows} mode="calls" />
           )}
+          {calledRows.length > 0 ? <CalledScorers rows={calledRows} /> : null}
+          <AnytimeTdRecord rows={scoreRows} takes={gradedTakes} league={league} />
+          <p className="text-sm text-mute">
+            <Link href={researchHref} className="text-gold">
+              Model notes
+            </Link>
+            <span> · Chances only. We do not place bets.</span>
+          </p>
         </>
       )}
     </div>
   );
+}
+
+type CalledRow = PropRow & {
+  result?: string | null;
+  game_status?: string | null;
+  final_score?: string | null;
+};
+
+function CalledScorers({ rows }: { rows: CalledRow[] }) {
+  const waiting = rows.filter((row) => row.result !== "scored" && row.result !== "blank");
+  if (waiting.length === 0) return null;
+  const ordered = [...waiting].sort((a, b) => resultRank(a) - resultRank(b) || a.player_name.localeCompare(b.player_name));
+  return (
+    <section className="space-y-3">
+      <div className="border-b border-white/10 pb-2">
+        <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Already kicked off</h2>
+        <p className="mt-2 max-w-xl text-sm text-mute">The name was locked in before the game. It joins the record once the result is in.</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {ordered.map((row) => {
+          const when = kickoffParts(row.kickoff_utc);
+          const scored = row.result === "scored";
+          const missed = row.result === "blank";
+          const club = presentTeam({ abbreviation: row.team, mark: row.team_mark });
+          return (
+            <Link
+              key={row.outcome_id}
+              href={`/games/${row.game_id}`}
+              className={
+                scored
+                  ? "plate block border-gold/50 px-5 py-5 shadow-[0_0_36px_rgba(214,255,63,0.14)]"
+                  : "plate block px-4 py-4"
+              }
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-mute">
+                  {row.league_id} · {when.day}
+                  {row.final_score ? ` · ${row.final_score}` : ` · ${when.time}`}
+                </p>
+                <span
+                  className={
+                    scored
+                      ? "bg-gold px-2 py-0.5 font-display text-lg uppercase leading-none tracking-wide text-ink-950"
+                      : missed
+                        ? "font-mono text-[10px] uppercase tracking-[0.16em] text-heat"
+                        : "font-mono text-[10px] uppercase tracking-[0.16em] text-mute"
+                  }
+                >
+                  {resultLabel(row)}
+                </span>
+              </div>
+              <div className="mt-4 flex items-center gap-3">
+                <TeamMark team={club} size="sm" />
+                <p className={`truncate font-display uppercase leading-none tracking-wide ${scored ? "text-4xl" : "text-3xl"}`}>
+                  {row.player_name}
+                </p>
+              </div>
+              <p className="mt-3 text-sm text-paper/70">
+                {row.away_abbr} at {row.home_abbr}
+                {row.position ? ` · ${row.position}` : ""}
+                {row.forecast.p_estimate != null ? ` · called at ${pct(row.forecast.p_estimate, 0)}` : ""}
+              </p>
+              {row.result !== "scored" && row.result !== "blank" && row.game_status === "final" ? (
+                <p className="mt-2 text-sm text-mute">Final is in. Waiting to see if this player scored.</p>
+              ) : null}
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function resultRank(row: CalledRow): number {
+  if (row.result === "scored") return 0;
+  if (row.result === "pending") return 1;
+  return 2;
+}
+
+function resultLabel(row: CalledRow): string {
+  if (row.result === "scored") return "Scored";
+  if (row.result === "blank") return "No score";
+  if (row.game_status === "final") return "Pending";
+  return "Live";
 }

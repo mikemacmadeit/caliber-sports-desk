@@ -102,10 +102,7 @@ export function deskPickReason(row: PropRow): string {
   const implied = americanToImplied(price);
   const gap = Math.round((chance - implied) * 100);
   const priceText = price > 0 ? `+${price}` : String(price);
-  const pointWord = Math.abs(gap) === 1 ? "point" : "points";
-  const parts = [
-    `We have him at ${Math.round(chance * 100)}%. ${priceText} is about ${Math.round(implied * 100)}%. Our chance is ${gap} ${pointWord} above the price.`,
-  ];
+  const parts = [priceCompared(Math.round(chance * 100), priceText, Math.round(implied * 100), gap)];
   const work = usagePhrase(row.usage);
   if (work) parts.push(work);
   const matchup = row.forecast.matchup;
@@ -120,12 +117,25 @@ export function deskPickReason(row: PropRow): string {
 function usagePhrase(usage: PropRow["usage"]): string | null {
   if (!usage) return null;
   const bits: string[] = [];
-  if (usage.carries != null && usage.carries >= 1) bits.push(`${trimNum(usage.carries)} carries`);
-  if (usage.targets != null && usage.targets >= 1) bits.push(`${trimNum(usage.targets)} targets`);
-  if (usage.gl_carries != null && usage.gl_carries >= 0.2) bits.push(`${trimNum(usage.gl_carries)} goal-line carries`);
-  if (usage.rz_targets != null && usage.rz_targets >= 0.2) bits.push(`${trimNum(usage.rz_targets)} red-zone targets`);
+  if (usage.carries != null && usage.carries >= 1) bits.push(countPhrase(usage.carries, "carry", "carries"));
+  if (usage.targets != null && usage.targets >= 1) bits.push(countPhrase(usage.targets, "target", "targets"));
+  if (usage.gl_carries != null && usage.gl_carries >= 0.2) bits.push(countPhrase(usage.gl_carries, "goal-line carry", "goal-line carries"));
+  if (usage.rz_targets != null && usage.rz_targets >= 0.2) bits.push(countPhrase(usage.rz_targets, "red-zone target", "red-zone targets"));
   if (bits.length === 0) return null;
   return `Recent work is ${bits.join(", ")} a game.`;
+}
+
+function priceCompared(chancePct: number, priceText: string, impliedPct: number, gap: number) {
+  const base = `Chance is ${chancePct}%. ${priceText} means the book has this around ${impliedPct}%.`;
+  const points = Math.abs(gap) === 1 ? "point" : "points";
+  if (gap > 0) return `${base} Our chance is ${gap} ${points} higher.`;
+  if (gap < 0) return `${base} Our chance is ${Math.abs(gap)} ${points} lower.`;
+  return `${base} That matches.`;
+}
+
+function countPhrase(value: number, singular: string, plural: string) {
+  const text = trimNum(value);
+  return `${text} ${text === "1" ? singular : plural}`;
 }
 
 function trimNum(value: number): string {

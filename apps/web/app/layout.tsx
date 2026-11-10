@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Barlow_Condensed, JetBrains_Mono, Outfit } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
@@ -19,6 +19,12 @@ const mono = JetBrains_Mono({
   weight: ["400", "500", "600"],
   variable: "--font-mono",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "Caliber — NFL & FBS probability desk",
