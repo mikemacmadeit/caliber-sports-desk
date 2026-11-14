@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { AnytimeTdRecord } from "@/components/AnytimeTdRecord";
 import { AnytimeTdResearchBoard, type ResearchFinderPayload } from "@/components/AnytimeTdResearchBoard";
 import type { AtdScoreRow, AtdTake } from "@/components/AnytimeTdScorecard";
@@ -32,32 +31,6 @@ export default async function AnytimeTdPage({
   }
 
   const today = days?.today || new Date().toISOString().slice(0, 10);
-
-  // No date in the URL + today has no TD prices → send people to the next day
-  // that already has a board (usually Sunday). Avoids a dead "empty today" page.
-  if (!researchView && !dateParam && days?.dates?.length) {
-    const todayBoard = await apiGet<{ rows: PropRow[] }>(
-      `/v1/props?market=anytime_td&league=${league}&date=${today}`,
-      8000,
-    ).catch(() => ({ rows: [] as PropRow[] }));
-    if ((todayBoard.rows?.length ?? 0) === 0) {
-      for (const day of days.dates.filter((d) => d > today).slice(0, 3)) {
-        const probe = await apiGet<{ rows: PropRow[] }>(
-          `/v1/props?market=anytime_td&league=${league}&date=${day}`,
-          8000,
-        ).catch(() => null);
-        if (probe && (probe.rows?.length ?? 0) > 0) {
-          redirect(
-            withQuery("/anytime-td", {
-              league: league === "all" ? undefined : league,
-              date: day,
-            }),
-          );
-        }
-      }
-    }
-  }
-
   const selected = dateParam || today;
 
   // Parallel + short budgets: Netlify SSR dies around ~26–60s if these run in series.
