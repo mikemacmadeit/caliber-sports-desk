@@ -133,7 +133,9 @@ def _nfl_week_roster(
             year,
             include_inactive_for_props=include_inactive_for_props,
         )
-    labels = _nfl_eligibility_labels(session, year, week) if apply_eligibility_audit else {}
+    labels = _nfl_eligibility_labels(
+        session, year, week, player_ids={rw.player_id for rw, _ in rows}
+    ) if apply_eligibility_audit else {}
     seen: set[str] = set()
     out: list[EligiblePlayer] = []
     for rw, player in rows:
@@ -164,11 +166,13 @@ def _nfl_week_roster(
     return out
 
 
-def _nfl_eligibility_labels(session: Session, season_year: int, week: int) -> dict[str, str]:
+def _nfl_eligibility_labels(
+    session: Session, season_year: int, week: int, *, player_ids: set[str] | None = None
+) -> dict[str, str]:
     """Map player_id → eligible | uncertain | confirmed_ineligible for a week."""
     from spe.models.eligibility_audit import audit_nfl_week
 
-    audit = audit_nfl_week(session, season_year=season_year, week=week)
+    audit = audit_nfl_week(session, season_year=season_year, week=week, player_ids=player_ids)
     labels: dict[str, str] = {}
     for row in audit["confirmed_ineligible"]:
         labels[row["player_id"]] = "confirmed_ineligible"
@@ -193,7 +197,9 @@ def _latest_nfl_roster(
     max_week = max(r.week for r in rows)
     max_year = max(r.season_year for r in rows)
     latest = [r for r in rows if r.season_year == max_year and r.week == max_week]
-    labels = _nfl_eligibility_labels(session, max_year, max_week)
+    labels = _nfl_eligibility_labels(
+        session, max_year, max_week, player_ids={r.player_id for r in latest}
+    )
     players = {
         p.player_id: p
         for p in session.query(Player).filter(Player.player_id.in_({r.player_id for r in latest})).all()

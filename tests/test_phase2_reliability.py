@@ -573,3 +573,14 @@ def _seed_priced_outcome(db: Session, *, kickoff_hours: float):
     db.add(outcome)
     db.flush()
     return game, outcome, db.get(Bookmaker, "draftkings")
+
+
+def test_scoped_roster_audit_preserves_classification(db):
+    from spe.models.eligibility_audit import audit_nfl_week
+    _seed_priced_outcome(db, kickoff_hours=3)
+    full = audit_nfl_week(db, season_year=2026, week=10)
+    scoped = audit_nfl_week(db, season_year=2026, week=10, player_ids={"nfl:p1"})
+    assert scoped == full
+    empty = audit_nfl_week(db, season_year=2026, week=10, player_ids=set())
+    assert empty["act_rows"] == 0
+    assert empty["uncertain"] == []

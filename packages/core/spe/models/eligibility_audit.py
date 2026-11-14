@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from spe.db.base import as_utc
@@ -30,11 +30,11 @@ def audit_nfl_week(
     season_year: int,
     week: int,
     now: datetime | None = None,
+    player_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """Classify ACT players for a roster week without inventing availability."""
     del now  # classification is roster/stats evidence, not wall-clock dependent
-    rows = session.execute(
-        text(
+    statement = text(
             """
             WITH active_roster AS (
                 SELECT rw.player_id, rw.team_id, rw.status, p.name, p.position_group
@@ -43,6 +43,7 @@ def audit_nfl_week(
                 WHERE rw.season_year = :year AND rw.week = :week
                   AND UPPER(COALESCE(rw.status, '')) = 'ACT'
                   AND rw.team_id LIKE 'nfl:%'
+                  {player_filter}
             ), active_ids AS (
                 SELECT DISTINCT player_id FROM active_roster
             ), retirement AS (
@@ -76,10 +77,13 @@ def audit_nfl_week(
             FROM active_roster a
             LEFT JOIN retirement r ON r.player_id = a.player_id
             LEFT JOIN history h ON h.player_id = a.player_id
-            """
-        ),
-        {"year": season_year, "week": week, "season_start": f"{season_year}-08-01"},
-    ).mappings().all()
+            """.format(player_filter="AND rw.player_id IN :players" if player_ids is not None else "")
+    )
+    params = {"year": season_year, "week": week, "season_start": f"{season_year}-08-01"}
+    if player_ids is not None:
+        statement = statement.bindparams(bindparam("players", expanding=True))
+        params["players"] = sorted(player_ids)
+    rows = session.execute(statement, params).mappings().all()
 
     confirmed: list[dict[str, Any]] = []
     uncertain: list[dict[str, Any]] = []

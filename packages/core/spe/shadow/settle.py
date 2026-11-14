@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from spe.db.base import as_utc, new_id
 from spe.db.models import ShadowPrediction, ShadowSettlement
@@ -39,9 +39,11 @@ def settle_shadow_predictions(
     ).count()
     # Filter before materializing JSON snapshots: old settled history can exceed
     # the cron worker's memory even though only a small pending set needs work.
-    query = session.query(ShadowPrediction).filter(
-        ~ShadowPrediction.shadow_id.in_(terminal_ids)
-    )
+    query = session.query(ShadowPrediction).options(load_only(
+        ShadowPrediction.shadow_id, ShadowPrediction.game_id, ShadowPrediction.player_id,
+        ShadowPrediction.market_id, ShadowPrediction.outcome_id, ShadowPrediction.side,
+        ShadowPrediction.line, ShadowPrediction.price_american, raiseload=True,
+    )).filter(~ShadowPrediction.shadow_id.in_(terminal_ids))
     if shadow_ids is not None:
         query = query.filter(ShadowPrediction.shadow_id.in_(shadow_ids or ["__none__"]))
     open_rows = query.all()
