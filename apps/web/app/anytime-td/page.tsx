@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AnytimeTdRecord } from "@/components/AnytimeTdRecord";
 import { AnytimeTdResearchBoard, type ResearchFinderPayload } from "@/components/AnytimeTdResearchBoard";
 import type { AtdScoreRow, AtdTake } from "@/components/AnytimeTdScorecard";
@@ -25,12 +26,39 @@ export default async function AnytimeTdPage({
   let days: SlateDays | null = null;
   let daysError: string | null = null;
   try {
-    days = await apiGet<SlateDays>(`/v1/days?league=${league}`, 15000);
+    days = await apiGet<SlateDays>(`/v1/days?league=${league}`, 10000);
   } catch (e) {
     daysError = e instanceof Error ? e.message : "days unavailable";
   }
 
-  let selected = dateParam || days?.today || new Date().toISOString().slice(0, 10);
+  const today = days?.today || new Date().toISOString().slice(0, 10);
+
+  // No date in the URL + today has no TD prices → send people to the next day
+  // that already has a board (usually Sunday). Avoids a dead "empty today" page.
+  if (!researchView && !dateParam && days?.dates?.length) {
+    const todayBoard = await apiGet<{ rows: PropRow[] }>(
+      `/v1/props?market=anytime_td&league=${league}&date=${today}`,
+      8000,
+    ).catch(() => ({ rows: [] as PropRow[] }));
+    if ((todayBoard.rows?.length ?? 0) === 0) {
+      for (const day of days.dates.filter((d) => d > today).slice(0, 3)) {
+        const probe = await apiGet<{ rows: PropRow[] }>(
+          `/v1/props?market=anytime_td&league=${league}&date=${day}`,
+          8000,
+        ).catch(() => null);
+        if (probe && (probe.rows?.length ?? 0) > 0) {
+          redirect(
+            withQuery("/anytime-td", {
+              league: league === "all" ? undefined : league,
+              date: day,
+            }),
+          );
+        }
+      }
+    }
+  }
+
+  const selected = dateParam || today;
 
   // Parallel + short budgets: Netlify SSR dies around ~26–60s if these run in series.
   let data: { rows: PropRow[]; disclaimer: string } | null = null;
@@ -44,7 +72,7 @@ export default async function AnytimeTdPage({
 
   if (researchView) {
     try {
-      research = await apiGet<ResearchFinderPayload>(`/v1/anytime-td/research?league=${league}`, 12000);
+      research = await apiGet<ResearchFinderPayload>(`/v1/anytime-td/research?league=${league}`, 10000);
     } catch (e) {
       researchError = e instanceof Error ? e.message : "research unavailable";
       research = null;
@@ -53,48 +81,22 @@ export default async function AnytimeTdPage({
     const [propsResult, calledResult, scoreResult] = await Promise.all([
       apiGet<{ rows: PropRow[]; disclaimer: string }>(
         `/v1/props?market=anytime_td&league=${league}&date=${selected}`,
-        12000,
+        10000,
       ).then(
         (ok) => ({ ok: true as const, value: ok }),
         (e) => ({ ok: false as const, error: e instanceof Error ? e.message : "props unavailable" }),
       ),
-      apiGet<{ rows: CalledRow[] }>(`/v1/anytime-td/called?league=${league}&date=${selected}`, 12000).catch(
+      apiGet<{ rows: CalledRow[] }>(`/v1/anytime-td/called?league=${league}&date=${selected}`, 10000).catch(
         () => null,
       ),
       apiGet<{
         atd_scorecard?: { rows: AtdScoreRow[]; note?: string; open_and_settled_takes?: AtdTake[] };
-      }>("/v1/shadow/track-record", 12000).catch(() => null),
+      }>("/v1/shadow/track-record", 10000).catch(() => null),
     ]);
     if (propsResult.ok) data = propsResult.value;
     else propsError = propsResult.error;
     called = calledResult;
     scorecard = scoreResult;
-
-    // Landing on "today" with no TD prices is normal mid-week. Jump to the next
-    // slate day that already has a saved board so the page is not a dead end.
-    if (!dateParam && (data?.rows.length ?? 0) === 0 && days?.dates?.length) {
-      const candidates = days.dates.filter((d) => d > selected).slice(0, 4);
-      const probes = await Promise.all(
-        candidates.map((day) =>
-          apiGet<{ rows: PropRow[]; disclaimer: string }>(
-            `/v1/props?market=anytime_td&league=${league}&date=${day}`,
-            8000,
-          )
-            .then((value) => ({ day, value }))
-            .catch(() => null),
-        ),
-      );
-      const hit = probes.find((p) => p && (p.value.rows?.length ?? 0) > 0);
-      if (hit) {
-        selected = hit.day;
-        data = hit.value;
-        propsError = null;
-        called = await apiGet<{ rows: CalledRow[] }>(
-          `/v1/anytime-td/called?league=${league}&date=${selected}`,
-          8000,
-        ).catch(() => null);
-      }
-    }
   }
   const calledRows = called?.rows ?? [];
   const scoreRows = scorecard?.atd_scorecard?.rows || [];
@@ -112,9 +114,10 @@ export default async function AnytimeTdPage({
     date: days && selected === days.today ? undefined : selected,
   });
 
+  // Empty board is not a load failure. Only hard-fail when we have no usable payload.
   const loadFailure = researchView
     ? Boolean(researchError && !research)
-    : Boolean(daysError || propsError);
+    : Boolean((daysError && !days) || (propsError && !data));
 
   return (
     <div className="space-y-10">
