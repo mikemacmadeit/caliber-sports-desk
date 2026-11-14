@@ -68,7 +68,9 @@ NFL_GRADED_COVER_LABEL = "Covered 54% of recent NFL games"
 MARKET_WINNER_WEIGHT = 0.85
 # Finished games stay on the card for four days, long enough for a
 # Thursday kickoff to still be here on Sunday.
-BOARD_RESULT_LOOKBACK = timedelta(days=4)
+# Keep a full prior week of finals on the card so weekend grades stay visible
+# through the next slate (research board, not a season archive).
+BOARD_RESULT_LOOKBACK = timedelta(days=10)
 
 
 def blend_margin_toward_market(

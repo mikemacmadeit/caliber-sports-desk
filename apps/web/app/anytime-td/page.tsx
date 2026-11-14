@@ -32,50 +32,45 @@ export default async function AnytimeTdPage({
 
   const selected = dateParam || days?.today || new Date().toISOString().slice(0, 10);
 
-  // Research view does not render the priced board — skip the heavy props scan so
-  // ingest overlap cannot 500 the finder behind a 15s AbortSignal on /v1/props.
+  // Parallel + short budgets: Netlify SSR dies around ~26–60s if these run in series.
   let data: { rows: PropRow[]; disclaimer: string } | null = null;
   let propsError: string | null = null;
-  if (!researchView) {
-    try {
-      data = await apiGet<{ rows: PropRow[]; disclaimer: string }>(
-        `/v1/props?market=anytime_td&league=${league}&date=${selected}`,
-        45000,
-      );
-    } catch (e) {
-      propsError = e instanceof Error ? e.message : "props unavailable";
-    }
-  }
-
   let called: { rows: CalledRow[] } | null = null;
-  if (!researchView) {
-    try {
-      called = await apiGet<{ rows: CalledRow[] }>(
-        `/v1/anytime-td/called?league=${league}&date=${selected}`,
-        45000,
-      );
-    } catch {
-      called = null;
-    }
-  }
-  const calledRows = called?.rows ?? [];
-
   let research: ResearchFinderPayload | null = null;
   let researchError: string | null = null;
+  let scorecard: {
+    atd_scorecard?: { rows: AtdScoreRow[]; note?: string; open_and_settled_takes?: AtdTake[] };
+  } | null = null;
+
   if (researchView) {
     try {
-      research = await apiGet<ResearchFinderPayload>(`/v1/anytime-td/research?league=${league}`, 20000);
+      research = await apiGet<ResearchFinderPayload>(`/v1/anytime-td/research?league=${league}`, 12000);
     } catch (e) {
       researchError = e instanceof Error ? e.message : "research unavailable";
       research = null;
     }
-  }
-
-  const scorecard = researchView
-    ? null
-    : await apiGet<{
+  } else {
+    const [propsResult, calledResult, scoreResult] = await Promise.all([
+      apiGet<{ rows: PropRow[]; disclaimer: string }>(
+        `/v1/props?market=anytime_td&league=${league}&date=${selected}`,
+        12000,
+      ).then(
+        (ok) => ({ ok: true as const, value: ok }),
+        (e) => ({ ok: false as const, error: e instanceof Error ? e.message : "props unavailable" }),
+      ),
+      apiGet<{ rows: CalledRow[] }>(`/v1/anytime-td/called?league=${league}&date=${selected}`, 12000).catch(
+        () => null,
+      ),
+      apiGet<{
         atd_scorecard?: { rows: AtdScoreRow[]; note?: string; open_and_settled_takes?: AtdTake[] };
-      }>("/v1/shadow/track-record", 45000).catch(() => null);
+      }>("/v1/shadow/track-record", 12000).catch(() => null),
+    ]);
+    if (propsResult.ok) data = propsResult.value;
+    else propsError = propsResult.error;
+    called = calledResult;
+    scorecard = scoreResult;
+  }
+  const calledRows = called?.rows ?? [];
   const scoreRows = scorecard?.atd_scorecard?.rows || [];
   const gradedTakes = scorecard?.atd_scorecard?.open_and_settled_takes || [];
 

@@ -1,6 +1,7 @@
-# Caliber cloud API + Postgres (free tier).
-# Hourly scoreboard/odds stay on the Windows Task Scheduler for $0 until a
-# Render payment method is added (cron requires billing). Then add caliber-hourly.
+# Caliber cloud API + Postgres.
+# Web service should be 1c-2g (2 GB) for public boards. Free sleeps and OOMs.
+# After billing is on, the hourly cron refreshes odds + saved boards in cloud
+# so the Windows PC is not required for production.
 #
 # After deploy, set WEB_ORIGIN / ODDS_API_KEY / CFBD_API_KEY, then point Netlify
 # API_URL at this service.
@@ -15,11 +16,11 @@ services:
   - type: web
     name: caliber-api
     runtime: docker
-    plan: free
+    plan: 1c-2g
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /docs
+    healthCheckPath: /health
     envVars:
       - key: APP_ENV
         value: prod
@@ -39,5 +40,55 @@ services:
         value: "2000"
       - key: DISCLAIMER
         value: Research forecast only. Not betting advice. No wagering, no automated placement.
+      - key: PYTHONPATH
+        value: /app/packages/core:/app/services/api:/app/services/worker
+
+  # Odds + props board warm. Needs ODDS_API_KEY set in the dashboard.
+  - type: cron
+    name: caliber-hourly
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "0 * * * *"
+    dockerCommand: "python -m worker.main ingest-odds-live --hours 168"
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caliber-db
+          property: connectionString
+      - key: PARQUET_DIR
+        value: /data/parquet
+      - key: ODDS_API_KEY
+        sync: false
+      - key: CFBD_API_KEY
+        sync: false
+      - key: ODDS_CREDIT_BUDGET_PER_DAY
+        value: "2000"
+      - key: PYTHONPATH
+        value: /app/packages/core:/app/services/api:/app/services/worker
+
+  # Scores + ATS grade/refresh so last weekend stays settled without the PC.
+  - type: cron
+    name: caliber-scoreboard
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "*/30 * * * *"
+    dockerCommand: "python -m worker.main ingest-scoreboard --year 2026 && python -m worker.main ats-cycle --skip-odds"
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caliber-db
+          property: connectionString
+      - key: PARQUET_DIR
+        value: /data/parquet
       - key: PYTHONPATH
         value: /app/packages/core:/app/services/api:/app/services/worker
