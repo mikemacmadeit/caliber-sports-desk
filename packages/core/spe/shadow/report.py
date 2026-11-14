@@ -94,7 +94,10 @@ def shadow_track_record(session: Session) -> dict[str, Any]:
 
     m3_vs_m4 = _paired_comparison(preds, settles)
     independence = _independence_counts(preds, settles)
-    atd_scorecard = _atd_scorecard(preds, settles)
+    from spe.shadow.desk_ledger import latest_decisions
+    decisions = latest_decisions(session)
+    desk_ids = {r.payload["shadow_id"] for r in decisions.values() if r.payload.get("shadow_id")}
+    atd_scorecard = _atd_scorecard(preds, settles, desk_ids, set(decisions))
     _attach_take_slate(session, atd_scorecard)
     from spe.ops.freshness import operations_health
     from spe.shadow.ats import ats_track_record
@@ -202,6 +205,8 @@ def _family(model_version_id: str) -> str:
     (e.g. m5_c_recent before m5, blend before generic other).
     """
     mv = model_version_id or ""
+    if mv.startswith("desk_opportunity_v2"):
+        return "desk_opportunity_v2"
     if mv.startswith("blend_v1_c_recent") or mv.startswith("blend_"):
         return "blend_v1_c_recent"
     if mv.startswith("m5_c_recent"):
@@ -223,11 +228,19 @@ def _family(model_version_id: str) -> str:
 def _atd_scorecard(
     preds: list[ShadowPrediction],
     settles: dict[str, ShadowSettlement],
+    desk_ids: set[str] | None = None,
+    desk_games: set[str] | None = None,
 ) -> dict[str, Any]:
     """Win/loss/Brier scoreboard for anytime TD — research universe and desk takes."""
-    from spe.shadow.atd_desk_takes import is_desk_take
+    from spe.shadow.atd_desk_takes import is_desk_take as legacy_desk_take
+    def is_desk_take(pred):
+        if (pred.components or {}).get("desk_take_source") == "desk_opportunity_v2":
+            return desk_ids is not None and pred.shadow_id in desk_ids
+        if pred.game_id in (desk_games or set()):
+            return False
+        return legacy_desk_take(pred)
 
-    primary = ("blend_v1_c_recent", "m5_c_recent", "player_td_v1", "m3", "m5", "m6", "atd_sim_v1")
+    primary = ("desk_opportunity_v2", "blend_v1_c_recent", "m5_c_recent", "player_td_v1", "m3", "m5", "m6", "atd_sim_v1")
 
     def _bucket_rows(only_desk_takes: bool) -> list[dict[str, Any]]:
         by_key: dict[tuple[str, str], dict[str, Any]] = {}
@@ -261,7 +274,7 @@ def _atd_scorecard(
             bucket["games"].add(pred.game_id)
             bucket["ps"].append(float(pred.forecast_probability))
             bucket["ys"].append(y)
-            if settle.flat_stake_return is not None:
+            if settle.flat_stake_return is not None and (pred.components or {}).get("quote_verified", True):
                 bucket["returns"].append(float(settle.flat_stake_return))
 
         rows: list[dict[str, Any]] = []
@@ -272,7 +285,7 @@ def _atd_scorecard(
                 {
                     "league_id": b["league_id"],
                     "family": family,
-                    "primary": family in {"blend_v1_c_recent", "m5_c_recent", "player_td_v1"},
+                    "primary": family in {"desk_opportunity_v2", "blend_v1_c_recent", "m5_c_recent", "player_td_v1"},
                     "desk_takes_only": only_desk_takes,
                     "n": b["n"],
                     "wins": b["wins"],

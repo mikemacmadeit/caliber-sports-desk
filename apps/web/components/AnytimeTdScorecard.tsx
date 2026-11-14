@@ -16,6 +16,7 @@ export type AtdScoreRow = {
 };
 
 export type AtdTake = {
+  taken_at?: string | null;
   shadow_id: string;
   league_id: string;
   game_id: string;

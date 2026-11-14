@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { PropRow } from "@/lib/api";
 import { PropExplorer } from "@/components/PropExplorer";
+import { PriceFreshnessBadge } from "@/components/PropTable";
 import { TeamMark } from "@/components/TeamMark";
 import { dayParts } from "@/lib/days";
 import { browserGet, peekBrowserCache } from "@/lib/browserApi";
@@ -37,6 +38,11 @@ export function AnytimeTdBoard({
   const [boardDate, setBoardDate] = useState(date);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!(cached && (cached.rows?.length ?? 0) > 0));
+  const [clock, setClock] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClock(n => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -82,7 +88,7 @@ export function AnytimeTdBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dates keyed by joined string
   }, [league, date, candidateDates.join("|")]);
 
-  const deskPicks = useMemo(() => selectDeskTakes(data?.rows || []), [data]);
+  const deskPicks = useMemo(() => selectDeskTakes(data?.rows || []), [data, clock]);
 
   if (loading && !(data?.rows?.length)) {
     return <p className="text-sm text-mute">Loading touchdown prices…</p>;
@@ -133,14 +139,14 @@ export function AnytimeTdBoard({
         <div className="border-b border-white/10 pb-2">
           <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Desk picks</h2>
           <p className="mt-2 max-w-xl text-sm text-mute">
-            One name per game. These are the ones we grade on the record — a touchdown is a win, no touchdown is a loss.
+            At most one name per game, using scoring opportunities, matchup, and price. These are the ones we grade on the record — a touchdown is a win, no touchdown is a loss.
           </p>
         </div>
         {deskPicks.length === 0 ? (
           <div className="plate px-5 py-5">
             <p className="font-display text-3xl uppercase leading-none">No desk pick locked yet</p>
             <p className="mt-2 max-w-xl text-sm text-mute">
-              A desk pick needs scoring work and a chance ahead of the price. The full board is still below.
+              A desk pick needs scoring work, a current price, and an estimated chance at least four points above the price. The full board is still below.
             </p>
           </div>
         ) : (
@@ -188,6 +194,12 @@ function DeskPickCard({ row }: { row: PropRow }) {
         {row.book_price != null ? ` · ${row.book_price > 0 ? `+${row.book_price}` : row.book_price}` : ""}
       </p>
       {reason ? <p className="mt-2 text-sm text-mute">{reason}</p> : null}
+      {row.desk_analysis ? <div className="mt-3 border-t border-white/10 pt-3 text-xs leading-relaxed text-mute">
+        <p className="font-mono uppercase tracking-wide">What could change this pick</p>
+        {row.desk_analysis.risks.map(risk => <p key={risk} className="mt-1">{risk}</p>)}
+        <p className="mt-2">New research model · live accuracy is still being measured.</p>
+      </div> : null}
+      <PriceFreshnessBadge freshness={row.price_freshness || row.forecast.price_freshness} />
     </Link>
   );
 }

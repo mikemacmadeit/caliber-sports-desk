@@ -6,6 +6,7 @@ import type { AtdScoreRow, AtdTake } from "@/components/AnytimeTdScorecard";
 import { kickoffDate, kickoffMs, kickoffParts, pct } from "@/lib/format";
 
 const FAMILY_RANK: Record<string, number> = {
+  desk_opportunity_v2: -1,
   blend_v1_c_recent: 0,
   m5_c_recent: 1,
   player_td_v1: 2,
@@ -53,7 +54,7 @@ export function AnytimeTdRecord({
         <div>
           <h2 className="font-display text-4xl uppercase leading-none tracking-wide">How the picks did</h2>
           <p className="mt-2 max-w-xl text-sm text-mute">
-            One name per game. Most recent game first.
+            One recorded pregame choice per game. New model results start with its first recorded call.
           </p>
         </div>
         <Link href="/track-record" className="font-display text-xl uppercase tracking-wide text-gold">
@@ -294,9 +295,10 @@ function dedupeTakes(takes: AtdTake[], league: string) {
   for (const row of takes) {
     if (league !== "all" && row.league_id !== league) continue;
     if (row.settlement !== "win" && row.settlement !== "loss") continue;
-    const key = `${row.game_id}:${(row.player_name || row.shadow_id).toLowerCase()}`;
+    const key = row.game_id;
     const prev = best.get(key);
-    if (!prev || familyRank(row) < familyRank(prev)) best.set(key, row);
+    if (!prev || familyRank(row) < familyRank(prev) ||
+      (familyRank(row) === familyRank(prev) && Date.parse(row.taken_at || "") > Date.parse(prev.taken_at || ""))) best.set(key, row);
   }
   return [...best.values()];
 }

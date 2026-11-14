@@ -2,7 +2,7 @@ import type { PropRow } from "@/lib/api";
 
 /** Keep in lockstep with spe.shadow.atd_desk_takes */
 export const VALUE_HAIRCUT = 0.04;
-/** Same floor the desk already uses before it will name an unpriced player. */
+/** Minimum modeled scoring probability for a research Desk candidate. */
 export const SCORE_CHANCE_FLOOR = 0.22;
 /** A desk pick has to be a real chance, not a longshot whose price looks generous. */
 const MIN_DESK_CHANCE = 0.18;
@@ -64,12 +64,11 @@ export function deskPickScore(row: PropRow): number {
 
 function eligible(row: PropRow, _haircut = VALUE_HAIRCUT): boolean {
   const status = (row.forecast.availability_status || "").toLowerCase();
-  if (status === "out" || status === "doubtful") return false;
+  if (["out", "doubtful", "inactive", "confirmed_inactive", "suspended", "questionable", "uncertain"].includes(status)) return false;
+  if (row.desk_analysis && !row.desk_analysis.eligible) return false;
   if (row.forecast.p_estimate == null) return false;
   const p = row.forecast.p_estimate ?? 0;
-  if (p <= 0) return false;
-  // Freshness/edge are score factors, not vetoes. Research-only rows need a floor.
-  if (row.book_price == null && p < 0.22) return false;
+  if (!Number.isFinite(p) || p < SCORE_CHANCE_FLOOR || p > 1) return false;
   return true;
 }
 
@@ -93,13 +92,13 @@ function tonightChance(row: PropRow): number | null {
 function priceGap(row: PropRow): number | null {
   const chance = tonightChance(row);
   const price = row.book_price;
-  if (chance == null || price == null) return null;
+  if (chance == null || price == null || !Number.isFinite(price) || !Number.isInteger(price) || Math.abs(price) < 100) return null;
   return chance - americanToImplied(price);
 }
 
 function usageNum(row: PropRow, key: "gl_carries" | "rz_targets" | "rush_td" | "rec_td" | "carries" | "targets"): number {
   const value = row.usage?.[key];
-  return value == null || Number.isNaN(value) ? 0 : value;
+  return value == null || !Number.isFinite(value) ? 0 : value;
 }
 
 /** A price gap is not a reason. He has to be the one getting the scoring work. */
@@ -114,8 +113,13 @@ export function scoringRole(row: PropRow): number {
   return usageNum(row, "gl_carries") * 4 + usageNum(row, "rz_targets") * 2 + (usageNum(row, "rush_td") + usageNum(row, "rec_td")) * 1.5;
 }
 
-/** One scorer per game: scoring touches, and only when our chance beats the price. */
+/** New API selections are authoritative; the legacy fallback preserves the prior board. */
 export function selectDeskTakes(rows: PropRow[], haircut = VALUE_HAIRCUT): PropRow[] {
+  if (rows.some(row => row.desk_selected !== undefined)) {
+    return rows.filter(row => row.desk_selected && (row.locked || (eligible(row, haircut) &&
+      Boolean(row.desk_analysis?.valid_until) && Date.parse(row.desk_analysis!.valid_until!) > Date.now())))
+      .sort((a, b) => b.forecast.p_estimate - a.forecast.p_estimate);
+  }
   const best = new Map<string, { role: number; gap: number; row: PropRow }>();
   for (const row of rows) {
     if (!eligible(row, haircut)) continue;
@@ -126,7 +130,8 @@ export function selectDeskTakes(rows: PropRow[], haircut = VALUE_HAIRCUT): PropR
     if (!hasScoringRole(row)) continue;
     const role = scoringRole(row);
     const prior = best.get(row.game_id);
-    if (!prior || role > prior.role || (role === prior.role && gap > prior.gap)) {
+    if (!prior || role > prior.role || (role === prior.role && (gap > prior.gap ||
+      (gap === prior.gap && String(row.player_id) > String(prior.row.player_id))))) {
       best.set(row.game_id, { role, gap, row });
     }
   }
@@ -148,6 +153,7 @@ export function deskScoringLine(row: PropRow): string | null {
 }
 
 export function deskPickReason(row: PropRow): string {
+  if (row.desk_analysis) return row.desk_analysis.reasons.join(" ");
   const chance = row.forecast.p_estimate;
   const price = row.book_price;
   const parts: string[] = [];

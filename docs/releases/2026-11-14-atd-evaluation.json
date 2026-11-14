@@ -1,0 +1,169 @@
+{
+  "nfl": {
+    "train_n": 1732,
+    "validation_n": 3427,
+    "test_n": 1981,
+    "test_window": "2026 season through available November 7\u20139 finals",
+    "limitations": [
+      "Retrospective revised stats; not a prospective betting record.",
+      "Observed skill-player participants with at least two same-season, same-team prior games.",
+      "No historical injuries, route/coverage charting, or executable prices; no ROI claim.",
+      "NFL team identity coverage starts in 2025; FBS 2023\u20132024 training.",
+      "Comparison is recent-TD baseline, not the previous production model."
+    ],
+    "validation": {
+      "opportunity_model": {
+        "player_games": 3427,
+        "brier": 0.13699377998017082,
+        "log_loss": 0.4345792630835944,
+        "predicted_rate": 0.18354245695943974,
+        "actual_rate": 0.18354245695943974,
+        "picks": 162,
+        "hits": 74,
+        "hit_rate": 0.4567901234567901
+      },
+      "recent_td_baseline": {
+        "player_games": 3427,
+        "brier": 0.14919191408797416,
+        "log_loss": 1.677964818619466,
+        "predicted_rate": 0.17608403595174107,
+        "actual_rate": 0.18354245695943974,
+        "picks": 163,
+        "hits": 64,
+        "hit_rate": 0.39263803680981596
+      }
+    },
+    "test": {
+      "opportunity_model": {
+        "player_games": 1981,
+        "brier": 0.14805106978891136,
+        "log_loss": 0.46277986793793563,
+        "predicted_rate": 0.1912642219060703,
+        "actual_rate": 0.20343260979303382,
+        "picks": 104,
+        "hits": 50,
+        "hit_rate": 0.4807692307692308
+      },
+      "recent_td_baseline": {
+        "player_games": 1981,
+        "brier": 0.16825303025183194,
+        "log_loss": 2.662878201972927,
+        "predicted_rate": 0.17283084794196388,
+        "actual_rate": 0.20343260979303382,
+        "picks": 104,
+        "hits": 54,
+        "hit_rate": 0.5192307692307693
+      }
+    }
+  },
+  "fbs": {
+    "train_n": 21643,
+    "validation_n": 11200,
+    "test_n": 7494,
+    "test_window": "2026 season through available November 7\u20139 finals",
+    "limitations": [
+      "Retrospective revised stats; not a prospective betting record.",
+      "Observed skill-player participants with at least two same-season, same-team prior games.",
+      "No historical injuries, route/coverage charting, or executable prices; no ROI claim.",
+      "NFL team identity coverage starts in 2025; FBS 2023\u20132024 training.",
+      "Comparison is recent-TD baseline, not the previous production model."
+    ],
+    "validation": {
+      "opportunity_model": {
+        "player_games": 11200,
+        "brier": 0.17991399716913198,
+        "log_loss": 0.5413535639740729,
+        "predicted_rate": 0.26428571428571435,
+        "actual_rate": 0.2642857142857143,
+        "picks": 631,
+        "hits": 343,
+        "hit_rate": 0.5435816164817749
+      },
+      "recent_td_baseline": {
+        "player_games": 11200,
+        "brier": 0.2030745105470077,
+        "log_loss": 2.296681368485024,
+        "predicted_rate": 0.24963903214296462,
+        "actual_rate": 0.2642857142857143,
+        "picks": 631,
+        "hits": 340,
+        "hit_rate": 0.5388272583201268
+      }
+    },
+    "test": {
+      "opportunity_model": {
+        "player_games": 7494,
+        "brier": 0.1755916858645851,
+        "log_loss": 0.5315888989163062,
+        "predicted_rate": 0.25564111725012717,
+        "actual_rate": 0.25593808380037364,
+        "picks": 429,
+        "hits": 229,
+        "hit_rate": 0.5337995337995338
+      },
+      "recent_td_baseline": {
+        "player_games": 7494,
+        "brier": 0.2034336136879591,
+        "log_loss": 2.5132949712220922,
+        "predicted_rate": 0.2498935253691456,
+        "actual_rate": 0.25593808380037364,
+        "picks": 429,
+        "hits": 213,
+        "hit_rate": 0.4965034965034965
+      }
+    }
+  },
+  "paired_existing_model_replay": {
+    "nfl": {
+      "existing_frozen_model": {
+        "player_games": 257,
+        "brier": 0.15896165696966813,
+        "log_loss": 0.49752092613661886,
+        "predicted_rate": 0.219376338210443,
+        "actual_rate": 0.20233463035019456,
+        "picks": 14,
+        "hits": 5,
+        "hit_rate": 0.35714285714285715
+      },
+      "candidate": {
+        "player_games": 257,
+        "brier": 0.15178452756560584,
+        "log_loss": 0.47688371739121044,
+        "predicted_rate": 0.20082324328422788,
+        "actual_rate": 0.20233463035019456,
+        "picks": 14,
+        "hits": 7,
+        "hit_rate": 0.5
+      },
+      "note": "Paired observed-player sample only; excludes missing historical availability and players without two prior games. Not the exact published Desk picks."
+    },
+    "fbs": {
+      "existing_frozen_model": {
+        "player_games": 35,
+        "brier": 0.12703064789434854,
+        "log_loss": 0.42381555230410356,
+        "predicted_rate": 0.21065445358578025,
+        "actual_rate": 0.14285714285714285,
+        "picks": 2,
+        "hits": 1,
+        "hit_rate": 0.5
+      },
+      "candidate": {
+        "player_games": 35,
+        "brier": 0.1140364269695689,
+        "log_loss": 0.3920723781756381,
+        "predicted_rate": 0.2613658467127986,
+        "actual_rate": 0.14285714285714285,
+        "picks": 2,
+        "hits": 1,
+        "hit_rate": 0.5
+      },
+      "note": "Paired observed-player sample only; excludes missing historical availability and players without two prior games. Not the exact published Desk picks."
+    }
+  },
+  "live_loader_parity": {
+    "players_with_history": 150,
+    "identical_feature_sets": 150,
+    "observed_slate": "NFL 2026-11-15"
+  }
+}
