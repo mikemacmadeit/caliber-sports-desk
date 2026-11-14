@@ -8,8 +8,9 @@ const GROUPS = [
   {
     label: "The slate",
     items: [
-      { href: "/", label: "Board", hint: "Every game, in kick order" },
-      { href: "/best-bets", label: "Best bets", hint: "Strongest calls for the day" },
+      { href: "/", label: "Today", hint: "Your football research desk" },
+      { href: "/schedule", label: "Schedule", hint: "Every game, in kick order" },
+      { href: "/best-bets", label: "Published", hint: "Research that cleared the checks" },
       { href: "/parlays", label: "Parlays", hint: "Tickets for the day" },
       { href: "/ats", label: "ATS", hint: "One side of the number" },
       { href: "/anytime-td", label: "Anytime TD", hint: "Who finds the end zone" },
@@ -107,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="px-5 py-5">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-mute">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold" />
-            Desk live
+            Research desk
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-mute">
             Research only. Not a sportsbook. NFL and college are scored apart.
@@ -121,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="grid h-8 w-8 place-items-center bg-gold font-display text-xl leading-none text-ink-950">C</span>
             <span className="font-display text-2xl uppercase tracking-wide">Caliber</span>
           </Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">Live</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">Research</span>
         </div>
         <nav aria-label="Sections" className="flex flex-wrap gap-1 px-3 pb-2">
           {PRIMARY.map((item) => {

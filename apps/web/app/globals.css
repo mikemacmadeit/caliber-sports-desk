@@ -209,3 +209,7 @@ a.plate:hover {
   --font-sans: "Outfit Variable";
   --font-mono: "JetBrains Mono Variable";
 }
+
+.desk-intro { background: linear-gradient(115deg, rgba(214,255,63,.06), rgba(12,16,24,.95) 60%); }
+.desk-card::before { left: 0; right: 0; background: linear-gradient(90deg, rgba(214,255,63,.6), transparent 75%); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

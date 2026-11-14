@@ -67,6 +67,7 @@ def ingest_odds_live(
     horizon_hours: int | None = None,
     publish_forecasts: bool = True,
 ) -> dict[str, Any]:
+    fixed_clock = now is not None or fixture_odds is not None
     now = now or datetime.now(UTC)
     adapter = adapter or OddsApiAdapter()
     if fixture_odds is None:
@@ -195,6 +196,7 @@ def ingest_odds_live(
             cost = int(result.credit_cost)
         if not fixture_odds:
             reconcile_actual_cost(session, reserved, cost)
+        observed_now = now if fixed_clock else datetime.now(UTC)
         empty = len(result.records) == 0
         # Raw snapshot records the observation; credit already reserved/reconciled.
         append_raw(
@@ -212,7 +214,7 @@ def ingest_odds_live(
                 "observation_ok": True,
                 "price_rows": len(result.records),
             },
-            observed_at=now,
+            observed_at=observed_now,
             credit_cost=0,
         )
         if adapter.last_credits_remaining is not None:
@@ -226,7 +228,7 @@ def ingest_odds_live(
         eligible_ids = {player_id for player_id, _ in catalog}
         for rec in result.records:
             added, unmatched, unlinked, changed = _store_tick(
-                session, game, rec, catalog, now, cost, eligible_ids=eligible_ids
+                session, game, rec, catalog, observed_now, cost, eligible_ids=eligible_ids
             )
             league_ticks[league] += added
             totals["ticks_upserted"] += added
@@ -269,7 +271,7 @@ def ingest_odds_live(
     if publish_forecasts:
         from spe.ingest.model_forecasts import publish_model_forecasts
 
-        totals["forecasts"] = publish_model_forecasts(session, now)
+        totals["forecasts"] = publish_model_forecasts(session, now if fixed_clock else datetime.now(UTC))
     else:
         totals["forecasts"] = {"skipped": True}
     session.flush()

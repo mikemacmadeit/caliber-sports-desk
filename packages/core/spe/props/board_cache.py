@@ -85,7 +85,12 @@ def write_entry(
     path: Path | None = None,
 ) -> dict[str, Any]:
     if path is None:
-        from spe.publishing.store import write
+        from spe.publishing.store import read, write
+        from spe.publishing.desk import changes_for, selection_key
+        old = read("props:" + entry_key(market, league, date)) or {}
+        previous = {selection_key(r): r for r in old.get("rows", [])}
+        now = datetime.now(UTC)
+        rows = [{**r, "changes": changes_for(r, previous.get(selection_key(r)), now)} for r in rows]
         return write("props:" + entry_key(market, league, date), {
             "market": market or "all", "league": league or "all", "date": date or "all", "rows": rows,
         })
