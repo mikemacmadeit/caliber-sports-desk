@@ -282,6 +282,23 @@ def test_wrong_team_player_stays_unlinked(db: Session):
     assert db.query(Outcome).filter(Outcome.player_id == "nfl:stranger").count() == 0
 
 
+@pytest.mark.parametrize("allowed", [True, False])
+def test_batch_quote_reuses_validated_roster_without_losing_exclusions(db, monkeypatch, allowed):
+    game, _, book = _seed_priced_outcome(db, kickoff_hours=3)
+    def unexpected_audit(*args, **kwargs):
+        raise AssertionError("Do not repeat the full roster audit for each quote")
+    monkeypatch.setattr("spe.ingest.odds_live._player_on_game_roster", unexpected_audit)
+    for price in (200, 210, 220):
+        _, unmatched, unlinked, _ = _store_tick(
+            db, game,
+            {"market_key": "player_anytime_td", "bookmaker": book.bookmaker_id,
+             "description": "Test Player", "name": "Yes", "price_american": price},
+            [("nfl:p1", "Test Player")], datetime.now(UTC), 0,
+            eligible_ids={"nfl:p1"} if allowed else set(),
+        )
+        assert (unmatched, unlinked) == ((0, 0) if allowed else (1, 1))
+
+
 def test_ambiguous_name_stays_unlinked(db: Session):
     game, _, book = _seed_priced_outcome(db, kickoff_hours=3)
     catalog = [("nfl:p1", "Test Player")]

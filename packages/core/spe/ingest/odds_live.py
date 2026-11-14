@@ -221,9 +221,13 @@ def ingest_odds_live(
         totals["credits_spent"] += cost
         fetched_by[league] += 1
         totals["events_fetched"] += 1
-        catalog = _roster_catalog(session, game)
+        # Audit current membership once per event, then reuse it for every book quote.
+        catalog = _roster_catalog(session, game, apply_eligibility_audit=True)
+        eligible_ids = {player_id for player_id, _ in catalog}
         for rec in result.records:
-            added, unmatched, unlinked, changed = _store_tick(session, game, rec, catalog, now, cost)
+            added, unmatched, unlinked, changed = _store_tick(
+                session, game, rec, catalog, now, cost, eligible_ids=eligible_ids
+            )
             league_ticks[league] += added
             totals["ticks_upserted"] += added
             totals["unmatched_players"] += unmatched
@@ -373,20 +377,21 @@ def _nfl_id(name: str) -> str | None:
     return nfl_team_id(abbr) if abbr else None
 
 
-def _roster_catalog(session: Session, game: Game) -> list[tuple[str, str]]:
+def _roster_catalog(
+    session: Session, game: Game, *, apply_eligibility_audit: bool = False
+) -> list[tuple[str, str]]:
     """Current eligible players only — never the multi-season open roster dump."""
     from spe.identity.roster import eligible_players_for_game
 
-    # The week-long eligibility audit scans every player's history. It is too slow
-    # to run while a live price download is holding the database, and this path
-    # already drops retired roster rows before matching a name.
+    # The ingest loop requests the full audit once and reuses these validated IDs.
+    # Other latency-sensitive callers can retain the status-filtered catalog.
     return [
         (row.player_id, row.name)
         for row in eligible_players_for_game(
             session,
             game,
             include_inactive_for_props=True,
-            apply_eligibility_audit=False,
+            apply_eligibility_audit=apply_eligibility_audit,
         )
     ]
 
@@ -398,6 +403,8 @@ def _store_tick(
     catalog: list[tuple[str, str]],
     observed_at: datetime,
     credit_cost: int,
+    *,
+    eligible_ids: set[str] | None = None,
 ) -> tuple[int, int, int, bool]:
     """Returns (added, unmatched, unlinked, price_changed).
 
@@ -422,7 +429,11 @@ def _store_tick(
         if decision.review_status == "auto":
             player_id = decision.canonical_id
             # Never accept a fuzzy/auto match that fails roster membership for this game.
-            if not _player_on_game_roster(session, game, player_id):
+            on_roster = (
+                player_id in eligible_ids if eligible_ids is not None
+                else _player_on_game_roster(session, game, player_id)
+            )
+            if not on_roster:
                 player_id = None
                 unlinked = 1
                 unmatched = 1

@@ -28,19 +28,24 @@ def settle_shadow_predictions(
         "blockers": {},
     }
     # Terminal results stay immutable. Blocked rows may be retried when box scores appear.
-    terminal = {
-        r.shadow_id
-        for r in session.query(ShadowSettlement).filter(ShadowSettlement.result.in_(("win", "loss", "void", "push"))).all()
-    }
-    blocked_ids = {
-        r.shadow_id
-        for r in session.query(ShadowSettlement).filter(ShadowSettlement.result == "blocked").all()
-    }
-    query = session.query(ShadowPrediction)
+    terminal_ids = session.query(ShadowSettlement.shadow_id).filter(
+        ShadowSettlement.result.in_(("win", "loss", "void", "push"))
+    )
+    if shadow_ids is not None:
+        terminal_ids = terminal_ids.filter(ShadowSettlement.shadow_id.in_(shadow_ids or ["__none__"]))
+    summary["already_settled"] = terminal_ids.count()
+    blocked_count = session.query(ShadowSettlement).filter(
+        ShadowSettlement.result == "blocked"
+    ).count()
+    # Filter before materializing JSON snapshots: old settled history can exceed
+    # the cron worker's memory even though only a small pending set needs work.
+    query = session.query(ShadowPrediction).filter(
+        ~ShadowPrediction.shadow_id.in_(terminal_ids)
+    )
     if shadow_ids is not None:
         query = query.filter(ShadowPrediction.shadow_id.in_(shadow_ids or ["__none__"]))
-    open_rows = [row for row in query.all() if row.shadow_id not in terminal]
-    summary["blocked_retry_candidates"] = len(blocked_ids)
+    open_rows = query.all()
+    summary["blocked_retry_candidates"] = blocked_count
     if not open_rows:
         summary["status"] = "nothing_open"
         return summary

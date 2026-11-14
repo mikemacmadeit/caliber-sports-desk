@@ -36,46 +36,46 @@ def audit_nfl_week(
     rows = session.execute(
         text(
             """
-            SELECT rw.player_id, rw.team_id, rw.status, p.name, p.position_group,
-                   (
-                     SELECT MAX(r2.season_year * 100 + r2.week)
-                     FROM roster_weeks r2
-                     WHERE r2.player_id = rw.player_id AND UPPER(COALESCE(r2.status, '')) = 'RET'
-                   ) AS last_ret_key,
-                   (
-                     SELECT MAX(g.kickoff_utc)
-                     FROM player_game_stats pgs
-                     JOIN games g ON g.game_id = pgs.game_id
-                     WHERE pgs.player_id = rw.player_id
-                       AND g.status = 'final'
-                       AND (
-                         COALESCE(pgs.targets, 0) + COALESCE(pgs.carries, 0) + COALESCE(pgs.receptions, 0)
-                         + ABS(COALESCE(pgs.rec_yards, 0)) + ABS(COALESCE(pgs.rush_yards, 0))
-                       ) > 0
-                   ) AS last_involved_kickoff,
-                   (
-                     SELECT MAX(g.kickoff_utc)
-                     FROM player_game_stats pgs
-                     JOIN games g ON g.game_id = pgs.game_id
-                     WHERE pgs.player_id = rw.player_id AND g.status = 'final'
-                   ) AS last_any_kickoff,
-                   (
-                     SELECT COUNT(*)
-                     FROM player_game_stats pgs
-                     JOIN games g ON g.game_id = pgs.game_id
-                     WHERE pgs.player_id = rw.player_id
-                       AND g.status = 'final'
-                       AND g.kickoff_utc >= :season_start
-                       AND (
-                         COALESCE(pgs.targets, 0) + COALESCE(pgs.carries, 0) + COALESCE(pgs.receptions, 0)
-                         + ABS(COALESCE(pgs.rec_yards, 0)) + ABS(COALESCE(pgs.rush_yards, 0))
-                       ) > 0
-                   ) AS season_involved_games
-            FROM roster_weeks rw
-            JOIN players p ON p.player_id = rw.player_id
-            WHERE rw.season_year = :year AND rw.week = :week
-              AND UPPER(COALESCE(rw.status, '')) = 'ACT'
-              AND rw.team_id LIKE 'nfl:%'
+            WITH active_roster AS (
+                SELECT rw.player_id, rw.team_id, rw.status, p.name, p.position_group
+                FROM roster_weeks rw
+                JOIN players p ON p.player_id = rw.player_id
+                WHERE rw.season_year = :year AND rw.week = :week
+                  AND UPPER(COALESCE(rw.status, '')) = 'ACT'
+                  AND rw.team_id LIKE 'nfl:%'
+            ), active_ids AS (
+                SELECT DISTINCT player_id FROM active_roster
+            ), retirement AS (
+                SELECT r.player_id, MAX(r.season_year * 100 + r.week) AS last_ret_key
+                FROM roster_weeks r
+                JOIN active_ids a ON a.player_id = r.player_id
+                WHERE UPPER(COALESCE(r.status, '')) = 'RET'
+                GROUP BY r.player_id
+            ), final_stats AS (
+                SELECT pgs.player_id, g.kickoff_utc,
+                       CASE WHEN (
+                           COALESCE(pgs.targets, 0) + COALESCE(pgs.carries, 0)
+                           + COALESCE(pgs.receptions, 0) + ABS(COALESCE(pgs.rec_yards, 0))
+                           + ABS(COALESCE(pgs.rush_yards, 0))
+                       ) > 0 THEN 1 ELSE 0 END AS involved
+                FROM player_game_stats pgs
+                JOIN active_ids a ON a.player_id = pgs.player_id
+                JOIN games g ON g.game_id = pgs.game_id
+                WHERE g.status = 'final'
+            ), history AS (
+                SELECT player_id,
+                       MAX(CASE WHEN involved = 1 THEN kickoff_utc END) AS last_involved_kickoff,
+                       MAX(kickoff_utc) AS last_any_kickoff,
+                       SUM(CASE WHEN involved = 1 AND kickoff_utc >= :season_start
+                                THEN 1 ELSE 0 END) AS season_involved_games
+                FROM final_stats
+                GROUP BY player_id
+            )
+            SELECT a.*, r.last_ret_key, h.last_involved_kickoff, h.last_any_kickoff,
+                   COALESCE(h.season_involved_games, 0) AS season_involved_games
+            FROM active_roster a
+            LEFT JOIN retirement r ON r.player_id = a.player_id
+            LEFT JOIN history h ON h.player_id = a.player_id
             """
         ),
         {"year": season_year, "week": week, "season_start": f"{season_year}-08-01"},
