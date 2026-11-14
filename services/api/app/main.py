@@ -369,10 +369,13 @@ def prop_picks(
     if cached and now - cached[0] < _PROP_PICK_TTL_S:
         return cached[1]
 
+    from spe.props.board_cache import load_slate_props
+
     games = games_for_slate(session, selected, league_id)
     picks: list[dict[str, Any]] = []
     if games:
-        rows = list_props(session, None, None, None, league_id, selected)
+        # Saved market boards — never scan every prop market live on the tiny API box.
+        rows = load_slate_props(session, league_id, selected)
         picks = build_game_prop_picks(rows, {game.game_id for game in games})
     payload = {
         "date": selected,
@@ -740,7 +743,9 @@ def parlay_card(
         "disclaimer": disclaimer(),
     }
     if games:
-        rows = list_props(session, None, None, None, league_id, selected)
+        from spe.props.board_cache import load_slate_props
+
+        rows = load_slate_props(session, league_id, selected)
         pair = best_same_game_pair(rows)
         joints: dict[tuple[str, str, str], float] = {}
         if pair is not None:

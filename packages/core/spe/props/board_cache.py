@@ -179,6 +179,21 @@ def load_props(
     return _filter_rows(list(entry.get("rows") or []), min_odds=min_odds, min_ev=min_ev)
 
 
+def load_slate_props(
+    session: Session,
+    league: str | None,
+    date: str | None,
+    *,
+    markets: tuple[str, ...] = WARM_MARKETS,
+    path: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Merge the warmed market boards for picks / tickets. Avoids a full all-market scan."""
+    rows: list[dict[str, Any]] = []
+    for market in markets:
+        rows.extend(load_props(session, market, None, None, league, date, path))
+    return rows
+
+
 def refresh_near_slate(session: Session, path: Path | None = None) -> dict[str, Any]:
     """Warm the boards the website opens first after an odds/forecast refresh."""
     from datetime import timedelta
@@ -194,11 +209,9 @@ def refresh_near_slate(session: Session, path: Path | None = None) -> dict[str, 
             if day and today <= day <= horizon:
                 dates.add(day)
     warmed: list[str] = []
+    leagues = ("all",) + WARM_LEAGUES
     for day in sorted(dates):
-        # Default Anytime TD page uses league=all.
-        refresh_entry(session, "anytime_td", "all", day, path)
-        warmed.append(entry_key("anytime_td", "all", day))
-        for league in WARM_LEAGUES:
+        for league in leagues:
             for market in WARM_MARKETS:
                 refresh_entry(session, market, league, day, path)
                 warmed.append(entry_key(market, league, day))

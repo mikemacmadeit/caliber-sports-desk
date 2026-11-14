@@ -22,19 +22,28 @@ export default async function TodayPage({
   let calls: AtsRow[] = [];
   let error: string | null = null;
   try {
-    days = await apiGet<SlateDays>(`/v1/days?league=${league}`);
+    days = await apiGet<SlateDays>(`/v1/days?league=${league}`, 20000);
+  } catch (e) {
+    error = e instanceof Error ? e.message : "API unavailable";
+  }
+  try {
     // If today is dark, land on the next day that actually has games.
-    const fallback =
-      days.dates.includes(days.today) ? days.today : (days.dates[0] ?? days.today);
+    const fallback = days
+      ? days.dates.includes(days.today)
+        ? days.today
+        : (days.dates[0] ?? days.today)
+      : new Date().toISOString().slice(0, 10);
     const selectedDate = dateParam || fallback;
     const [slate, board] = await Promise.all([
-      apiGet<SlateResponse>(`/v1/slate?league=${league}&date=${selectedDate}`),
-      apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff`, 30000).catch(() => ({ rows: [] as AtsRow[] })),
+      apiGet<SlateResponse>(`/v1/slate?league=${league}&date=${selectedDate}`, 25000),
+      apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff`, 20000).catch(() => ({
+        rows: [] as AtsRow[],
+      })),
     ]);
     data = slate;
     calls = board.rows.filter((row) => kickoffDate(row.kickoff_utc) === selectedDate);
   } catch (e) {
-    error = e instanceof Error ? e.message : "API unavailable";
+    error = error || (e instanceof Error ? e.message : "API unavailable");
   }
   const today = days?.today ?? "";
   const fallback =
@@ -63,8 +72,8 @@ export default async function TodayPage({
 
       {error && (
         <div className="plate border-danger/40 bg-danger/10 p-4 text-sm text-paper">
-          Desk is dark. The API at localhost:8000 isn’t answering. Start it with{" "}
-          <code className="font-mono text-gold">scripts/dev.ps1</code>. {error}
+          Desk is dark — the live API didn’t answer in time (often a cold start). Refresh in a
+          few seconds. {error}
         </div>
       )}
 
