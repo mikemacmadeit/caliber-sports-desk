@@ -4,6 +4,8 @@ import type { PropRow } from "@/lib/api";
 export const VALUE_HAIRCUT = 0.04;
 /** Same floor the desk already uses before it will name an unpriced player. */
 export const SCORE_CHANCE_FLOOR = 0.22;
+/** A desk pick has to be a real chance, not a longshot whose price looks generous. */
+const MIN_DESK_CHANCE = 0.18;
 
 const W_CHANCE = 0.35;
 const W_EDGE = 0.4;
@@ -78,33 +80,87 @@ export function beatsThePrice(row: PropRow): boolean {
   return chance >= SCORE_CHANCE_FLOOR && chance > americanToImplied(price);
 }
 
-/** One scorer per game: the highest chance he scores tonight. Price is not a veto. */
+/** Season chance, cut when this team is a big dog. Favorites stay as they are. */
+function tonightChance(row: PropRow): number | null {
+  const raw = row.forecast.p_estimate;
+  if (raw == null) return null;
+  const spread = row.team_spread;
+  if (spread == null || spread <= 3) return raw;
+  const factor = Math.max(0.35, 1 - (spread - 3) / 40);
+  return raw * factor;
+}
+
+function priceGap(row: PropRow): number | null {
+  const chance = tonightChance(row);
+  const price = row.book_price;
+  if (chance == null || price == null) return null;
+  return chance - americanToImplied(price);
+}
+
+function usageNum(row: PropRow, key: "gl_carries" | "rz_targets" | "rush_td" | "rec_td" | "carries" | "targets"): number {
+  const value = row.usage?.[key];
+  return value == null || Number.isNaN(value) ? 0 : value;
+}
+
+/** A price gap is not a reason. He has to be the one getting the scoring work. */
+function hasScoringRole(row: PropRow): boolean {
+  const scores = usageNum(row, "rush_td") + usageNum(row, "rec_td");
+  if (usageNum(row, "gl_carries") >= 0.4 || usageNum(row, "rz_targets") >= 0.5) return true;
+  return scores >= 0.45 && (usageNum(row, "carries") >= 5 || usageNum(row, "targets") >= 3.5);
+}
+
+/** Goal-line and red-zone work first. Recent scores cover a league without those splits. */
+export function scoringRole(row: PropRow): number {
+  return usageNum(row, "gl_carries") * 4 + usageNum(row, "rz_targets") * 2 + (usageNum(row, "rush_td") + usageNum(row, "rec_td")) * 1.5;
+}
+
+/** One scorer per game: scoring touches, and only when our chance beats the price. */
 export function selectDeskTakes(rows: PropRow[], haircut = VALUE_HAIRCUT): PropRow[] {
-  const best = new Map<string, { chance: number; row: PropRow }>();
+  const best = new Map<string, { role: number; gap: number; row: PropRow }>();
   for (const row of rows) {
     if (!eligible(row, haircut)) continue;
-    const chance = row.forecast.p_estimate ?? 0;
-    if (chance < 0.05) continue;
+    const chance = tonightChance(row) ?? 0;
+    if (chance < MIN_DESK_CHANCE) continue;
+    const gap = priceGap(row);
+    if (gap == null || gap < haircut) continue;
+    if (!hasScoringRole(row)) continue;
+    const role = scoringRole(row);
     const prior = best.get(row.game_id);
-    if (!prior || chance > prior.chance) best.set(row.game_id, { chance, row });
+    if (!prior || role > prior.role || (role === prior.role && gap > prior.gap)) {
+      best.set(row.game_id, { role, gap, row });
+    }
   }
   return [...best.values()]
-    .sort((a, b) => b.chance - a.chance || a.row.player_name.localeCompare(b.row.player_name))
+    .sort((a, b) => b.role - a.role || b.gap - a.gap || a.row.player_name.localeCompare(b.row.player_name))
     .map((entry) => entry.row);
 }
 
+export function deskScoringLine(row: PropRow): string | null {
+  const bits: string[] = [];
+  const gl = row.usage?.gl_carries;
+  const rz = row.usage?.rz_targets;
+  const scores = (row.usage?.rush_td ?? 0) + (row.usage?.rec_td ?? 0);
+  if (gl != null && gl >= 0.2) bits.push(countPhrase(gl, "goal-line carry", "goal-line carries"));
+  if (rz != null && rz >= 0.2) bits.push(countPhrase(rz, "red-zone target", "red-zone targets"));
+  if (scores >= 0.3) bits.push(`${trimNum(scores)} recent scores`);
+  if (bits.length === 0) return null;
+  return `${bits.join(", ")} a game`;
+}
+
 export function deskPickReason(row: PropRow): string {
-  const summary = row.forecast.tonight?.summary;
-  if (summary) return summary;
   const chance = row.forecast.p_estimate;
   const price = row.book_price;
-  if (chance == null || price == null) return "No posted price, so this player is not a pick.";
-  const implied = americanToImplied(price);
-  const gap = Math.round((chance - implied) * 100);
-  const priceText = price > 0 ? `+${price}` : String(price);
-  const parts = [priceCompared(Math.round(chance * 100), priceText, Math.round(implied * 100), gap)];
-  const work = usagePhrase(row.usage);
-  if (work) parts.push(work);
+  const parts: string[] = [];
+  const path = deskScoringLine(row);
+  if (path) parts.push(`${path}.`);
+  if (chance == null || price == null) {
+    parts.push("No posted price, so this player is not a pick.");
+  } else {
+    const implied = americanToImplied(price);
+    const gap = Math.round((chance - implied) * 100);
+    const priceText = price > 0 ? `+${price}` : String(price);
+    parts.push(priceCompared(Math.round(chance * 100), priceText, Math.round(implied * 100), gap));
+  }
   const matchup = row.forecast.matchup;
   if (matchup && matchup.factor >= 1.04) {
     parts.push(`This defense has allowed more ${matchup.kind === "rush" ? "rushing" : "receiving"} scores than usual.`);
@@ -112,17 +168,6 @@ export function deskPickReason(row: PropRow): string {
     parts.push(`This defense has allowed fewer ${matchup.kind === "rush" ? "rushing" : "receiving"} scores than usual.`);
   }
   return parts.join(" ");
-}
-
-function usagePhrase(usage: PropRow["usage"]): string | null {
-  if (!usage) return null;
-  const bits: string[] = [];
-  if (usage.carries != null && usage.carries >= 1) bits.push(countPhrase(usage.carries, "carry", "carries"));
-  if (usage.targets != null && usage.targets >= 1) bits.push(countPhrase(usage.targets, "target", "targets"));
-  if (usage.gl_carries != null && usage.gl_carries >= 0.2) bits.push(countPhrase(usage.gl_carries, "goal-line carry", "goal-line carries"));
-  if (usage.rz_targets != null && usage.rz_targets >= 0.2) bits.push(countPhrase(usage.rz_targets, "red-zone target", "red-zone targets"));
-  if (bits.length === 0) return null;
-  return `Recent work is ${bits.join(", ")} a game.`;
 }
 
 function priceCompared(chancePct: number, priceText: string, impliedPct: number, gap: number) {

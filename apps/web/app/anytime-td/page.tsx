@@ -19,7 +19,6 @@ export default async function AnytimeTdPage({
   const dateParam = params.date;
   const researchView = params.view === "research";
 
-  // Keep SSR light so the page paints fast. The board hydrates in the browser.
   let days: SlateDays | null = null;
   try {
     days = await apiGet<SlateDays>(`/v1/days?league=${league}`, 6000);
@@ -52,7 +51,6 @@ export default async function AnytimeTdPage({
     }
   }
 
-  // Record is secondary — fail soft and never block the board.
   const scorecard = researchView
     ? null
     : await apiGet<{
@@ -69,7 +67,7 @@ export default async function AnytimeTdPage({
       <PageHeader
         kicker={days && selected === days.today ? `Today · ${dayParts(selected).monthDay}` : dayParts(selected).monthDay}
         title="Anytime TD"
-        lede="One player in each game — the one most likely to score a touchdown. The percentage is a chance, not a promise."
+        lede="Desk picks are the names we grade. The board underneath is every priced chance for the day."
         accent="flare"
         action={
           <LeagueToggle
