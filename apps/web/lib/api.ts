@@ -238,6 +238,10 @@ export type PropRow = {
     candidate_status: string; candidate_probability: number | null;
     valid_until?: string | null;
     reasons: string[]; risks: string[];
+    hybrid?: {
+      probability: number; team_probability: number; player_probability: number;
+      team_weight: number; status: "research_comparison_only"; play_enabled: false;
+    };
   };
   qualification?: Qualification;
   published_pick_id?: string | null;

@@ -12,8 +12,7 @@ from spe.models.advanced import add_player_priors, load_model_frame
 from spe.models.player_td.shares import ShareWeights, attach_shares, fit_share_weights
 from spe.models.rolling_td import prepare_td_frame
 from spe.models.team_td.dataset import build_team_td_frame
-from spe.models.team_td.model import predict_frame
-from spe.models.team_td.train import load_team_td_model
+from spe.models.team_td.model import fit_team_td_model, predict_frame
 
 SKILL = {"QB", "RB", "WR", "TE"}
 
@@ -35,47 +34,55 @@ def _add_component_td_priors(frame: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def attach_team_td_lambdas(session: Session, players: pd.DataFrame, league_id: str) -> pd.DataFrame:
-    """Merge Phase 2 predicted team λ (prior features only) onto player rows."""
-    model = load_team_td_model(league_id)
-    if model is None:
-        # Fallback: use prior team TD rates from player environment if Phase 2 missing.
-        out = players.copy()
-        out["team_lambda_off_td"] = out.get("prior_td_rate", pd.Series(np.nan, index=out.index)).fillna(0.2) * 4.0
-        out["team_lambda_pass_td"] = out["team_lambda_off_td"] * 0.6
-        out["team_lambda_rush_td"] = out["team_lambda_off_td"] * 0.4
-        out["team_td_source"] = "fallback_prior"
-        return out
+def temporal_team_predictions(team: pd.DataFrame, players: pd.DataFrame, league_id: str,
+                              *, min_train_rows: int = 200) -> pd.DataFrame:
+    """Out-of-time team expectations. No current saved model enters historical rows.
 
-    print(f"[player_td] building team TD frame for {league_id}…", flush=True)
-    team = build_team_td_frame(session, league_id)
-    if team.empty:
-        out = players.copy()
-        out["team_lambda_off_td"] = 2.3 if league_id == "nfl" else 3.0
-        out["team_lambda_pass_td"] = out["team_lambda_off_td"] * 0.6
-        out["team_lambda_rush_td"] = out["team_lambda_off_td"] * 0.4
-        out["team_td_source"] = "league_default"
-        return out
+    Fit once per season using only previous seasons. This also supplies out-of-time
+    inputs for downstream player fitting, not just its final evaluation fold.
+    Uncovered early seasons remain missing rather than masquerading as predictions.
+    """
+    import hashlib
+    import json
 
-    pred = predict_frame(model, team)
-    team_pred = pred[
-        ["game_id", "team_id", "lambda_off_td", "lambda_pass_td", "lambda_rush_td", "exp_possessions"]
-    ].rename(
-        columns={
-            "lambda_off_td": "team_lambda_off_td",
-            "lambda_pass_td": "team_lambda_pass_td",
-            "lambda_rush_td": "team_lambda_rush_td",
-            "exp_possessions": "team_exp_possessions",
-        }
-    )
-    out = players.merge(team_pred, on=["game_id", "team_id"], how="left")
-    # Fill rare misses with league baseline from the model.
-    base = float(model.baseline_mean)
-    out["team_lambda_off_td"] = out["team_lambda_off_td"].fillna(base)
-    out["team_lambda_pass_td"] = out["team_lambda_pass_td"].fillna(base * 0.6)
-    out["team_lambda_rush_td"] = out["team_lambda_rush_td"].fillna(base * 0.4)
-    out["team_td_source"] = "phase2_team_td_v1"
+    out = players.copy()
+    for c in ("team_lambda_off_td", "team_lambda_pass_td", "team_lambda_rush_td"):
+        out[c] = np.nan
+    out["team_td_source"] = "insufficient_prior_team_history"
+    out["team_td_train_end"] = None
+    out["team_td_artifact_sha256"] = None
+    if team.empty or players.empty:
+        return out
+    tk = pd.to_datetime(team["kickoff_utc"], utc=True)
+    pk = pd.to_datetime(players["kickoff_utc"], utc=True)
+    years = pk.dt.year - (pk.dt.month < 7).astype(int)
+    for year in sorted(years.unique()):
+        cutoff = pd.Timestamp(year=int(year), month=7, day=1, tz="UTC")
+        train = team.loc[tk < cutoff].copy()
+        period = team.loc[(tk >= cutoff) & (tk < cutoff + pd.DateOffset(years=1))]
+        if len(train) < min_train_rows or period.empty:
+            continue
+        model = fit_team_td_model(train, league_id, cutoff.isoformat())
+        digest = hashlib.sha256(json.dumps(model.to_dict(), sort_keys=True).encode()).hexdigest()
+        pred = predict_frame(model, period).set_index(["game_id", "team_id"])
+        if pred.index.has_duplicates:
+            raise ValueError("Duplicate team-game predictions")
+        mask = years == year
+        keys = pd.MultiIndex.from_frame(players.loc[mask, ["game_id", "team_id"]])
+        matched = pred.reindex(keys)
+        for source, target in (("lambda_off_td", "team_lambda_off_td"),
+                               ("lambda_pass_td", "team_lambda_pass_td"),
+                               ("lambda_rush_td", "team_lambda_rush_td")):
+            out.loc[mask, target] = matched[source].to_numpy()
+        covered = mask & out["team_lambda_off_td"].notna()
+        out.loc[covered, "team_td_source"] = "walk_forward_team_td"
+        out.loc[covered, "team_td_train_end"] = cutoff.isoformat()
+        out.loc[covered, "team_td_artifact_sha256"] = digest
     return out
+
+
+def attach_team_td_lambdas(session: Session, players: pd.DataFrame, league_id: str) -> pd.DataFrame:
+    return temporal_team_predictions(build_team_td_frame(session, league_id), players, league_id)
 
 
 def build_player_td_frame(
@@ -131,11 +138,17 @@ def build_player_td_frame(
         frame = _add_component_td_priors(frame)
 
     frame = attach_team_td_lambdas(session, frame, league_id)
+    frame = frame.dropna(subset=["team_lambda_off_td", "team_lambda_pass_td", "team_lambda_rush_td"])
+    if frame.empty:
+        return frame, default_or_fit_empty(league_id)
     kick = pd.to_datetime(frame["kickoff_utc"], utc=True)
     share_train = frame.loc[kick < pd.Timestamp("2024-08-01", tz="UTC")]
     if len(share_train) < 500:
-        share_train = frame.iloc[: max(int(len(frame) * 0.6), 1)]
-    weights = fit_share_weights(share_train, league_id)
+        # Fixed defaults for a small early sample; never fit on a later test season.
+        return_weights = default_or_fit_empty(league_id)
+    else:
+        return_weights = fit_share_weights(share_train, league_id)
+    weights = return_weights
     frame = attach_shares(frame, weights)
     frame["lambda_rush_td"] = frame["team_lambda_rush_td"] * frame["rush_td_share"]
     frame["lambda_rec_td"] = frame["team_lambda_pass_td"] * frame["rec_td_share"]

@@ -27,7 +27,9 @@ def test_apply_positive_shift_raises_p():
     assert float(after) > before
 
 
-def test_fit_improves_or_holds_synthetic_underconfidence():
+def test_holdout_labels_do_not_select_calibration_shifts(tmp_path, monkeypatch):
+    import spe.shadow.atd_role_calibration as calibration
+    monkeypatch.setattr(calibration, "artifact_path", lambda: tmp_path / "role.json")
     rng = np.random.default_rng(0)
     n = 400
     pos = np.array(["RB"] * 200 + ["QB"] * 200)
@@ -37,7 +39,7 @@ def test_fit_improves_or_holds_synthetic_underconfidence():
     y = (rng.random(n) < 0.35).astype(float)
     frame = pd.DataFrame(
         {
-            "kickoff_utc": pd.date_range("2026-09-01", periods=n, freq="h", tz="UTC"),
+            "kickoff_utc": pd.date_range("2026-09-01", periods=n // 10, freq="h", tz="UTC").repeat(10),
             "position_group": pos,
             "prior_carries": carries,
             "p_blend": p,
@@ -47,4 +49,9 @@ def test_fit_improves_or_holds_synthetic_underconfidence():
     )
     fit = fit_role_calibration(frame, p_col="p_blend", y_col="y")
     assert fit["ok"] is True
-    assert fit["holdout"]["brier_after"] <= fit["holdout"]["brier_before"] + 1e-6
+    changed = frame.copy()
+    changed.loc[280:, "y"] = 1 - changed.loc[280:, "y"]
+    again = fit_role_calibration(changed, p_col="p_blend", y_col="y")
+    assert fit["logit_shifts"] == again["logit_shifts"]
+    assert fit["holdout"]["brier_after"] != again["holdout"]["brier_after"]
+    assert not fit["evaluation_used_for_selection"]

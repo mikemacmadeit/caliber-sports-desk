@@ -104,6 +104,7 @@ def shadow_track_record(session: Session) -> dict[str, Any]:
 
     health = operations_health(session)
     picks_scorecard = ats_track_record(session)
+    from spe.shadow.desk_hybrid_report import comparison_report
     return {
         "play_enabled": False,
         "research_only": True,
@@ -124,6 +125,7 @@ def shadow_track_record(session: Session) -> dict[str, Any]:
             "blocked": blocked,
         },
         "atd_scorecard": atd_scorecard,
+        "hybrid_comparison": comparison_report(preds, settles),
         "picks_scorecard": picks_scorecard,
         "independence": independence,
         "abstain_reason_counts": dict(sorted(abstain_counts.items(), key=lambda kv: (-kv[1], kv[0]))),
@@ -205,6 +207,8 @@ def _family(model_version_id: str) -> str:
     (e.g. m5_c_recent before m5, blend before generic other).
     """
     mv = model_version_id or ""
+    if mv.startswith("desk_hybrid_v1"):
+        return "desk_hybrid_v1"
     if mv.startswith("desk_opportunity_v2"):
         return "desk_opportunity_v2"
     if mv.startswith("blend_v1_c_recent") or mv.startswith("blend_"):

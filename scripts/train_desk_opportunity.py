@@ -12,25 +12,11 @@ import numpy as np
 
 from spe.integrity.assignments import canonical_team_map
 from spe.models.metrics import apply_platt, brier_score, log_loss, platt_calibrate
-from spe.models.player_td.desk_opportunity import FEATURES, VERSION, OpportunityHistory, prepare_history, vector
+from spe.models.player_td.desk_opportunity import VERSION, OpportunityHistory, fit_logistic, prepare_history, vector
 
 
-def fit(x, y):
-    center, scale = x.mean(axis=0), x.std(axis=0)
-    scale[scale < 1e-8] = 1
-    z = np.column_stack([np.ones(len(x)), (x - center) / scale])
-    b = np.zeros(z.shape[1])
-    penalty = np.eye(len(b)) * 10.0
-    penalty[0, 0] = 0
-    for _ in range(40):
-        p = 1 / (1 + np.exp(-np.clip(z @ b, -25, 25)))
-        h = z.T @ (z * (p * (1 - p))[:, None]) + penalty + np.eye(len(b)) * 1e-8
-        step = np.linalg.solve(h, z.T @ (p - y) + penalty @ b)
-        b -= step
-        if np.max(np.abs(step)) < 1e-7:
-            break
-    return {"features": FEATURES, "center": center.tolist(), "scale": scale.tolist(),
-            "intercept": float(b[0]), "coefficients": b[1:].tolist()}
+# One fitting implementation for standalone and combined models.
+fit = fit_logistic
 
 
 def probabilities(model, x):

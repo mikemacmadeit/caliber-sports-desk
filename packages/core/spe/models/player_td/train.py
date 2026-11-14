@@ -13,11 +13,10 @@ from sqlalchemy.orm import Session
 
 from spe.config import settings
 from spe.db.base import as_utc
-from spe.models.advanced import apply_beta, binary_probability, opponent_adjustment, shrinkage_mean
+from spe.models.advanced import binary_probability, opponent_adjustment, shrinkage_mean
 from spe.models.metrics import apply_platt, brier_score, expected_calibration_error, log_loss, platt_calibrate
 from spe.models.player_td.dataset import build_player_td_frame, chronological_player_split
 from spe.models.player_td.model import PlayerTdModel, evaluate_binary, fit_player_td_model, predict_frame
-from spe.models.player_td.shares import ShareWeights
 from spe.models.temporal_integrity import training_cutoff
 from spe.models.train import FittedMarket, load_artifacts
 from spe.shadow.m4_artifact import adjust_mean, load_m4_artifacts, probability_from_mean
@@ -72,7 +71,7 @@ def train_player_td_models(
         "architecture": {
             "family": "team_lambda_x_opportunity_share",
             "anytime_definition": "rush_td + rec_td only; QB pass TDs excluded",
-            "team_source": "phase2_team_td_v1",
+            "team_source": "walk_forward_team_td",
             "leagues_separate": True,
             "availability": "never_assume_missing_injury_healthy",
         },
@@ -105,59 +104,41 @@ def train_player_td_models(
                     }
                 )
                 continue
-            # Recompute shares on train-fit weights for this window.
-            from spe.models.player_td.shares import attach_shares, fit_share_weights
-
-            w = fit_share_weights(train, league_id)
-            train_s = attach_shares(train, w)
-            test_s = attach_shares(test, w)
-            train_s["lambda_rush_td"] = train_s["team_lambda_rush_td"] * train_s["rush_td_share"]
-            train_s["lambda_rec_td"] = train_s["team_lambda_pass_td"] * train_s["rec_td_share"]
-            train_s["lambda_player_td"] = train_s["lambda_rush_td"] + train_s["lambda_rec_td"]
-            test_s["lambda_rush_td"] = test_s["team_lambda_rush_td"] * test_s["rush_td_share"]
-            test_s["lambda_rec_td"] = test_s["team_lambda_pass_td"] * test_s["rec_td_share"]
-            test_s["lambda_player_td"] = test_s["lambda_rush_td"] + test_s["lambda_rec_td"]
-
-            model = fit_player_td_model(train_s, league_id, te.isoformat(), w)
-            pred = predict_frame(model, test_s)
+            # The model separates coefficient fitting and calibration internally.
+            from spe.models.player_td.shares import default_weights
+            model = fit_player_td_model(train, league_id, te.isoformat(), default_weights(league_id))
+            pred = predict_frame(model, test)
             metrics = evaluate_binary(pred)
-            baselines = _baseline_metrics(train_s, test_s, league_id)
+            baselines = _baseline_metrics(train, test, league_id)
             windows.append(
                 {
                     "window": label,
                     "status": "ok",
-                    "train_n": int(len(train_s)),
-                    "test_n": int(len(test_s)),
+                    "train_n": int(len(train)),
+                    "test_n": int(len(test)),
                     "train_end": te.isoformat(),
                     "test_start": ts.isoformat(),
                     "test_end": tend.isoformat(),
                     "features": list(model.feature_betas.keys()),
+                    "calibration_start": model.calibration_start,
+                    "calibration_end": model.calibration_end,
                     "metrics": metrics,
                     "baselines": baselines,
-                    "leakage_check": _leakage_check_2026(test_s, label),
+                    "leakage_check": _leakage_check_2026(test, label),
                 }
             )
 
         # Final artifact on all usable except last 45 days shadow.
-        shadow_start = kick.max() - pd.Timedelta(days=45)
+        shadow_start = pd.to_datetime(usable["kickoff_utc"], utc=True).max() - pd.Timedelta(days=45)
         # Restrict to usable kickoffs
         ukick = pd.to_datetime(usable["kickoff_utc"], utc=True)
         train_final = usable.loc[ukick < shadow_start].copy()
         test_final = usable.loc[ukick >= shadow_start].copy()
         if len(train_final) < 500:
-            cut_i = int(len(usable) * 0.85)
-            train_final = usable.iloc[:cut_i].copy()
-            test_final = usable.iloc[cut_i:].copy()
-        from spe.models.player_td.shares import attach_shares, fit_share_weights
-
-        w_final = fit_share_weights(train_final, league_id)
-        train_final = attach_shares(train_final, w_final)
-        test_final = attach_shares(test_final, w_final)
-        for part in (train_final, test_final):
-            part["lambda_rush_td"] = part["team_lambda_rush_td"] * part["rush_td_share"]
-            part["lambda_rec_td"] = part["team_lambda_pass_td"] * part["rec_td_share"]
-            part["lambda_player_td"] = part["lambda_rush_td"] + part["lambda_rec_td"]
-        final_model = fit_player_td_model(train_final, league_id, train_end.isoformat(), w_final)
+            from spe.models.player_td.temporal import split_games
+            train_final, test_final = split_games(usable, 0.85)
+        from spe.models.player_td.shares import default_weights
+        final_model = fit_player_td_model(train_final, league_id, train_end.isoformat(), default_weights(league_id))
         shadow_pred = predict_frame(final_model, test_final) if len(test_final) else test_final
         shadow_metrics = evaluate_binary(shadow_pred) if len(test_final) else {}
         shadow_baselines = _baseline_metrics(train_final, test_final, league_id) if len(test_final) else {}
@@ -180,7 +161,7 @@ def train_player_td_models(
             "seasons": sorted({int(y) for y in usable["season_year"].dropna().unique()}),
             "train_end": train_end.isoformat(),
             "artifact_path": str(artifact_path(league_id)),
-            "share_weights": w_final.to_dict(),
+            "share_weights": final_model.share_weights,
             "feature_betas": final_model.feature_betas,
             "shadow_metrics": shadow_metrics,
             "shadow_baselines": shadow_baselines,
@@ -214,17 +195,20 @@ def load_player_td_model(league_id: str) -> PlayerTdModel | None:
 
 
 def _leakage_check_2026(test: pd.DataFrame, label: str) -> dict[str, Any]:
-    if label != "2026_ytd" or test.empty:
+    if test.empty:
         return {"status": "n/a"}
     # Priors are shift(1) expanding — verify no row has prior equal to same-game outcome correlation leak marker.
     # Practical check: kickoff must be <= cutoff and prior columns finite without using later games
     # (enforced by construction). Report max kickoff.
     kick = pd.to_datetime(test["kickoff_utc"], utc=True)
+    team_fits_before = bool((pd.to_datetime(test["team_td_train_end"], utc=True) < kick).all())
     return {
-        "status": "ok",
+        "status": "ok" if team_fits_before else "failed",
         "n": int(len(test)),
         "max_kickoff": kick.max().isoformat(),
-        "note": "Priors use shift(1) expanding means; Phase 2 team λ uses prior-only team features.",
+        "note": "Team coefficients fit only on seasons before each row; later revisions of source data remain a limitation.",
+        "team_fits_before_kickoff": team_fits_before,
+        "upstream_artifacts": test[["team_td_train_end", "team_td_artifact_sha256"]].drop_duplicates().to_dict("records"),
     }
 
 
@@ -264,6 +248,7 @@ def _baseline_metrics(train: pd.DataFrame, test: pd.DataFrame, league_id: str) -
         else:
             p_art = _predict_m3_frame(fitted, test)
             out["m3_artifact"] = {
+                "comparable": False, "reason": "artifact_not_refit_inside_evaluation_fold",
                 "brier": brier_score(y, p_art),
                 "log_loss": log_loss(y, p_art),
                 "ece": expected_calibration_error(y, p_art),
@@ -292,6 +277,7 @@ def _baseline_metrics(train: pd.DataFrame, test: pd.DataFrame, league_id: str) -
                 ps.append(probability_from_mean(mean, market, line=0.5, side="yes"))
             p_m4 = np.asarray(ps, dtype=float)
             out["m4_artifact"] = {
+                "comparable": False, "reason": "artifact_not_refit_inside_evaluation_fold",
                 "brier": brier_score(y, p_m4),
                 "log_loss": log_loss(y, p_m4),
                 "ece": expected_calibration_error(y, p_m4),

@@ -1,7 +1,7 @@
 """Role / position accuracy fix for Anytime TD research scores.
 
 Fixes the main miss pattern: rushing QBs and high-carry RBs are underconfident
-(model too low when they score). Fits small logit shifts on holdout history and
+(model too low when they score). Fits small logit shifts on an earlier calibration period and
 applies them at serve/replay time.
 
 Research-only. Does not unlock Validated Play.
@@ -19,7 +19,7 @@ import pandas as pd
 
 from spe.models.metrics import brier_score
 
-VERSION = "atd_role_calib_v1"
+VERSION = "atd_role_calib_v2"
 RUSHING_QB_CARRIES = 4.0
 HIGH_CARRY_RB = 8.0
 
@@ -40,7 +40,7 @@ def _sigmoid(z: np.ndarray) -> np.ndarray:
 
 
 def _carry_col(frame: pd.DataFrame) -> pd.Series:
-    for name in ("prior_carries", "exp_carries", "recent8_carries", "carries"):
+    for name in ("prior_carries", "exp_carries", "recent8_carries"):
         if name in frame.columns:
             return pd.to_numeric(frame[name], errors="coerce")
     return pd.Series(np.nan, index=frame.index)
@@ -129,13 +129,10 @@ def fit_role_calibration(
     if df.empty:
         return {"ok": False, "reason": "empty"}
 
-    ko = pd.to_datetime(df["kickoff_utc"], utc=True)
-    order = np.argsort(ko.to_numpy())
-    cut = int(len(order) * train_frac)
-    train_idx = order[: max(cut, 1)]
-    test_idx = order[max(cut, 1) :]
-    train = df.iloc[train_idx]
-    test = df.iloc[test_idx] if len(test_idx) else train
+    from spe.models.player_td.temporal import split_games
+    train, test = split_games(df, train_frac)
+    if test.empty:
+        return {"ok": False, "reason": "no_separate_evaluation_games"}
 
     tags_tr = role_tags(train)
     p_tr = np.clip(train[p_col].to_numpy(dtype=float), 1e-6, 1 - 1e-6)
@@ -166,22 +163,8 @@ def fit_role_calibration(
             "delta_brier": float(brier_score(y, p0) - brier_score(y, p1)),
         }
 
-    # Keep only shifts that help (or are ~neutral) on holdout; zero the rest.
+    # Evaluation is reporting only. Its labels must never select or remove shifts.
     before_tags = role_tags(test)
-    provisional = dict(shifts)
-    for key, delta in list(provisional.items()):
-        if abs(float(delta)) < 1e-9 or key not in before_tags.columns:
-            continue
-        part = test.loc[before_tags[key]]
-        if part.empty or len(part) < 40:
-            continue
-        solo = {k: (float(v) if k == key else 0.0) for k, v in provisional.items()}
-        p0 = np.clip(part[p_col].to_numpy(dtype=float), 1e-6, 1 - 1e-6)
-        y = part[y_col].to_numpy(dtype=float)
-        p1 = apply_role_calibration(p0, frame=part, artifact={"ok": True, "logit_shifts": solo})
-        assert isinstance(p1, np.ndarray)
-        if float(brier_score(y, p1)) > float(brier_score(y, p0)) - 1e-5:
-            shifts[key] = 0.0
 
     cohort = {}
     for key in ("rushing_qb", "high_carry_rb", "rb", "qb"):
@@ -198,12 +181,15 @@ def fit_role_calibration(
         "validated_play": False,
         "research_only": True,
         "logit_shifts": shifts,
+        "evaluation_used_for_selection": False,
+        "calibration_end": str(train["kickoff_utc"].max()),
+        "evaluation_start": str(test["kickoff_utc"].min()),
         "thresholds": {"rushing_qb_carries": RUSHING_QB_CARRIES, "high_carry_rb": HIGH_CARRY_RB},
         "train": _metrics(train),
         "holdout": _metrics(test),
         "holdout_cohorts": cohort,
         "note": (
-            "Logit shifts lift underconfident rushing QBs / high-carry RBs. "
+            "Role shifts fit on earlier games and evaluated separately. "
             "Research-only; Official Play stays off."
         ),
     }
