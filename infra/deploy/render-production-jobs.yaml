@@ -1,4 +1,5 @@
 # Existing Caliber production workers. Adopt matching jobs; retain the existing API and database.
+# Set API_SPORTS_KEY on caliber-inputs in Render when available. Missing FBS coverage stays degraded.
 services:
 - type: cron
   runtime: docker
@@ -81,10 +82,5 @@ services:
     value: /data/parquet
   - key: PYTHONPATH
     value: /app/packages/core:/app/services/api:/app/services/worker
-  - key: API_SPORTS_KEY
-    fromService:
-      name: caliber-api-xtkn
-      type: web
-      envVarKey: API_SPORTS_KEY
   - key: NWS_USER_AGENT
     value: Caliber Sports Desk (calibersportsbet@gmail.com)
