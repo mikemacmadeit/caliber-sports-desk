@@ -167,16 +167,33 @@ def load_props(
     league: str | None,
     date: str | None,
     path: Path | None = None,
+    *,
+    block_on_miss: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return saved props for this board. Rebuild in the background when stale."""
+    """Return saved props for this board. Rebuild in the background when stale.
+
+    API requests must use ``block_on_miss=False`` so a cold cache never stalls
+    the public site. Workers may pass ``block_on_miss=True`` to warm boards.
+    """
+    del session  # reserved for callers that already opened a DB session
     cached = read_entry(market, league, date, path)
-    if cached and (cached.get("rows") or []) and is_fresh(cached):
-        return _filter_rows(list(cached.get("rows") or []), min_odds=min_odds, min_ev=min_ev)
-    if cached and (cached.get("rows") or []):
-        _refresh_in_background(market, league, date, path)
-        return _filter_rows(list(cached.get("rows") or []), min_odds=min_odds, min_ev=min_ev)
-    entry = refresh_entry(session, market, league, date, path)
-    return _filter_rows(list(entry.get("rows") or []), min_odds=min_odds, min_ev=min_ev)
+    if cached is not None:
+        rows = list(cached.get("rows") or [])
+        if not is_fresh(cached):
+            _refresh_in_background(market, league, date, path)
+        return _filter_rows(rows, min_odds=min_odds, min_ev=min_ev)
+    # No saved board yet: never block the website on a full rebuild.
+    _refresh_in_background(market, league, date, path)
+    if block_on_miss:
+        from spe.db.session import session_factory
+
+        db = session_factory()
+        try:
+            entry = refresh_entry(db, market, league, date, path)
+            return _filter_rows(list(entry.get("rows") or []), min_odds=min_odds, min_ev=min_ev)
+        finally:
+            db.close()
+    return []
 
 
 def load_slate_props(
@@ -186,12 +203,24 @@ def load_slate_props(
     *,
     markets: tuple[str, ...] = WARM_MARKETS,
     path: Path | None = None,
+    block_on_miss: bool = False,
 ) -> list[dict[str, Any]]:
     """Merge the warmed market boards for picks / tickets. Avoids a full all-market scan."""
     rows: list[dict[str, Any]] = []
     for market in markets:
         try:
-            rows.extend(load_props(session, market, None, None, league, date, path))
+            rows.extend(
+                load_props(
+                    session,
+                    market,
+                    None,
+                    None,
+                    league,
+                    date,
+                    path,
+                    block_on_miss=block_on_miss,
+                )
+            )
         except Exception:
             # One market must not take down the whole home-page card.
             continue
