@@ -22,7 +22,15 @@ export async function apiGet<T>(path: string, timeoutMs = 15000): Promise<T> {
       return hit.value as T;
     }
   }
-  const res = await fetch(`${API}${path}`, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+  // AbortSignal.timeout is missing on some Netlify runtimes and throws before fetch.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, { cache: "no-store", signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     throw new Error(`${path} failed: ${res.status}`);
   }

@@ -5,8 +5,8 @@ import { AnytimeTdResearchBoard, type ResearchFinderPayload } from "@/components
 import type { AtdScoreRow, AtdTake } from "@/components/AnytimeTdScorecard";
 import { DayStrip, EmptyDay } from "@/components/DayStrip";
 import { LeagueToggle } from "@/components/LeagueToggle";
+import { AnytimeTdBoard } from "@/components/AnytimeTdBoard";
 import { PageHeader } from "@/components/PageHeader";
-import { PropExplorer } from "@/components/PropExplorer";
 import { TeamMark } from "@/components/TeamMark";
 import { apiGet, type PropRow } from "@/lib/api";
 import { dayParts, type SlateDays, withQuery } from "@/lib/days";
@@ -114,10 +114,9 @@ export default async function AnytimeTdPage({
     date: days && selected === days.today ? undefined : selected,
   });
 
-  // Empty board is not a load failure. Only hard-fail when we have no usable payload.
-  const loadFailure = researchView
-    ? Boolean(researchError && !research)
-    : Boolean((daysError && !days) || (propsError && !data));
+  // Props can soft-fail and hydrate in the browser. Only hard-fail the research view.
+  const loadFailure = researchView ? Boolean(researchError && !research) : Boolean(daysError && !days);
+  void propsError;
 
   return (
     <div className="space-y-10">
@@ -165,42 +164,31 @@ export default async function AnytimeTdPage({
           {days ? (
             <DayStrip today={days.today} dates={days.dates} selected={selected} basePath="/anytime-td" league={league} />
           ) : null}
-          {(data?.rows.length ?? 0) === 0 ? (
-            days && days.dates.includes(selected) ? (
-              <div className="plate px-6 py-8">
-                <p className="font-display text-4xl uppercase leading-none">No odds posted {when}</p>
-                <p className="mt-3 max-w-xl text-sm text-mute">
-                  The games are on the slate. Sportsbooks have not posted a touchdown price yet.
-                </p>
-                {next ? (
-                  <Link
-                    href={withQuery("/anytime-td", {
+          {days && !days.dates.includes(selected) ? (
+            <EmptyDay
+              selected={selected}
+              today={days.today}
+              next={next}
+              href={next ? withQuery("/anytime-td", { league, date: next === days.today ? undefined : next }) : null}
+            />
+          ) : (
+            <AnytimeTdBoard
+              league={league}
+              date={selected}
+              initial={data}
+              emptyTitle={`No odds posted ${when}`}
+              emptyHref={
+                next
+                  ? withQuery("/anytime-td", {
                       league: league === "all" ? undefined : league,
                       date: days && next === days.today ? undefined : next,
-                    })}
-                    className="mt-4 inline-block font-display text-2xl uppercase tracking-wide text-gold"
-                  >
-                    Open {dayParts(next).weekday} {dayParts(next).monthDay} →
-                  </Link>
-                ) : (
-                  <Link
-                    href={withQuery("/", { league, date: selected === days.today ? undefined : selected })}
-                    className="mt-4 inline-block font-display text-2xl uppercase tracking-wide text-gold"
-                  >
-                    Open the slate →
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <EmptyDay
-                selected={selected}
-                today={days?.today ?? selected}
-                next={next}
-                href={next ? withQuery("/anytime-td", { league, date: days && next === days.today ? undefined : next }) : null}
-              />
-            )
-          ) : (
-            <PropExplorer rows={data!.rows} mode="calls" />
+                    })
+                  : withQuery("/", { league, date: days && selected === days.today ? undefined : selected })
+              }
+              emptyLabel={
+                next ? `Open ${dayParts(next).weekday} ${dayParts(next).monthDay} →` : "Open the slate →"
+              }
+            />
           )}
           {calledRows.length > 0 ? <CalledScorers rows={calledRows} /> : null}
           <AnytimeTdRecord rows={scoreRows} takes={gradedTakes} league={league} />
