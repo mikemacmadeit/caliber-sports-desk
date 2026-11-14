@@ -67,6 +67,7 @@ export type PriceFreshness = {
   status: "fresh" | "stale" | "missing" | string;
   age_minutes: number | null;
   captured_at: string | null;
+  observed_at?: string | null;
   source_timestamp: string | null;
   max_age_minutes: number;
   is_current_opportunity: boolean;
@@ -235,6 +236,7 @@ export type PropRow = {
   desk_analysis?: {
     version: string; as_of: string; eligible: boolean; blockers: string[];
     candidate_status: string; candidate_probability: number | null;
+    valid_until?: string | null;
     reasons: string[]; risks: string[];
   };
   qualification?: Qualification;
@@ -250,6 +252,7 @@ export type PropRow = {
   team: string;
   team_mark?: { location?: string; nick?: string; primary?: string; secondary?: string; logo?: string } | null;
   opponent: string;
+  team_spread?: number | null;
   away_abbr?: string;
   home_abbr?: string;
   away_mark?: { location?: string; nick?: string; primary?: string; secondary?: string; logo?: string } | null;
@@ -275,6 +278,8 @@ export type PropRow = {
     targets?: number | null;
     rz_targets?: number | null;
     gl_carries?: number | null;
+    rush_td?: number | null;
+    rec_td?: number | null;
     games?: number | null;
   } | null;
   data_tier?: string;

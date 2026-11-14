@@ -95,6 +95,7 @@ def enrich_desk_rows(db, rows, now=None):
             }
             if chance is not None:
                 row["usage"] = {"games": f["games"], "carries": f["carries"],
+                    "rush_td": f["rush_td"], "rec_td": f["rec_td"],
                     "targets": f["targets"] if league == "nfl" else None,
                     "receptions": f["receptions"],
                     "gl_carries": f["gl_carries"] if f["charting_known"] else None,
@@ -110,8 +111,17 @@ def enrich_desk_rows(db, rows, now=None):
                     "ev": ev_per_dollar(chance, int(row["book_price"])) if row.get("book_price") and abs(row["book_price"]) >= 100 else None,
                     "reason_codes": list(dict.fromkeys([*prior.get("reason_codes", []), "DESK_EXPERIMENTAL", "PLAY_DISABLED"]))}
                 row["data_tier"] = "research"
+            from spe.shadow.atd_desk_takes import desk_candidate_blockers
+            selection_blocks, valid_until = desk_candidate_blockers(row, now=now)
+            row["desk_analysis"]["blockers"] = list(dict.fromkeys([*blockers, *selection_blocks]))
+            row["desk_analysis"]["eligible"] = not row["desk_analysis"]["blockers"]
+            row["desk_analysis"]["valid_until"] = valid_until
+            if chance is not None and row.get("book_price") and abs(row["book_price"]) >= 100:
+                from spe.market.odds import american_to_implied
+                implied = american_to_implied(int(row["book_price"]))
+                reasons.append(f"Research estimate {chance:.0%}; posted price implies {implied:.0%}. This estimated gap is not a proven edge.")
     # One decision for the whole slate, before any UI filtering or sorting.
     from spe.shadow.atd_desk_takes import select_desk_takes
-    selected = {r["outcome_id"] for r in select_desk_takes(atd)}
+    selected = {r["outcome_id"] for r in select_desk_takes(atd, now=now)}
     for row in atd:
         row["desk_selected"] = row["outcome_id"] in selected

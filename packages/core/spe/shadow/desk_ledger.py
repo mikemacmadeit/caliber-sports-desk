@@ -4,10 +4,17 @@ import json
 from datetime import UTC, datetime
 
 from spe.db.base import as_utc, new_id
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from spe.db.models import DeskDecision, ShadowPrediction
 from spe.market.odds import american_to_implied, ev_per_dollar
 from spe.shadow.atd_desk_takes import select_desk_takes
+
+
+@event.listens_for(DeskDecision, "before_update")
+@event.listens_for(DeskDecision, "before_delete")
+def immutable(mapper, connection, target):
+    raise ValueError("Desk decisions are append-only")
+
 
 def latest_decisions(db, game_ids=None):
     stmt = select(DeskDecision.decision_id.label("id"), func.row_number().over(
@@ -23,7 +30,7 @@ def latest_decisions(db, game_ids=None):
 def freeze_desk_rows(db, rows, now=None):
     now = as_utc(now) or datetime.now(UTC)
     atd = [r for r in rows if r.get("market_id") == "anytime_td"]
-    chosen = {r["game_id"]: r for r in select_desk_takes(atd)}
+    chosen = {r["game_id"]: r for r in select_desk_takes(atd, now=now)}
     game_rows = {r["game_id"]: r for r in atd}
     records = latest_decisions(db, list(game_rows))
     saved = 0

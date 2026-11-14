@@ -170,9 +170,9 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
       {mode === "calls" && visible.length > 0 ? (
         <>
           {toolbar}
-          <Section title="Desk TD picks" count={plays.length} accent="flare" />
+          <Section title="Desk picks" count={plays.length} accent="flare" />
           <p className="max-w-xl text-sm text-mute">
-            At most one player per game, using recent workload, scoring-area opportunities, and the opponent. Experimental estimates; games with weak evidence are passed.
+            At most one name per game, using scoring opportunities, matchup, and price. These are the ones we grade. Experimental estimates; games with weak evidence are passed.
           </p>
           {plays.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-2">

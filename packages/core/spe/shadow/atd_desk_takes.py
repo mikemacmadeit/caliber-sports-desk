@@ -1,7 +1,7 @@
 """Anytime TD desk takes — one scorer per game.
 
-The pick is the player most likely to score tonight. Price is a separate
-question. A short number does not take the scorer off the card.
+The Desk requires a supported scoring role and a current price at least four
+probability points below the estimate, then ranks by modeled scoring chance.
 
 Validated Play stays off. These are research takes for scoring only.
 """
@@ -21,8 +21,7 @@ from spe.db.models import Game, ShadowPrediction, ShadowSettlement
 from spe.market.odds import american_to_implied, ev_per_dollar
 
 DESK_TAKE_KIND = "game_scorer"
-VALUE_HAIRCUT = 0.04  # aligned with settings.min_ev_after_haircut / web shortlist floor
-# Same floor the desk already uses before it will name an unpriced player.
+VALUE_HAIRCUT = 0.04  # probability-point margin, not an EV haircut
 SCORE_CHANCE_FLOOR = 0.22
 
 # Weights for the composite desk score (must sum ~1).
@@ -119,32 +118,41 @@ def desk_pick_score(row: dict[str, Any]) -> dict[str, float]:
     }
 
 
-def _eligible(row: dict[str, Any], *, haircut: float) -> bool:
-    """Hard gates before scoring — desk will not pick these.
+def desk_candidate_blockers(row: dict[str, Any], *, haircut: float = VALUE_HAIRCUT,
+                            now: datetime | None = None) -> tuple[list[str], str | None]:
+    """Selection policy. Price freshness is independent of published-Play eligibility."""
+    from spe.publishing.policy import assess, finite
 
-    Freshness and edge are score factors, not vetoes: the desk still names one
-    player per game when books are stale. Official Play stays off separately.
-    """
-    del haircut  # reserved for callers / future floor knobs
     forecast = row.get("forecast") or {}
+    checked = assess(row, now)
+    reasons = [r for r in checked["reasons"] if r in {
+        "game_not_pregame", "price_not_verified_recently", "invalid_price", "missing_book_or_selection"}]
     status = str(forecast.get("availability_status") or "").lower()
     if status in {"out", "doubtful", "confirmed_inactive", "inactive", "suspended", "questionable", "uncertain"}:
-        return False
+        reasons.append("availability_requires_review")
+    p = finite(forecast.get("p_estimate"))
+    price = finite(row.get("book_price"))
+    if p is None or not SCORE_CHANCE_FLOOR <= p <= 1:
+        reasons.append("insufficient_scoring_chance")
+    elif price is not None and abs(price) >= 100:
+        if p - american_to_implied(int(price)) + 1e-12 < haircut:
+            reasons.append("insufficient_price_advantage")
+    usage = row.get("usage") or {}
+    work = lambda key: finite(usage.get(key)) or 0.0
+    # College has no trustworthy goal-line charting: meaningful carries or catches
+    # can support a role without requiring a recent touchdown streak.
+    role = (work("gl_carries") >= .4 or work("rz_targets") >= .5
+            or work("carries") >= 5 or work("receptions") >= 3.5)
+    if not role:
+        reasons.append("insufficient_scoring_role")
+    return reasons, checked["valid_until"]
+
+
+def _eligible(row: dict[str, Any], *, haircut: float, now: datetime | None = None) -> bool:
     analysis = row.get("desk_analysis")
     if analysis is not None and not analysis.get("eligible"):
         return False
-    if forecast.get("p_estimate") is None:
-        return False
-    try:
-        p = float(forecast.get("p_estimate") or 0.0)
-    except (TypeError, ValueError):
-        return False
-    if not math.isfinite(p) or not SCORE_CHANCE_FLOOR <= p <= 1:
-        return False
-    # Prefer a posted number; allow research-only rows with a real chance.
-    if row.get("book_price") is None and p < 0.22:
-        return False
-    return True
+    return not desk_candidate_blockers(row, haircut=haircut, now=now)[0]
 
 
 def beats_the_price(row: dict[str, Any]) -> bool:
@@ -166,11 +174,12 @@ def select_desk_takes(
     rows: list[dict[str, Any]],
     *,
     haircut: float = VALUE_HAIRCUT,
+    now: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """One scorer per game: the highest chance he actually scores tonight."""
+    """Highest scoring chance among supported, currently priced research candidates."""
     best: dict[str, tuple[float, dict[str, Any], dict[str, float]]] = {}
     for row in rows:
-        if not _eligible(row, haircut=haircut):
+        if not _eligible(row, haircut=haircut, now=now):
             continue
         gid = str(row.get("game_id") or "")
         if not gid:
@@ -205,10 +214,10 @@ def capture_atd_desk_takes(
 
     moment = as_utc(now) or datetime.now(UTC)
     props = list_anytime_prop_rows(session, league=league)
-    takes = select_desk_takes(props)
+    takes = select_desk_takes(props, now=moment)
     saved = freeze_desk_rows(session, props, now=moment)
     return {"status": "ok", "research_only": True, "play_enabled": False,
-            "validated_play": False, "selection": "opportunity_probability_with_role_checks",
+            "validated_play": False, "selection": "opportunity_probability_with_role_and_price_checks",
             "prop_rows_scanned": len(props), "takes_selected": len(takes),
             "decisions_appended": saved, "captured_at": moment.isoformat()}
 

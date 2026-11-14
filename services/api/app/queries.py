@@ -625,11 +625,6 @@ def list_props(
                 continue
             if date and kickoff_day(row["kickoff_utc"]) != date:
                 continue
-            if min_odds is not None and (row["book_price"] is None or row["book_price"] < min_odds):
-                continue
-            ev = row["forecast"].get("ev")
-            if min_ev is not None and (ev is None or ev < min_ev):
-                continue
             rows.append(row)
     rows = without_duplicate_props(rows)
     _attach_td_usage(session, rows)
@@ -637,6 +632,11 @@ def list_props(
     enrich_desk_rows(session, rows)
     rows = [r for r in rows if not r["forecast"].get("desk_requires_opportunity_score")
             or (r.get("desk_analysis") or {}).get("candidate_probability") is not None]
+    # Select from the full slate first; request filters must not create a new Desk call.
+    if min_odds is not None:
+        rows = [r for r in rows if r["book_price"] is not None and r["book_price"] >= min_odds]
+    if min_ev is not None:
+        rows = [r for r in rows if r["forecast"].get("ev") is not None and r["forecast"]["ev"] >= min_ev]
     rows.sort(
         key=lambda r: (
             r["forecast"].get("ev") is None,
