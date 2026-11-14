@@ -369,22 +369,27 @@ def prop_picks(
     if cached and now - cached[0] < _PROP_PICK_TTL_S:
         return cached[1]
 
-    from spe.props.board_cache import load_slate_props
-
-    games = games_for_slate(session, selected, league_id)
-    picks: list[dict[str, Any]] = []
-    if games:
-        # Saved market boards — never scan every prop market live on the tiny API box.
-        rows = load_slate_props(session, league_id, selected)
-        picks = build_game_prop_picks(rows, {game.game_id for game in games})
-    payload = {
+    payload: dict[str, Any] = {
         "date": selected,
         "league": league_id,
-        "games_on_slate": len(games),
-        "picks": picks,
+        "games_on_slate": 0,
+        "picks": [],
         "note": _PROP_PICK_NOTE,
         "disclaimer": disclaimer(),
     }
+    try:
+        from spe.props.board_cache import load_slate_props
+
+        games = games_for_slate(session, selected, league_id)
+        payload["games_on_slate"] = len(games)
+        if games:
+            # Saved market boards — never scan every prop market live on the tiny API box.
+            rows = load_slate_props(session, league_id, selected)
+            payload["picks"] = build_game_prop_picks(rows, {game.game_id for game in games})
+    except Exception:
+        # Public desk must stay up even when a board rebuild fails.
+        payload["picks"] = []
+        payload["degraded"] = True
     _PROP_PICK_CACHE[key] = (now, payload)
     return payload
 
@@ -730,35 +735,39 @@ def parlay_card(
     if cached and now - cached[0] < _PARLAY_CARD_TTL_S:
         return cached[1]
 
-    games = games_for_slate(session, selected, league_id)
     payload: dict[str, Any] = {
         "date": selected,
         "league": league_id,
         "built_at": datetime.now(UTC).isoformat(),
-        "games_on_slate": len(games),
+        "games_on_slate": 0,
         "eligible_legs": 0,
         "games_with_legs": 0,
         "tickets": [],
         "note": _PARLAY_CARD_NOTE,
         "disclaimer": disclaimer(),
     }
-    if games:
-        from spe.props.board_cache import load_slate_props
+    try:
+        games = games_for_slate(session, selected, league_id)
+        payload["games_on_slate"] = len(games)
+        if games:
+            from spe.props.board_cache import load_slate_props
 
-        rows = load_slate_props(session, league_id, selected)
-        pair = best_same_game_pair(rows)
-        joints: dict[tuple[str, str, str], float] = {}
-        if pair is not None:
-            game_id, player_a, player_b = pair
-            game = session.get(Game, game_id)
-            joint = anytime_td_joint(session, game, player_a, player_b) if game is not None else None
-            if joint is not None:
-                lo, hi = sorted((player_a, player_b))
-                joints[(game_id, lo, hi)] = float(joint)
-        card = build_parlay_card(rows, joints, _spreads_for_slate(session, league_id, selected))
-        payload["eligible_legs"] = card["eligible_legs"]
-        payload["games_with_legs"] = card["games_with_legs"]
-        payload["tickets"] = card["tickets"]
+            rows = load_slate_props(session, league_id, selected)
+            pair = best_same_game_pair(rows)
+            joints: dict[tuple[str, str, str], float] = {}
+            if pair is not None:
+                game_id, player_a, player_b = pair
+                game = session.get(Game, game_id)
+                joint = anytime_td_joint(session, game, player_a, player_b) if game is not None else None
+                if joint is not None:
+                    lo, hi = sorted((player_a, player_b))
+                    joints[(game_id, lo, hi)] = float(joint)
+            card = build_parlay_card(rows, joints, _spreads_for_slate(session, league_id, selected))
+            payload["eligible_legs"] = card["eligible_legs"]
+            payload["games_with_legs"] = card["games_with_legs"]
+            payload["tickets"] = card["tickets"]
+    except Exception:
+        payload["degraded"] = True
     _PARLAY_CARD_CACHE[key] = (now, payload)
     return payload
 

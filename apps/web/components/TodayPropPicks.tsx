@@ -10,19 +10,27 @@ export function TodayPropPicks({
   gameId,
   market,
   pending = false,
+  initialCard = null,
 }: {
   league: string;
   date: string;
   gameId?: string;
   market?: string;
   pending?: boolean;
+  initialCard?: PropPickCard | null;
 }) {
-  const [card, setCard] = useState<PropPickCard | null>(null);
+  const [card, setCard] = useState<PropPickCard | null>(initialCard);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Server already filled the card — do not re-hit the Netlify→API proxy.
+    if (initialCard) {
+      setCard(initialCard);
+      setError(null);
+      return;
+    }
     const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), 120000);
+    const timer = window.setTimeout(() => ctrl.abort(), 20000);
     setCard(null);
     setError(null);
     const params = new URLSearchParams({ league, date });
@@ -43,9 +51,9 @@ export function TodayPropPicks({
       ctrl.abort();
       window.clearTimeout(timer);
     };
-  }, [league, date]);
+  }, [league, date, initialCard]);
 
-  if (error) return <p className="text-sm text-mute">The prop calls didn’t load.</p>;
+  if (error) return <p className="text-sm text-mute">No prop call for this slate.</p>;
   if (!card) return <p className="text-sm text-mute">Choosing the prop calls.</p>;
 
   const picks = card.picks.filter((pick) => (!gameId || pick.game_id === gameId) && (!market || pick.market_id === market));

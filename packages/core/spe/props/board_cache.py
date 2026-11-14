@@ -190,7 +190,11 @@ def load_slate_props(
     """Merge the warmed market boards for picks / tickets. Avoids a full all-market scan."""
     rows: list[dict[str, Any]] = []
     for market in markets:
-        rows.extend(load_props(session, market, None, None, league, date, path))
+        try:
+            rows.extend(load_props(session, market, None, None, league, date, path))
+        except Exception:
+            # One market must not take down the whole home-page card.
+            continue
     return rows
 
 

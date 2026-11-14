@@ -7,7 +7,7 @@ import { SlateBoard } from "@/components/SlateBoard";
 import { TodayPropPicks } from "@/components/TodayPropPicks";
 import { TodayTickets } from "@/components/TodayTickets";
 import type { AtsRow } from "@/components/AtsBoard";
-import { apiGet, type SlateGame, type SlateResponse } from "@/lib/api";
+import { apiGet, type ParlayCard, type PropPickCard, type SlateGame, type SlateResponse } from "@/lib/api";
 import { dayParts, type SlateDays, withQuery } from "@/lib/days";
 import { kickoffDate } from "@/lib/format";
 
@@ -20,35 +20,41 @@ export default async function TodayPage({
   let data: SlateResponse | null = null;
   let days: SlateDays | null = null;
   let calls: AtsRow[] = [];
+  let propCard: PropPickCard | null = null;
+  let ticketCard: ParlayCard | null = null;
   let error: string | null = null;
   try {
-    days = await apiGet<SlateDays>(`/v1/days?league=${league}`, 20000);
+    days = await apiGet<SlateDays>(`/v1/days?league=${league}`, 15000);
   } catch (e) {
     error = e instanceof Error ? e.message : "API unavailable";
   }
+  const todayEarly = days?.today ?? "";
+  const fallbackEarly = days
+    ? days.dates.includes(days.today)
+      ? days.today
+      : (days.dates[0] ?? days.today)
+    : new Date().toISOString().slice(0, 10);
+  const selectedEarly = dateParam || fallbackEarly;
   try {
     // If today is dark, land on the next day that actually has games.
-    const fallback = days
-      ? days.dates.includes(days.today)
-        ? days.today
-        : (days.dates[0] ?? days.today)
-      : new Date().toISOString().slice(0, 10);
-    const selectedDate = dateParam || fallback;
-    const [slate, board] = await Promise.all([
-      apiGet<SlateResponse>(`/v1/slate?league=${league}&date=${selectedDate}`, 25000),
-      apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff`, 20000).catch(() => ({
+    const [slate, board, picks, tickets] = await Promise.all([
+      apiGet<SlateResponse>(`/v1/slate?league=${league}&date=${selectedEarly}`, 20000),
+      apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff`, 15000).catch(() => ({
         rows: [] as AtsRow[],
       })),
+      // Server → API direct (API_URL). Avoid the browser → Netlify proxy path that 500s.
+      apiGet<PropPickCard>(`/v1/props/picks?league=${league}&date=${selectedEarly}`, 15000).catch(() => null),
+      apiGet<ParlayCard>(`/v1/parlays/card?league=${league}&date=${selectedEarly}`, 15000).catch(() => null),
     ]);
     data = slate;
-    calls = board.rows.filter((row) => kickoffDate(row.kickoff_utc) === selectedDate);
+    calls = board.rows.filter((row) => kickoffDate(row.kickoff_utc) === selectedEarly);
+    propCard = picks;
+    ticketCard = tickets;
   } catch (e) {
     error = error || (e instanceof Error ? e.message : "API unavailable");
   }
-  const today = days?.today ?? "";
-  const fallback =
-    days && days.dates.includes(today) ? today : (days?.dates[0] ?? today);
-  const selected = dateParam || fallback;
+  const today = days?.today ?? todayEarly;
+  const selected = dateParam || selectedEarly;
   const next = days?.dates.find((d) => d > selected) ?? null;
   const visible = [...(data?.games ?? [])].sort(byKick);
   const openCalls = calls.filter((row) => row.game_status !== "final");
@@ -105,14 +111,14 @@ export default async function TodayPage({
       {selected ? (
         <section className="space-y-4">
           <Section title="The props" meta="One call per market" href={withQuery("/props", { league, date: selected === today ? undefined : selected })} />
-          <TodayPropPicks league={league} date={selected} />
+          <TodayPropPicks league={league} date={selected} initialCard={propCard} />
         </section>
       ) : null}
 
       {selected ? (
         <section className="space-y-4">
           <Section title="The tickets" meta="Built from this day" href={withQuery("/parlays", { league, date: selected === today ? undefined : selected })} />
-          <TodayTickets league={league} date={selected} />
+          <TodayTickets league={league} date={selected} initialCard={ticketCard} />
         </section>
       ) : null}
 
