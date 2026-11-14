@@ -2,19 +2,13 @@
 
 const BROWSER_API = "/api/backend";
 
-/** Keep priced boards in memory across page navigations in this tab. */
+/** Reuse non-price research across navigation; current prices always reach the API. */
 const BOARD_TTL_MS = 10 * 60 * 1000;
 const boardCache = new Map<string, { expires: number; value: unknown }>();
 
 function cacheablePath(path: string): boolean {
-  return (
-    path.startsWith("/v1/props") ||
-    path.startsWith("/v1/ats") ||
-    path.startsWith("/v1/days") ||
-    path.startsWith("/v1/anytime-td") ||
-    path.startsWith("/v1/parlays/card") ||
-    path.startsWith("/v1/props/picks")
-  );
+  const pathname = path.split("?")[0];
+  return pathname === "/v1/days" || pathname === "/v1/anytime-td/research";
 }
 
 export function peekBrowserCache<T>(path: string): T | null {
@@ -32,7 +26,7 @@ export async function browserGet<T>(path: string, signal?: AbortSignal): Promise
   }
   const res = await fetch(`${BROWSER_API}${path}`, {
     signal,
-    // Boards change on the hour, not every click — memory cache above is the source of truth.
+    // Current opportunities must be reverified by the API.
     cache: "no-store",
   });
   if (!res.ok) {

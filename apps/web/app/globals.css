@@ -202,3 +202,10 @@ a.plate:hover {
 .btn-primary:disabled {
   opacity: 0.4;
 }
+
+/* Bundle the brand fonts with the app so deploys do not depend on Google Fonts. */
+:root {
+  --font-display: "Barlow Condensed";
+  --font-sans: "Outfit Variable";
+  --font-mono: "JetBrains Mono Variable";
+}

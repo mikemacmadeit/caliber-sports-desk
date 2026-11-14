@@ -145,18 +145,7 @@ function trimNum(value: number): string {
 
 /** Fresh edge shortlist (secondary value list). */
 export function valueAtPrice(rows: PropRow[], haircut = VALUE_HAIRCUT): PropRow[] {
-  const best = new Map<string, PropRow>();
-  for (const row of rows) {
-    const freshness = row.price_freshness || row.forecast.price_freshness;
-    const fresh =
-      freshness?.status === "fresh" && freshness.is_current_opportunity && row.book_price != null;
-    const edge = row.forecast.ev_after_haircut;
-    if (row.forecast.availability_status === "out") continue;
-    if (!fresh || edge == null || edge < haircut) continue;
-    const current = best.get(row.game_id);
-    if (!current || edge > (current.forecast.ev_after_haircut ?? -1)) best.set(row.game_id, row);
-  }
-  return [...best.values()].sort(
-    (a, b) => (b.forecast.ev_after_haircut ?? 0) - (a.forecast.ev_after_haircut ?? 0),
-  );
+  return rows.filter(row => Boolean(row.published_pick_id) && row.qualification?.eligible &&
+    Boolean(row.qualification.valid_until) && Date.parse(row.qualification.valid_until!) > Date.now() &&
+    (row.forecast.ev_after_haircut ?? -1) >= haircut);
 }

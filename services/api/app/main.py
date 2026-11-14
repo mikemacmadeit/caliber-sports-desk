@@ -330,6 +330,9 @@ def props(
     from spe.props.board_cache import load_props
 
     rows = load_props(session, market, min_odds, min_ev, league, date)
+    from spe.publishing.ledger import current_picks
+    published = {r["outcome_id"]: r["pick_id"] for r in current_picks(session, rows)}
+    rows = [{**row, "published_pick_id": published.get(row.get("outcome_id"))} for row in rows]
     return {"market": market or "all", "date": date or "all", "rows": rows, "disclaimer": disclaimer()}
 
 
@@ -343,55 +346,46 @@ def anytime_td_called(
     return {"date": date or slate_today(), "rows": rows, "disclaimer": disclaimer()}
 
 
-_PROP_PICK_CACHE: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
-_PROP_PICK_TTL_S = 600.0
-_PROP_PICK_NOTE = (
-    "One prop per market for each game still to come. "
-    "A chance far from the price stays off. "
-    "A stale price is named, and the sentence says the number is old."
-)
-
-
 @app.get("/v1/props/picks")
-def prop_picks(
-    league: str = Query(default="all"),
-    date: str | None = None,
-    session: Session = Depends(db_session),
-) -> dict[str, Any]:
-    """The day's prop calls. One per market per open game."""
-    from spe.props.game_picks import build_game_prop_picks
-
+def prop_picks(league: str = Query(default="all"), date: str | None = None,
+               session: Session = Depends(db_session)) -> dict[str, Any]:
+    from spe.props.board_cache import load_slate_props, read_entry, WARM_MARKETS
+    from spe.publishing.ledger import current_picks
     selected = date or slate_today()
-    league_id = league or "all"
-    key = (league_id, selected)
-    cached = _PROP_PICK_CACHE.get(key)
-    now = time.monotonic()
-    if cached and now - cached[0] < _PROP_PICK_TTL_S:
-        return cached[1]
+    games = games_for_slate(session, selected, league)
+    rows = load_slate_props(session, league, selected)
+    degraded = bool(games) and any(read_entry(market, league, selected) is None for market in WARM_MARKETS)
+    return {"date": selected, "league": league, "games_on_slate": len(games), "degraded": degraded,
+            "picks": current_picks(session, rows),
+            "note": "Published research opportunities. Only verified prices meeting the value threshold appear.",
+            "disclaimer": disclaimer()}
 
-    payload: dict[str, Any] = {
-        "date": selected,
-        "league": league_id,
-        "games_on_slate": 0,
-        "picks": [],
-        "note": _PROP_PICK_NOTE,
-        "disclaimer": disclaimer(),
-    }
+
+@app.get("/v1/published/history")
+def published_history(league: str | None = None, market: str | None = None,
+                      offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200),
+                      session: Session = Depends(db_session)) -> dict[str, Any]:
+    from spe.publishing.ledger import history, ats_history
+    if market == "point_spread":
+        return ats_history(session, league, offset, limit)
+    return history(session, league, market, offset, limit)
+
+
+@app.get("/v1/operations/status")
+def operations_status(session: Session = Depends(db_session)) -> dict[str, Any]:
+    from spe.publishing.pipeline import health
+    return health(session)
+
+
+@app.get("/ready")
+def readiness(session: Session = Depends(db_session)):
+    from fastapi.responses import JSONResponse
+    from spe.publishing.pipeline import health
     try:
-        from spe.props.board_cache import load_slate_props
-
-        games = games_for_slate(session, selected, league_id)
-        payload["games_on_slate"] = len(games)
-        if games:
-            # Saved market boards — never scan every prop market live on the tiny API box.
-            rows = load_slate_props(session, league_id, selected)
-            payload["picks"] = build_game_prop_picks(rows, {game.game_id for game in games})
+        payload = health(session)
+        return JSONResponse(payload, status_code=200 if payload["ok"] else 503)
     except Exception:
-        # Public desk must stay up even when a board rebuild fails.
-        payload["picks"] = []
-        payload["degraded"] = True
-    _PROP_PICK_CACHE[key] = (now, payload)
-    return payload
+        return JSONResponse({"ok": False, "alerts": ["database_unavailable"]}, status_code=503)
 
 
 @app.get("/v1/anytime-td/research")
@@ -730,10 +724,7 @@ def parlay_card(
     selected = date or slate_today()
     league_id = league or "all"
     key = (league_id, selected)
-    cached = _PARLAY_CARD_CACHE.get(key)
     now = time.monotonic()
-    if cached and now - cached[0] < _PARLAY_CARD_TTL_S:
-        return cached[1]
 
     payload: dict[str, Any] = {
         "date": selected,
@@ -753,6 +744,8 @@ def parlay_card(
             from spe.props.board_cache import load_slate_props
 
             rows = load_slate_props(session, league_id, selected)
+            from spe.publishing.policy import assess
+            rows = [r for r in rows if assess(r)["eligible"]]
             pair = best_same_game_pair(rows)
             joints: dict[tuple[str, str, str], float] = {}
             if pair is not None:
@@ -762,7 +755,7 @@ def parlay_card(
                 if joint is not None:
                     lo, hi = sorted((player_a, player_b))
                     joints[(game_id, lo, hi)] = float(joint)
-            card = build_parlay_card(rows, joints, _spreads_for_slate(session, league_id, selected))
+            card = build_parlay_card(rows, joints, [])
             payload["eligible_legs"] = card["eligible_legs"]
             payload["games_with_legs"] = card["games_with_legs"]
             payload["tickets"] = card["tickets"]

@@ -1,3 +1,7 @@
+# Current production pipeline
+
+For the publication ledger, shared database boards, current cron schedules, and deployment checks, follow [PRODUCTION_PIPELINE.md](PRODUCTION_PIPELINE.md). The older setup notes below describe the original prototype; its cron table and cost estimates are superseded.
+
 # Deploy Caliber (simple)
 
 You already have **Netlify** (website) and **API keys**.  

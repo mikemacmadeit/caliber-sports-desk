@@ -1,0 +1,90 @@
+# Existing Caliber production workers. Adopt matching jobs; retain the existing API and database.
+services:
+- type: cron
+  runtime: docker
+  plan: starter
+  region: oregon
+  repo: https://github.com/mikemacmadeit/caliber-sports-desk
+  branch: master
+  autoDeployTrigger: commit
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  name: caliber-hourly
+  schedule: '*/5 * * * *'
+  dockerCommand: python -m worker.main production-cycle --lane odds
+  envVars:
+  - key: APP_ENV
+    value: prod
+  - key: DATABASE_URL
+    fromDatabase:
+      name: caliber-db-xtkn
+      property: connectionString
+  - key: PARQUET_DIR
+    value: /data/parquet
+  - key: PYTHONPATH
+    value: /app/packages/core:/app/services/api:/app/services/worker
+  - key: ODDS_API_KEY
+    fromService:
+      name: caliber-api-xtkn
+      type: web
+      envVarKey: ODDS_API_KEY
+  - key: CFBD_API_KEY
+    fromService:
+      name: caliber-api-xtkn
+      type: web
+      envVarKey: CFBD_API_KEY
+  - key: ODDS_CREDIT_BUDGET_PER_DAY
+    value: '2000'
+- type: cron
+  runtime: docker
+  plan: starter
+  region: oregon
+  repo: https://github.com/mikemacmadeit/caliber-sports-desk
+  branch: master
+  autoDeployTrigger: commit
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  name: caliber-scoreboard
+  schedule: '*/15 * * * *'
+  dockerCommand: python -m worker.main production-cycle --lane settlement
+  envVars:
+  - key: APP_ENV
+    value: prod
+  - key: DATABASE_URL
+    fromDatabase:
+      name: caliber-db-xtkn
+      property: connectionString
+  - key: PARQUET_DIR
+    value: /data/parquet
+  - key: PYTHONPATH
+    value: /app/packages/core:/app/services/api:/app/services/worker
+- type: cron
+  runtime: docker
+  plan: starter
+  region: oregon
+  repo: https://github.com/mikemacmadeit/caliber-sports-desk
+  branch: master
+  autoDeployTrigger: commit
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  name: caliber-inputs
+  schedule: '*/15 * * * *'
+  dockerCommand: python -m worker.main production-cycle --lane inputs
+  envVars:
+  - key: APP_ENV
+    value: prod
+  - key: DATABASE_URL
+    fromDatabase:
+      name: caliber-db-xtkn
+      property: connectionString
+  - key: PARQUET_DIR
+    value: /data/parquet
+  - key: PYTHONPATH
+    value: /app/packages/core:/app/services/api:/app/services/worker
+  - key: API_SPORTS_KEY
+    fromService:
+      name: caliber-api-xtkn
+      type: web
+      envVarKey: API_SPORTS_KEY
+  - key: NWS_USER_AGENT
+    value: Caliber Sports Desk (calibersportsbet@gmail.com)

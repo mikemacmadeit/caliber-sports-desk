@@ -12,19 +12,14 @@ const GET_CACHE_TTL_MS = 5 * 60_000;
 const getCache = new Map<string, { expires: number; value: unknown }>();
 
 function cacheableGetPath(path: string): boolean {
-  return (
-    path.startsWith("/v1/props") ||
-    path.startsWith("/v1/ats") ||
-    path.startsWith("/v1/anytime-td") ||
-    path.startsWith("/v1/days") ||
-    path.startsWith("/v1/atd/desk-status")
-  );
+  const pathname = path.split("?")[0];
+  return pathname === "/v1/days" || pathname === "/v1/anytime-td/research";
 }
 
 export async function apiGet<T>(path: string, timeoutMs = 15000): Promise<T> {
   const session = await sessionToken();
-  const cacheKey = session ? `${path}@@${session}` : path;
-  const useCache = cacheableGetPath(path);
+  const cacheKey = path;
+  const useCache = !session && cacheableGetPath(path);
   if (useCache) {
     const hit = getCache.get(cacheKey);
     if (hit && hit.expires > Date.now()) {
@@ -234,7 +229,10 @@ export type ResearchDetail = ResearchSummary & {
   }>;
 };
 
+export type Qualification = { eligible: boolean; reasons: string[]; verified_at: string | null; valid_until: string | null; minimum_american_odds: number | null };
 export type PropRow = {
+  qualification?: Qualification;
+  published_pick_id?: string | null;
   locked?: boolean;
   outcome_id: string;
   game_id: string;
@@ -277,6 +275,10 @@ export type PropRow = {
 };
 
 export type PropPick = {
+  pick_id?: string;
+  published_at?: string;
+  bookmaker?: string;
+  qualification?: Qualification;
   locked?: boolean;
   game_id: string;
   league_id: string;
@@ -302,6 +304,7 @@ export type PropPickCard = {
   date: string;
   league: string;
   games_on_slate: number;
+  degraded?: boolean;
   picks: PropPick[];
   note: string;
   disclaimer: string;

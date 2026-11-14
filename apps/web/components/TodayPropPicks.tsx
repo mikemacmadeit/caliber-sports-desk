@@ -1,109 +1,51 @@
 "use client";
-
 import { useEffect, useState } from "react";
-import { LockedCall } from "@/components/LockedCall";
-import type { PropPick, PropPickCard } from "@/lib/api";
-import { kickoffParts } from "@/lib/format";
+import Link from "next/link";
+import type { PropPickCard } from "@/lib/api";
 
-export function TodayPropPicks({
-  league,
-  date,
-  gameId,
-  market,
-  pending = false,
-  initialCard = null,
-}: {
-  league: string;
-  date: string;
-  gameId?: string;
-  market?: string;
-  pending?: boolean;
-  initialCard?: PropPickCard | null;
+export function TodayPropPicks({ league, date, gameId, market, initialCard = null }: {
+  league: string; date: string; gameId?: string; market?: string; pending?: boolean; initialCard?: PropPickCard | null;
 }) {
-  const [card, setCard] = useState<PropPickCard | null>(initialCard);
-  const [error, setError] = useState<string | null>(null);
-
+  const [card, setCard] = useState(initialCard);
+  const [error, setError] = useState(false);
+  const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    // Server already filled the card — do not re-hit the Netlify→API proxy.
-    if (initialCard) {
-      setCard(initialCard);
-      setError(null);
-      return;
+    let disposed = false;
+    let controller: AbortController | null = null;
+    setCard(initialCard);
+    async function refresh() {
+      controller?.abort();
+      controller = new AbortController();
+      const timer = setTimeout(() => controller?.abort(), 15000);
+      try {
+        const params = new URLSearchParams({ league, date });
+        const response = await fetch(`/api/backend/v1/props/picks?${params}`, { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error("unavailable");
+        const next: PropPickCard = await response.json();
+        if (next.degraded) throw new Error("degraded");
+        if (!disposed) { setCard(next); setError(false); setNow(Date.now()); }
+      } catch { if (!disposed) setError(true); }
+      finally { clearTimeout(timer); }
     }
-    const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), 20000);
-    setCard(null);
-    setError(null);
-    const params = new URLSearchParams({ league, date });
-    import("@/lib/browserApi")
-      .then(({ browserGet }) => browserGet<PropPickCard>(`/v1/props/picks?${params}`, ctrl.signal))
-      .then((data) => {
-        if (!ctrl.signal.aborted) setCard(data);
-      })
-      .catch((err: unknown) => {
-        if (ctrl.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "unavailable");
-      })
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      ctrl.abort();
-      window.clearTimeout(timer);
-    };
+    setError(Boolean(initialCard?.degraded));
+    if (!initialCard || initialCard.degraded) void refresh();
+    const poll = setInterval(() => void refresh(), 60000);
+    const clock = setInterval(() => setNow(Date.now()), 1000);
+    return () => { disposed = true; controller?.abort(); clearInterval(poll); clearInterval(clock); };
   }, [league, date, initialCard]);
-
-  if (error) return <p className="text-sm text-mute">No prop call for this slate.</p>;
-  if (!card) return <p className="text-sm text-mute">Choosing the prop calls.</p>;
-
-  const picks = card.picks.filter((pick) => (!gameId || pick.game_id === gameId) && (!market || pick.market_id === market));
-  const openPicks = picks.filter((pick) => !pick.locked);
-  if (picks.length > 0 && openPicks.length === 0) {
-    return (
-      <LockedCall
-        title="Prop calls are locked"
-        detail="They open at kickoff. Subscribers see them now — $19.99 a month."
-      />
-    );
-  }
-  if (picks.length === 0) {
-    return <p className="text-sm text-mute">No prop call for this slate.</p>;
-  }
-
-  const groups = new Map<string, PropPick[]>();
-  for (const pick of openPicks) {
-    const list = groups.get(pick.game_id) ?? [];
-    list.push(pick);
-    groups.set(pick.game_id, list);
-  }
-
-  return (
-    <div className="space-y-3">
-      {picks.some((pick) => pick.locked) ? (
-        <LockedCall
-          title="Some prop calls are still locked"
-          detail="Finished games stay visible. Games that have not kicked off open with a subscription."
-        />
-      ) : null}
-      {[...groups.entries()].map(([id, rows]) => {
-        const first = rows[0];
-        const when = first.kickoff_utc ? kickoffParts(first.kickoff_utc) : null;
-        return (
-          <article key={id} className="plate px-4 py-4">
-            {gameId ? null : (
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-mute">
-                {first.away_abbr} at {first.home_abbr}
-                {when ? ` · ${when.time}` : ""}
-              </p>
-            )}
-            <ul className={gameId ? "space-y-2" : "mt-3 space-y-2"}>
-              {rows.map((pick) => (
-                <li key={`${pick.game_id}-${pick.market_id}`} className={`text-sm leading-relaxed ${pick.loud ? "text-gold" : "text-paper/75"}`}>
-                  {pending ? `${pick.sentence.replace(/\.$/, "")}: pending.` : pick.sentence}
-                </li>
-              ))}
-            </ul>
-          </article>
-        );
-      })}
-    </div>
-  );
+  if (error) return <p role="status" className="text-sm text-mute">Updates are temporarily unavailable. Current opportunities are paused while prices are verified.</p>;
+  if (!card) return <p className="text-sm text-mute">Checking published opportunities…</p>;
+  const picks = card.picks.filter(p => (!gameId || p.game_id === gameId) && (!market || p.market_id === market) &&
+    !p.locked && p.qualification?.eligible && p.qualification.valid_until && Date.parse(p.qualification.valid_until) > now);
+  if (!picks.length) return <p className="plate px-5 py-6 text-sm text-mute">No qualifying opportunity right now. A pick needs a verified price, sufficient data, and enough estimated value.</p>;
+  const odds = (n: number) => n > 0 ? `+${n}` : String(n);
+  return <div className="grid gap-3 md:grid-cols-2">{picks.map(p => <article key={p.pick_id} className="plate px-5 py-5">
+    <p className="font-mono text-xs text-mute">{p.away_abbr} at {p.home_abbr} · {p.league_id.toUpperCase()}</p>
+    <p className="mt-3 text-paper">{p.sentence}</p>
+    <p className="mt-3 text-sm text-gold">{p.bookmaker} · {odds(p.book_price)}</p>
+    <p className="mt-2 text-xs text-mute">Verified {p.qualification?.verified_at ? new Date(p.qualification.verified_at).toLocaleTimeString() : "—"}.
+      {p.qualification?.minimum_american_odds != null ? ` Pass below ${odds(p.qualification.minimum_american_odds)}.` : ""}</p>
+    <p className="mt-2 text-xs text-mute">Research estimate · {Math.round(p.p * 100)}% probability</p>
+    <Link href="/track-record" className="mt-3 inline-block text-sm text-gold">View the permanent record →</Link>
+  </article>)}</div>;
 }

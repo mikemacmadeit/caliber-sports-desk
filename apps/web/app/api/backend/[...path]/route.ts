@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readToken } from "@/lib/serverAuth";
 
 const API = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function proxy(request: NextRequest, path: string[]) {
-  const token = await readToken();
+  const token = request.cookies.get("caliber_session")?.value;
   const url = new URL(`${API}/${path.map(encodeURIComponent).join("/")}`);
   url.search = request.nextUrl.search;
   const headers = new Headers();
@@ -13,13 +12,8 @@ async function proxy(request: NextRequest, path: string[]) {
   if (token) headers.set("authorization", `Bearer ${token}`);
   const isGet = request.method === "GET" || request.method === "HEAD";
   const boardPath = path.join("/");
-  const cacheable =
-    isGet &&
-    (boardPath.startsWith("v1/props") ||
-      boardPath.startsWith("v1/ats") ||
-      boardPath.startsWith("v1/days") ||
-      boardPath.startsWith("v1/anytime-td") ||
-      boardPath.startsWith("v1/parlays/card"));
+  // Never cache personalized responses or current prices at the shared edge.
+  const cacheable = isGet && !token && (boardPath === "v1/days" || boardPath === "v1/anytime-td/research");
   const res = await fetch(url, {
     method: request.method,
     headers,

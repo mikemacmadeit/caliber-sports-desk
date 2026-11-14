@@ -1,6 +1,6 @@
 # Caliber cloud API + Postgres.
 # Web service should be 1c-2g (2 GB) for public boards. Free sleeps and OOMs.
-# After billing is on, the hourly cron refreshes odds + saved boards in cloud
+# After billing is on, the scheduled workers refreshes odds + saved boards in cloud
 # so the Windows PC is not required for production.
 #
 # After deploy, set WEB_ORIGIN / ODDS_API_KEY / CFBD_API_KEY, then point Netlify
@@ -51,8 +51,8 @@ services:
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    schedule: "0 * * * *"
-    dockerCommand: "python -m worker.main ingest-odds-live --hours 168"
+    schedule: "*/5 * * * *"
+    dockerCommand: "python -m worker.main production-cycle --lane odds"
     envVars:
       - key: APP_ENV
         value: prod
@@ -79,8 +79,8 @@ services:
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    schedule: "*/30 * * * *"
-    dockerCommand: "python -m worker.main ingest-scoreboard --year 2026 && python -m worker.main ats-cycle --skip-odds"
+    schedule: "*/15 * * * *"
+    dockerCommand: "python -m worker.main production-cycle --lane settlement"
     envVars:
       - key: APP_ENV
         value: prod
@@ -90,5 +90,30 @@ services:
           property: connectionString
       - key: PARQUET_DIR
         value: /data/parquet
+      - key: PYTHONPATH
+        value: /app/packages/core:/app/services/api:/app/services/worker
+
+  - type: cron
+    name: caliber-inputs
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "*/15 * * * *"
+    dockerCommand: "python -m worker.main production-cycle --lane inputs"
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caliber-db
+          property: connectionString
+      - key: PARQUET_DIR
+        value: /data/parquet
+      - key: API_SPORTS_KEY
+        sync: false
+      - key: NWS_USER_AGENT
+        sync: false
       - key: PYTHONPATH
         value: /app/packages/core:/app/services/api:/app/services/worker

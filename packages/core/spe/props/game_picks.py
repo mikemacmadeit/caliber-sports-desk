@@ -1,14 +1,16 @@
 """One prop call per game and market, from lines that already have a fresh price.
 
 A chance several times the book's number stays off. A soft line in the 80s or 90s
-stays off. A fresh price wins over a stale one. When the only number left is
-stale, the card still names the player and says so.
+stays off. Only verified prices with sufficient conservative value qualify.
+An empty card is a valid outcome.
 """
 
 from __future__ import annotations
 
 import math
 from typing import Any
+from datetime import datetime
+from spe.publishing.policy import assess
 
 from spe.market.odds import american_to_implied
 from spe.shadow.atd_desk_takes import desk_pick_score
@@ -28,12 +30,12 @@ COUNT_MAX_P = 0.66
 TARGET_P = 0.58
 
 
-def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None = None) -> list[dict[str, Any]]:
+def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None = None, *, now: datetime | None = None) -> list[dict[str, Any]]:
     """Return the published prop calls. ``game_ids`` limits the slate to games still open."""
     allowed = None if game_ids is None else {str(gid) for gid in game_ids}
     pools: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for row in rows:
-        if not _publishable(row):
+        if not _publishable(row) or not assess(row, now)["eligible"]:
             continue
         game_id = str(row.get("game_id") or "")
         if allowed is not None and game_id not in allowed:
@@ -48,12 +50,13 @@ def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None 
 
     picks: list[dict[str, Any]] = []
     for (game_id, market_id), group in by_market.items():
-        fresh = [row for row in group if _fresh(row)]
-        pool = fresh or group
-        valued = [row for row in pool if _haircut(row) >= 0]
-        ranked = valued or pool
-        winner = max(ranked, key=lambda row: (desk_pick_score(row)["total"], str(row.get("player_name") or "")))
-        picks.append(_public_pick(winner, price_ahead=not valued, stale=not _fresh(winner)))
+        winner = max(group, key=lambda row: (desk_pick_score(row)["total"], str(row.get("player_name") or "")))
+        pick = _public_pick(winner, price_ahead=False, stale=False)
+        pick.update(outcome_id=winner.get("outcome_id"), player_id=winner.get("player_id"),
+                    bookmaker=winner.get("bookmaker"), qualification=assess(winner, now),
+                    forecast=winner.get("forecast"), price_freshness=winner.get("price_freshness"),
+                    data_tier=winner.get("data_tier"))
+        picks.append(pick)
 
     picks.sort(key=lambda pick: (str(pick.get("kickoff_utc") or ""), str(pick.get("game_id")), MARKETS.index(pick["market_id"])))
     return picks
