@@ -114,9 +114,10 @@ export default async function AnytimeTdPage({
     date: days && selected === days.today ? undefined : selected,
   });
 
-  // Props can soft-fail and hydrate in the browser. Only hard-fail the research view.
-  const loadFailure = researchView ? Boolean(researchError && !research) : Boolean(daysError && !days);
+  // Never hard-fail the priced board on SSR timeouts — hydrate in the browser.
+  const loadFailure = researchView ? Boolean(researchError && !research) : false;
   void propsError;
+  void daysError;
 
   return (
     <div className="space-y-10">
