@@ -1,7 +1,14 @@
+import { cookies } from "next/headers";
+
 const API = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-/** Short in-process reuse so flipping league/date/back does not refetch cold boards. */
-const GET_CACHE_TTL_MS = 45_000;
+async function sessionToken(): Promise<string> {
+  const jar = await cookies();
+  return jar.get("caliber_session")?.value ?? "";
+}
+
+/** Reuse saved boards in the Netlify SSR process across navigations. */
+const GET_CACHE_TTL_MS = 5 * 60_000;
 const getCache = new Map<string, { expires: number; value: unknown }>();
 
 function cacheableGetPath(path: string): boolean {
@@ -15,9 +22,11 @@ function cacheableGetPath(path: string): boolean {
 }
 
 export async function apiGet<T>(path: string, timeoutMs = 15000): Promise<T> {
+  const session = await sessionToken();
+  const cacheKey = session ? `${path}@@${session}` : path;
   const useCache = cacheableGetPath(path);
   if (useCache) {
-    const hit = getCache.get(path);
+    const hit = getCache.get(cacheKey);
     if (hit && hit.expires > Date.now()) {
       return hit.value as T;
     }
@@ -27,7 +36,11 @@ export async function apiGet<T>(path: string, timeoutMs = 15000): Promise<T> {
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let res: Response;
   try {
-    res = await fetch(`${API}${path}`, { cache: "no-store", signal: ctrl.signal });
+    res = await fetch(`${API}${path}`, {
+      cache: "no-store",
+      signal: ctrl.signal,
+      headers: session ? { Authorization: `Bearer ${session}` } : undefined,
+    });
   } finally {
     clearTimeout(timer);
   }
@@ -36,7 +49,7 @@ export async function apiGet<T>(path: string, timeoutMs = 15000): Promise<T> {
   }
   const value = (await res.json()) as T;
   if (useCache) {
-    getCache.set(path, { expires: Date.now() + GET_CACHE_TTL_MS, value });
+    getCache.set(cacheKey, { expires: Date.now() + GET_CACHE_TTL_MS, value });
   }
   return value;
 }
@@ -222,6 +235,7 @@ export type ResearchDetail = ResearchSummary & {
 };
 
 export type PropRow = {
+  locked?: boolean;
   outcome_id: string;
   game_id: string;
   league_id: string;
@@ -263,6 +277,7 @@ export type PropRow = {
 };
 
 export type PropPick = {
+  locked?: boolean;
   game_id: string;
   league_id: string;
   away_abbr?: string | null;
@@ -283,6 +298,7 @@ export type PropPick = {
 };
 
 export type PropPickCard = {
+  locked?: boolean;
   date: string;
   league: string;
   games_on_slate: number;
@@ -300,6 +316,7 @@ export type SlateResponse = {
 };
 
 export type GameDetail = {
+  locked?: boolean;
   game: SlateGame;
   injuries: Array<{
     player_id: string;
@@ -365,6 +382,8 @@ export type ParlayTicket = {
 };
 
 export type ParlayCard = {
+  locked?: boolean;
+  locked_count?: number;
   date: string;
   league: string;
   built_at: string;

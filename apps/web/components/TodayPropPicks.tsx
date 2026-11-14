@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LockedCall } from "@/components/LockedCall";
 import type { PropPick, PropPickCard } from "@/lib/api";
 import { kickoffParts } from "@/lib/format";
 
@@ -34,11 +35,8 @@ export function TodayPropPicks({
     setCard(null);
     setError(null);
     const params = new URLSearchParams({ league, date });
-    fetch(`/api/backend/v1/props/picks?${params}`, { signal: ctrl.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`picks ${res.status}`);
-        return (await res.json()) as PropPickCard;
-      })
+    import("@/lib/browserApi")
+      .then(({ browserGet }) => browserGet<PropPickCard>(`/v1/props/picks?${params}`, ctrl.signal))
       .then((data) => {
         if (!ctrl.signal.aborted) setCard(data);
       })
@@ -57,12 +55,21 @@ export function TodayPropPicks({
   if (!card) return <p className="text-sm text-mute">Choosing the prop calls.</p>;
 
   const picks = card.picks.filter((pick) => (!gameId || pick.game_id === gameId) && (!market || pick.market_id === market));
+  const openPicks = picks.filter((pick) => !pick.locked);
+  if (picks.length > 0 && openPicks.length === 0) {
+    return (
+      <LockedCall
+        title="Prop calls are locked"
+        detail="They open at kickoff. Subscribers see them now — $19.99 a month."
+      />
+    );
+  }
   if (picks.length === 0) {
     return <p className="text-sm text-mute">No prop call for this slate.</p>;
   }
 
   const groups = new Map<string, PropPick[]>();
-  for (const pick of picks) {
+  for (const pick of openPicks) {
     const list = groups.get(pick.game_id) ?? [];
     list.push(pick);
     groups.set(pick.game_id, list);
@@ -70,6 +77,12 @@ export function TodayPropPicks({
 
   return (
     <div className="space-y-3">
+      {picks.some((pick) => pick.locked) ? (
+        <LockedCall
+          title="Some prop calls are still locked"
+          detail="Finished games stay visible. Games that have not kicked off open with a subscription."
+        />
+      ) : null}
       {[...groups.entries()].map(([id, rows]) => {
         const first = rows[0];
         const when = first.kickoff_utc ? kickoffParts(first.kickoff_utc) : null;
