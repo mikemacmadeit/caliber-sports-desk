@@ -51,9 +51,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     rememberNavigation(search ? `${pathname}?${search}` : pathname);
   }
 
+  // Main nav always opens "today". The day strip is what moves you to another date.
   function hrefFor(href: string) {
-    if (!date) return href;
-    return `${href}?date=${date}`;
+    void date;
+    return href;
   }
 
   return (

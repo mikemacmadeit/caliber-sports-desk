@@ -28,15 +28,10 @@ export default async function TodayPage({
   } catch (e) {
     error = e instanceof Error ? e.message : "API unavailable";
   }
-  const todayEarly = days?.today ?? "";
-  const fallbackEarly = days
-    ? days.dates.includes(days.today)
-      ? days.today
-      : (days.dates[0] ?? days.today)
-    : new Date().toISOString().slice(0, 10);
-  const selectedEarly = dateParam || fallbackEarly;
+  const todayEarly = days?.today ?? new Date().toISOString().slice(0, 10);
+  // Always open on today unless the URL asks for another day.
+  const selectedEarly = dateParam || todayEarly;
   try {
-    // If today is dark, land on the next day that actually has games.
     const [slate, board, picks, tickets] = await Promise.all([
       apiGet<SlateResponse>(`/v1/slate?league=${league}&date=${selectedEarly}`, 20000),
       apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff`, 15000).catch(() => ({
@@ -54,7 +49,7 @@ export default async function TodayPage({
     error = error || (e instanceof Error ? e.message : "API unavailable");
   }
   const today = days?.today ?? todayEarly;
-  const selected = dateParam || selectedEarly;
+  const selected = dateParam || today;
   const next = days?.dates.find((d) => d > selected) ?? null;
   const visible = [...(data?.games ?? [])].sort(byKick);
   const openCalls = calls.filter((row) => row.game_status !== "final");
