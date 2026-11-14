@@ -105,6 +105,7 @@ def warm_and_publish(db):
     from app.queries import games_for_slate, kickoff_day, list_props
     from spe.props.board_cache import write_entry, WARM_MARKETS
     from spe.publishing.ledger import publish
+    from spe.shadow.desk_ledger import freeze_desk_rows
 
     games = games_for_slate(db, None, "all")
     horizon = datetime.now(UTC) + timedelta(hours=48)
@@ -112,6 +113,7 @@ def warm_and_publish(db):
     published = 0
     for date in dates:
         all_rows = list_props(db, None, None, None, "all", date)
+        freeze_desk_rows(db, all_rows)
         for market in WARM_MARKETS:
             rows = [r for r in all_rows if r["market_id"] == market]
             for league in ("all", "nfl", "fbs"):

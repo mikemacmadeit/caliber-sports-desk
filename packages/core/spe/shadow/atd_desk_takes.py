@@ -16,8 +16,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, attributes
 
-from spe.config import settings
-from spe.db.base import as_utc, new_id, utcnow
+from spe.db.base import as_utc, new_id
 from spe.db.models import Game, ShadowPrediction, ShadowSettlement
 from spe.market.odds import american_to_implied, ev_per_dollar
 
@@ -116,7 +115,7 @@ def desk_pick_score(row: dict[str, Any]) -> dict[str, float]:
         "avail": avail,
         "total": float(total),
         "p": p,
-        "ev_after_haircut": float(ev_hc) if ev_hc is not None else float("nan"),
+        "ev_after_haircut": float(ev_hc) if ev_hc is not None else None,
     }
 
 
@@ -129,12 +128,18 @@ def _eligible(row: dict[str, Any], *, haircut: float) -> bool:
     del haircut  # reserved for callers / future floor knobs
     forecast = row.get("forecast") or {}
     status = str(forecast.get("availability_status") or "").lower()
-    if status in {"out", "doubtful"}:
+    if status in {"out", "doubtful", "confirmed_inactive", "inactive", "suspended", "questionable", "uncertain"}:
+        return False
+    analysis = row.get("desk_analysis")
+    if analysis is not None and not analysis.get("eligible"):
         return False
     if forecast.get("p_estimate") is None:
         return False
-    p = float(forecast.get("p_estimate") or 0.0)
-    if p <= 0.0:
+    try:
+        p = float(forecast.get("p_estimate") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    if not math.isfinite(p) or not SCORE_CHANCE_FLOOR <= p <= 1:
         return False
     # Prefer a posted number; allow research-only rows with a real chance.
     if row.get("book_price") is None and p < 0.22:
@@ -175,7 +180,7 @@ def select_desk_takes(
             continue
         parts = desk_pick_score(row)
         prior = best.get(gid)
-        if prior is None or chance > prior[0]:
+        if prior is None or (chance, str(row.get("player_id"))) > (prior[0], str(prior[1].get("player_id"))):
             best[gid] = (chance, row, parts)
 
     out: list[dict[str, Any]] = []
@@ -195,142 +200,17 @@ def capture_atd_desk_takes(
     now: datetime | None = None,
     haircut: float | None = None,
 ) -> dict[str, Any]:
-    """Mark pre-kickoff shadow rows for the current one-per-game desk picks.
+    """Capture the current Desk decision without rewriting previous calls."""
+    from spe.shadow.desk_ledger import freeze_desk_rows
 
-    Mutates components.desk_take only. Settled takes keep their flag.
-    """
     moment = as_utc(now) or datetime.now(UTC)
-    threshold = float(haircut if haircut is not None else settings.min_ev_after_haircut or VALUE_HAIRCUT)
     props = list_anytime_prop_rows(session, league=league)
-    takes = select_desk_takes(props, haircut=threshold)
-
-    prefer_prefix = (
-        "blend_v1_c_recent-",
-        "m5_c_recent-",
-        "player_td_v1-",
-        "m3-",
-    )
-
-    open_preds = session.query(ShadowPrediction).filter(ShadowPrediction.market_id == "anytime_td").all()
-    games = {
-        g.game_id: g
-        for g in session.query(Game).filter(Game.game_id.in_({p.game_id for p in open_preds} or {"__none__"})).all()
-    }
-    settled_ids = {
-        s.shadow_id
-        for s in session.query(ShadowSettlement.shadow_id).filter(
-            ShadowSettlement.shadow_id.in_([p.shadow_id for p in open_preds] or ["__none__"])
-        )
-    }
-
-    cleared = 0
-    for pred in open_preds:
-        comps = dict(pred.components or {})
-        if comps.get("desk_take") not in {DESK_TAKE_KIND, "at_this_price"}:
-            continue
-        if pred.shadow_id in settled_ids:
-            continue
-        game = games.get(pred.game_id)
-        status = (game.status if game else "") or ""
-        if status in {"final", "cancelled", "canceled", "postponed"}:
-            continue
-        for key in ("desk_take", "desk_take_at", "desk_take_kind", "desk_take_ev_after_haircut", "desk_pick_score", "desk_pick_parts"):
-            comps.pop(key, None)
-        pred.components = comps
-        attributes.flag_modified(pred, "components")
-        cleared += 1
-
-    by_gp: dict[tuple[str, str], ShadowPrediction] = {}
-    for pred in open_preds:
-        if pred.shadow_id in settled_ids:
-            continue
-        game = games.get(pred.game_id)
-        if game is None:
-            continue
-        kick = as_utc(game.kickoff_utc)
-        if kick is not None and kick <= moment:
-            continue
-        if (game.status or "") not in {"scheduled", "preview", "pregame"}:
-            continue
-        key = (pred.game_id, pred.player_id)
-        mv = pred.model_version_id or ""
-        rank = next((i for i, pref in enumerate(prefer_prefix) if mv.startswith(pref)), 99)
-        prior = by_gp.get(key)
-        if prior is None:
-            by_gp[key] = pred
-            continue
-        prior_rank = next(
-            (i for i, pref in enumerate(prefer_prefix) if (prior.model_version_id or "").startswith(pref)),
-            99,
-        )
-        if rank < prior_rank:
-            by_gp[key] = pred
-
-    marked = 0
-    missing_shadow = 0
-    open_take_rows: list[dict[str, Any]] = []
-    for row in takes:
-        gid = str(row["game_id"])
-        pid = str(row.get("player_id") or "")
-        pred = by_gp.get((gid, pid))
-        parts = row.get("desk_pick_parts") or desk_pick_score(row)
-        edge = (row.get("forecast") or {}).get("ev_after_haircut")
-        open_take_rows.append(
-            {
-                "game_id": gid,
-                "player_id": pid,
-                "player_name": row.get("player_name"),
-                "league_id": row.get("league_id"),
-                "team": row.get("team"),
-                "opponent": row.get("opponent"),
-                "kickoff_utc": row.get("kickoff_utc"),
-                "book_price": row.get("book_price"),
-                "p": (row.get("forecast") or {}).get("p_estimate"),
-                "ev_after_haircut": edge,
-                "desk_pick_score": parts.get("total"),
-                "desk_pick_parts": parts,
-                "shadow_id": None if pred is None else pred.shadow_id,
-                "model_version_id": None if pred is None else pred.model_version_id,
-            }
-        )
-        if pred is None:
-            missing_shadow += 1
-            continue
-        comps = dict(pred.components or {})
-        comps["desk_take"] = DESK_TAKE_KIND
-        comps["desk_take_kind"] = DESK_TAKE_KIND
-        comps["desk_take_at"] = moment.isoformat()
-        comps["desk_take_ev_after_haircut"] = None if edge is None else float(edge)
-        comps["desk_pick_score"] = float(parts.get("total") or 0)
-        comps["desk_pick_parts"] = {
-            k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in parts.items()
-        }
-        comps["desk_take_id"] = comps.get("desk_take_id") or new_id()
-        pred.components = comps
-        attributes.flag_modified(pred, "components")
-        marked += 1
-
-    return {
-        "status": "ok",
-        "play_enabled": False,
-        "validated_play": False,
-        "research_only": True,
-        "selection": "highest_chance_to_score",
-        "weights": {"chance": W_CHANCE, "edge": W_EDGE, "fresh": W_FRESH, "avail": W_AVAIL},
-        "haircut": threshold,
-        "prop_rows_scanned": len(props),
-        "takes_selected": len(takes),
-        "games_with_takes": len({r["game_id"] for r in open_take_rows}),
-        "shadow_marked": marked,
-        "shadow_cleared": cleared,
-        "missing_shadow_for_take": missing_shadow,
-        "open_takes": open_take_rows,
-        "captured_at": utcnow().isoformat(),
-        "note": (
-            "One Anytime TD desk pick per game: the player most likely to score tonight. "
-            "Official Play stays off."
-        ),
-    }
+    takes = select_desk_takes(props)
+    saved = freeze_desk_rows(session, props, now=moment)
+    return {"status": "ok", "research_only": True, "play_enabled": False,
+            "validated_play": False, "selection": "opportunity_probability_with_role_checks",
+            "prop_rows_scanned": len(props), "takes_selected": len(takes),
+            "decisions_appended": saved, "captured_at": moment.isoformat()}
 
 
 def frozen_desk_row(pred: ShadowPrediction) -> dict[str, Any] | None:
@@ -488,6 +368,9 @@ def assign_unsettled_board_call(
     A settled take stays put. The call time has to be before kickoff.
     """
     game = session.get(Game, game_id)
+    from spe.shadow.desk_ledger import latest_decisions
+    if game_id in latest_decisions(session, [game_id]):
+        return {"status": "recorded_desk_decision_is_immutable"}
     if game is None:
         return {"status": "missing_game"}
     kick = as_utc(game.kickoff_utc)

@@ -73,6 +73,7 @@ def assess(row: dict, now: datetime | None = None) -> dict:
     }:
         reasons.append("availability_unconfirmed")
     blocked = {
+        "DESK_EXPERIMENTAL",
         "IDENTITY_CONFLICT",
         "SOURCE_STALE",
         "INJURY_COVERAGE_INCOMPLETE",

@@ -945,6 +945,16 @@ class BoardSnapshot(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class DeskDecision(Base):
+    """Append-only pregame Desk decisions, including explicit passes. Never a cache."""
+    __tablename__ = "desk_decisions"
+    decision_id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.game_id"), nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    __table_args__ = (Index("ix_desk_game_time", "game_id", "decided_at"),)
+
+
 class PublishedPick(Base):
     """First qualifying selection per game/market. Never updated after publication."""
     __tablename__ = "published_picks"

@@ -62,10 +62,11 @@ export function deskPickScore(row: PropRow): number {
 
 function eligible(row: PropRow, _haircut = VALUE_HAIRCUT): boolean {
   const status = (row.forecast.availability_status || "").toLowerCase();
-  if (status === "out" || status === "doubtful") return false;
+  if (["out", "doubtful", "inactive", "confirmed_inactive", "suspended", "questionable", "uncertain"].includes(status)) return false;
+  if (row.desk_analysis && !row.desk_analysis.eligible) return false;
   if (row.forecast.p_estimate == null) return false;
   const p = row.forecast.p_estimate ?? 0;
-  if (p <= 0) return false;
+  if (!Number.isFinite(p) || p < SCORE_CHANCE_FLOOR || p > 1) return false;
   // Freshness/edge are score factors, not vetoes. Research-only rows need a floor.
   if (row.book_price == null && p < 0.22) return false;
   return true;
@@ -80,13 +81,17 @@ export function beatsThePrice(row: PropRow): boolean {
 
 /** One scorer per game: the highest chance he scores tonight. Price is not a veto. */
 export function selectDeskTakes(rows: PropRow[], haircut = VALUE_HAIRCUT): PropRow[] {
+  if (rows.some(row => row.desk_selected !== undefined)) {
+    return rows.filter(row => row.desk_selected && (row.locked || eligible(row, haircut)))
+      .sort((a, b) => b.forecast.p_estimate - a.forecast.p_estimate);
+  }
   const best = new Map<string, { chance: number; row: PropRow }>();
   for (const row of rows) {
     if (!eligible(row, haircut)) continue;
     const chance = row.forecast.p_estimate ?? 0;
     if (chance < 0.05) continue;
     const prior = best.get(row.game_id);
-    if (!prior || chance > prior.chance) best.set(row.game_id, { chance, row });
+    if (!prior || chance > prior.chance || (chance === prior.chance && String(row.player_id) > String(prior.row.player_id))) best.set(row.game_id, { chance, row });
   }
   return [...best.values()]
     .sort((a, b) => b.chance - a.chance || a.row.player_name.localeCompare(b.row.player_name))
@@ -94,11 +99,13 @@ export function selectDeskTakes(rows: PropRow[], haircut = VALUE_HAIRCUT): PropR
 }
 
 export function deskPickReason(row: PropRow): string {
+  if (row.desk_analysis) return row.desk_analysis.reasons.join(" ");
   const summary = row.forecast.tonight?.summary;
   if (summary) return summary;
   const chance = row.forecast.p_estimate;
   const price = row.book_price;
-  if (chance == null || price == null) return "No posted price, so this player is not a pick.";
+  if (chance == null) return "No scoring estimate available.";
+  if (price == null) return "Scoring estimate only; no current sportsbook price is available.";
   const implied = americanToImplied(price);
   const gap = Math.round((chance - implied) * 100);
   const priceText = price > 0 ? `+${price}` : String(price);

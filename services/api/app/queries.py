@@ -470,7 +470,8 @@ def prop_row(
     away = session.get(Team, game.away_team_id)
     opp = None
     if team and home and away:
-        opp = away if team.team_id == home.team_id else home
+        from spe.integrity.assignments import linked_team_ids
+        opp = away if team.team_id in linked_team_ids(home) else home
     forecast = latest_forecast(session, outcome.outcome_id)
     tick = latest_tick(session, outcome.outcome_id)
     if not forecast:
@@ -485,53 +486,19 @@ def prop_row(
     if game.league_id == "fbs" and outcome.market_id == "anytime_td":
         from spe.research.fbs_atd_props_overlay import apply_fbs_atd_research_overlay
 
-        payload = apply_fbs_atd_research_overlay(
+        overlaid = apply_fbs_atd_research_overlay(
             payload,
             game_id=game.game_id,
             player_id=outcome.player_id,
             league_id=game.league_id,
             market_id=outcome.market_id,
         )
-        if payload is None:
-            return None
-    if game.league_id == "nfl" and outcome.market_id == "anytime_td":
-        from spe.models.player_td.current_role import apply_current_role, load_current_role_tables
-        from spe.models.player_td.tonight import apply_tonight_chance, tables_ready
-
-        weather = _game_weather(session, game)
-        started = kick is not None and kick <= datetime.now(UTC)
-        through_week = (game.week - 1) if started and game.week else None
-        if tables_ready():
-            payload = apply_tonight_chance(
-                payload,
-                player_name=player.name if player else None,
-                team_abbr=team.abbreviation if team else None,
-                position=player.position_group if player else None,
-                opponent=opp.abbreviation if opp else None,
-                weather=weather,
-                availability=payload.get("availability_status"),
-                through_week=through_week,
-            )
+        if overlaid is None:
+            # Build the identity/price row for the new DB-backed research scorer.
+            # If scoring fails it remains ineligible and its old clone is hidden.
+            payload["desk_requires_opportunity_score"] = True
         else:
-            depth, touches, defense = load_current_role_tables()
-            payload = apply_current_role(
-                payload,
-                player_name=player.name if player else None,
-                team_abbr=team.abbreviation if team else None,
-                position=player.position_group if player else None,
-                depth=depth,
-                touches=touches,
-                defense=defense,
-                weather=weather,
-                opponent=opp.abbreviation if opp else None,
-            )
-        price = payload.get("book_price")
-        chance = payload.get("p_estimate")
-        if price is not None and isinstance(chance, (int, float)):
-            payload["ev"] = ev_per_dollar(float(chance), int(price))
-            interval = payload.get("confidence_interval") or (chance, chance)
-            width = float(interval[1]) - float(interval[0])
-            payload["ev_after_haircut"] = payload["ev"] - 0.5 * width * american_hold_factor(int(price))
+            payload = overlaid
     if outcome.player_id and (game.game_id, outcome.player_id) in (ruled_out or set()):
         _mark_ruled_out(payload)
     freshness = payload.get("price_freshness") or {}
@@ -544,6 +511,8 @@ def prop_row(
         "player_name": player.name if player else "Team",
         "position": player.position_group if player else None,
         "team": team.abbreviation if team else "?",
+        "team_id": team.team_id if team else None,
+        "opponent_id": opp.team_id if opp else None,
         "team_mark": _team_mark(team) if team else None,
         "opponent": (opp.abbreviation if opp else "?"),
         "away_abbr": away.abbreviation if away else "?",
@@ -554,6 +523,7 @@ def prop_row(
         "side": outcome.side,
         "line": outcome.line,
         "bookmaker": book.name if book else None,
+        "bookmaker_id": book.bookmaker_id if book else None,
         "book_price": tick.price_american if tick else None,
         "source_timestamp": tick.source_at if tick else None,
         "price_freshness": freshness,
@@ -663,6 +633,10 @@ def list_props(
             rows.append(row)
     rows = without_duplicate_props(rows)
     _attach_td_usage(session, rows)
+    from spe.models.player_td.desk_live import enrich_desk_rows
+    enrich_desk_rows(session, rows)
+    rows = [r for r in rows if not r["forecast"].get("desk_requires_opportunity_score")
+            or (r.get("desk_analysis") or {}).get("candidate_probability") is not None]
     rows.sort(
         key=lambda r: (
             r["forecast"].get("ev") is None,
@@ -683,8 +657,6 @@ def list_called_scorers(
     using only weeks before that game so the result cannot change the name.
     """
     from datetime import timedelta
-
-    from spe.shadow.atd_desk_takes import select_desk_takes
 
     day = date or slate_today()
     days = {day}
@@ -711,49 +683,27 @@ def list_called_scorers(
     ]
     if not games:
         return []
-    game_ids = [game.game_id for game in games]
-    outcomes = list(
-        session.scalars(
-            select(Outcome).where(Outcome.game_id.in_(game_ids), Outcome.market_id == "anytime_td")
-        )
-    )
-    roster_cache: dict[str, dict[str, Any]] = {}
-    rows: list[dict[str, Any]] = []
-    for outcome in outcomes:
-        if outcome.game_id not in roster_cache:
-            game = session.get(Game, outcome.game_id)
-            roster_cache[outcome.game_id] = eligible_roster_index(session, game) if game else {}
-        row = prop_row(
-            session,
-            outcome,
-            roster_index=roster_cache[outcome.game_id],
-            include_started=True,
-        )
-        if row:
-            rows.append(row)
-    called = select_desk_takes(rows)
-    by_game = {game.game_id: game for game in games}
-    for row in called:
-        game = by_game.get(row.get("game_id"))
-        chance = (row.get("forecast") or {}).get("p_estimate")
-        tonight = (row.get("forecast") or {}).get("tonight") or {}
-        summary = str(tonight.get("summary") or "")
-        if isinstance(chance, (int, float)):
-            shown = f"{round(float(chance) * 100)}% to score tonight."
-            called_at = f"Called at {round(float(chance) * 100)}% before kickoff."
-            summary = summary.replace(shown, called_at)
-            if tonight:
-                tonight = dict(tonight)
-                tonight["summary"] = summary
-                row["forecast"] = dict(row["forecast"])
-                row["forecast"]["tonight"] = tonight
-        row["game_status"] = game.status if game else None
-        row["final_score"] = _final_score(game) if game else None
-        row["result"] = _anytime_result(
-            session, str(row.get("game_id") or ""), row.get("player_id")
-        )
-    called.sort(key=lambda row: str(row.get("kickoff_utc") or ""))
-    return called
+    # Read the actual recorded pregame choice. Never recompute yesterday's pick.
+    from spe.shadow.desk_ledger import latest_decisions
+
+    called = []
+    decisions = latest_decisions(session, [g.game_id for g in games])
+    for game in games:
+        saved = decisions.get(game.game_id)
+        payload = saved.payload if saved else {}
+        frozen = payload.get("row")
+        at = as_utc(payload.get("called_at"))
+        if not frozen or not at or at >= as_utc(game.kickoff_utc):
+            continue
+        row = dict(frozen)
+        row["desk_selected"] = True
+        row["locked"] = True
+        row["called_at"] = at.isoformat()
+        row["game_status"] = game.status
+        row["final_score"] = _final_score(game)
+        row["result"] = _anytime_result(session, game.game_id, row.get("player_id")) if game.status == "final" else "pending"
+        called.append(row)
+    return sorted(called, key=lambda row: str(row.get("kickoff_utc") or ""))
 
 
 def _final_score(game: Game) -> str | None:

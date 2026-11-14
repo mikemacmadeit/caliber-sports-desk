@@ -231,6 +231,12 @@ export type ResearchDetail = ResearchSummary & {
 
 export type Qualification = { eligible: boolean; reasons: string[]; verified_at: string | null; valid_until: string | null; minimum_american_odds: number | null };
 export type PropRow = {
+  desk_selected?: boolean;
+  desk_analysis?: {
+    version: string; as_of: string; eligible: boolean; blockers: string[];
+    candidate_status: string; candidate_probability: number | null;
+    reasons: string[]; risks: string[];
+  };
   qualification?: Qualification;
   published_pick_id?: string | null;
   locked?: boolean;
@@ -265,6 +271,7 @@ export type PropRow = {
   forecast: Forecast;
   usage?: {
     carries?: number | null;
+    receptions?: number | null;
     targets?: number | null;
     rz_targets?: number | null;
     gl_carries?: number | null;

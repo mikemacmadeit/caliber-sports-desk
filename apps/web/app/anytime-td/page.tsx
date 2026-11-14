@@ -69,7 +69,7 @@ export default async function AnytimeTdPage({
       <PageHeader
         kicker={days && selected === days.today ? `Today · ${dayParts(selected).monthDay}` : dayParts(selected).monthDay}
         title="Anytime TD"
-        lede="One player in each game — the one most likely to score a touchdown. The percentage is a chance, not a promise."
+        lede="Touchdown picks built around workload, scoring opportunities, and matchups. One player when the evidence supports a choice; a pass when it does not."
         accent="flare"
         action={
           <LeagueToggle

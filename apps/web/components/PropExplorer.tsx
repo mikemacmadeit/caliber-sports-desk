@@ -38,12 +38,16 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
     }).sort((a, b) => compareRows(a, b, sort, dir));
   }, [rows, query, gameId, team, position, sort, dir]);
 
-  const plays = selectDeskTakes(visible);
+  const visibleIds = new Set(visible.map(row => row.outcome_id));
+  // Filtering must never manufacture a different official Desk selection.
+  const allPlays = selectDeskTakes(rows);
+  const plays = allPlays.filter(row => visibleIds.has(row.outcome_id));
   const priced = valueAtPrice(visible);
   const picked = new Set(plays.map((row) => row.outcome_id));
   const abstain = visible.filter((row) => !picked.has(row.outcome_id));
-  const pickedGames = new Set(plays.map((row) => row.game_id));
-  const noPickGames = games.filter((game) => !pickedGames.has(game.id));
+  const pickedGames = new Set(allPlays.map((row) => row.game_id));
+  const visibleGames = new Set(visible.map(row => row.game_id));
+  const noPickGames = games.filter((game) => visibleGames.has(game.id) && !pickedGames.has(game.id));
 
   const toolbar = (
     <div className="space-y-3">
@@ -166,9 +170,9 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
       {mode === "calls" && visible.length > 0 ? (
         <>
           {toolbar}
-          <Section title="Most likely to score" count={plays.length} accent="flare" />
+          <Section title="Desk TD picks" count={plays.length} accent="flare" />
           <p className="max-w-xl text-sm text-mute">
-            One name per game. The percentage is how often we expect a touchdown — not a promise, and not a bet.
+            At most one player per game, using recent workload, scoring-area opportunities, and the opponent. Experimental estimates; games with weak evidence are passed.
           </p>
           {plays.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-2">
@@ -177,7 +181,7 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
               ))}
             </div>
           ) : (
-            <p className="plate px-5 py-6 text-sm text-mute">No research projection matches these filters.</p>
+            <p className="plate px-5 py-6 text-sm text-mute">No Desk pick matches these filters. Filtering does not change the chosen player.</p>
           )}
           {noPickGames.length > 0 ? (
             <div className="space-y-2">
@@ -342,6 +346,11 @@ function ScorerCard({ row }: { row: PropRow }) {
         {row.position ? ` · ${row.position}` : ""}
       </p>
       <p className="mt-3 text-sm leading-relaxed text-paper/80">{deskPickReason(row)}</p>
+      {row.desk_analysis ? <div className="mt-3 border-t border-white/10 pt-3 text-xs leading-relaxed text-mute">
+        <p className="font-mono uppercase tracking-wide">What could change this pick</p>
+        {row.desk_analysis.risks.map(risk => <p key={risk} className="mt-1">{risk}</p>)}
+        <p className="mt-2">New research model · live accuracy is still being measured.</p>
+      </div> : null}
       <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-mute">
         {price ? `Pays ${price}` : "Odds not posted yet"}
       </p>
