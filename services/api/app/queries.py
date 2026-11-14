@@ -238,6 +238,8 @@ def slate_game(session: Session, game: Game, freshness: datetime | None) -> dict
 
 
 def latest_forecast(session: Session, outcome_id: str) -> Forecast | None:
+    if "board_batch" in session.info:
+        return session.info["board_batch"]["forecasts"].get(outcome_id)
     rows = (
         session.query(Forecast)
         .filter(Forecast.outcome_id == outcome_id, Forecast.is_official.is_(True))
@@ -252,6 +254,16 @@ def latest_forecast(session: Session, outcome_id: str) -> Forecast | None:
 
 
 def latest_tick(session: Session, outcome_id: str) -> OddsTick | None:
+    if "board_batch" in session.info:
+        from spe.market.odds import american_to_decimal
+        quotes = [q for q in session.info["board_batch"]["quotes"].get(outcome_id, []) if not q.is_live and abs(q.price_american) >= 100]
+        outcome = session.get(Outcome, outcome_id)
+        game = session.get(Game, outcome.game_id) if outcome else None
+        return max(quotes, key=lambda t: (
+            bool(price_freshness(t, kickoff=game.kickoff_utc if game else None)["is_current_opportunity"]) and not t.is_live,
+            american_to_decimal(t.price_american) if abs(t.price_american) >= 100 else 0,
+            as_utc(t.captured_at),
+        ), default=None)
     return (
         session.query(OddsTick)
         .filter(OddsTick.outcome_id == outcome_id)
@@ -299,7 +311,7 @@ def price_freshness(
     # the bookmaker price changed since the prior tick.
     age = None if observed is None else (now - observed).total_seconds() / 60.0
     provider_age = None if provider_ts is None else (now - provider_ts).total_seconds() / 60.0
-    stale = age is None or age > max_age
+    stale = age is None or age < 0 or age > max_age or tick.is_live
     quality = str(getattr(tick, "quality_status", None) or "ok")
     if quality in {"failed", "budget_blocked", "skipped", "unverified"}:
         stale = True
@@ -323,7 +335,7 @@ def price_freshness(
 
 
 def forecast_payload(session: Session, forecast: Forecast, tick: OddsTick | None) -> dict[str, Any]:
-    rec = (
+    rec = session.info["board_batch"]["recommendations"].get(forecast.forecast_id) if "board_batch" in session.info else (
         session.query(Recommendation)
         .filter(Recommendation.forecast_id == forecast.forecast_id)
         .order_by(Recommendation.created_at.desc())
@@ -545,6 +557,13 @@ def prop_row(
         "book_price": tick.price_american if tick else None,
         "source_timestamp": tick.source_at if tick else None,
         "price_freshness": freshness,
+        "offers": [
+            {"bookmaker": session.get(Bookmaker, q.bookmaker_id).name,
+             "book_price": q.price_american, "source_timestamp": q.source_at,
+             "price_freshness": price_freshness(q, kickoff=game.kickoff_utc)}
+            for q in session.info.get("board_batch", {}).get("quotes", {}).get(outcome.outcome_id, [])
+            if not q.is_live and abs(q.price_american) >= 100 and session.get(Bookmaker, q.bookmaker_id)
+        ],
         "forecast": payload,
         "best_available": bool(freshness.get("is_current_opportunity")),
         "data_tier": forecast.data_tier if forecast.data_tier == "research" else game.data_tier,
@@ -573,8 +592,12 @@ def _research_summary(session: Session, game_id: str):
 
 
 def _research_signal(session: Session, game_id: str, player_id: str | None, market_id: str):
-    from spe.intelligence.present import signal_for
-
+    from spe.intelligence.present import signal_for, MARKET_METRIC, _opportunity, _signal
+    batch = session.info.get("board_batch")
+    if batch is not None:
+        opportunity = batch["opportunities"].get((game_id, player_id, market_id))
+        signal = batch["signals"].get((game_id, player_id, MARKET_METRIC.get(market_id)))
+        return _opportunity(opportunity) if opportunity else (_signal(signal) if signal else None)
     return signal_for(session, game_id, player_id, market_id)
 
 
@@ -588,7 +611,11 @@ def list_props(
 ) -> list[dict[str, Any]]:
     from datetime import timedelta
 
-    stmt = select(Outcome).join(Game, Game.game_id == Outcome.game_id)
+    stmt = select(Outcome).join(Game, Game.game_id == Outcome.game_id).where(
+        Game.kickoff_utc > datetime.now(UTC),
+        Game.status.in_(("scheduled", "pre", "upcoming")),
+        Game.data_tier.notin_(("demo", "alias", "historical", "season")),
+    )
     if market:
         stmt = stmt.where(Outcome.market_id == market)
     if league and league not in {"all", ""}:
@@ -610,28 +637,30 @@ def list_props(
     unavailable = ruled_out_keys(session, [outcome.game_id for outcome in outcomes])
     rows: list[dict[str, Any]] = []
     roster_cache: dict[str, dict[str, Any]] = {}
-    for outcome in outcomes:
-        game_id = outcome.game_id
-        if game_id not in roster_cache:
-            game = session.get(Game, game_id)
-            roster_cache[game_id] = eligible_roster_index(session, game) if game else {}
-        row = prop_row(
-            session,
-            outcome,
-            roster_index=roster_cache[game_id],
-            stat_logs=stat_logs,
-            ruled_out=unavailable,
-        )
-        if not row:
-            continue
-        if date and kickoff_day(row["kickoff_utc"]) != date:
-            continue
-        if min_odds is not None and (row["book_price"] is None or row["book_price"] < min_odds):
-            continue
-        ev = row["forecast"].get("ev")
-        if min_ev is not None and (ev is None or ev < min_ev):
-            continue
-        rows.append(row)
+    from app.board_batch import board_batch
+    with board_batch(session, outcomes):
+        for outcome in outcomes:
+            game_id = outcome.game_id
+            if game_id not in roster_cache:
+                game = session.get(Game, game_id)
+                roster_cache[game_id] = eligible_roster_index(session, game) if game else {}
+            row = prop_row(
+                session,
+                outcome,
+                roster_index=roster_cache[game_id],
+                stat_logs=stat_logs,
+                ruled_out=unavailable,
+            )
+            if not row:
+                continue
+            if date and kickoff_day(row["kickoff_utc"]) != date:
+                continue
+            if min_odds is not None and (row["book_price"] is None or row["book_price"] < min_odds):
+                continue
+            ev = row["forecast"].get("ev")
+            if min_ev is not None and (ev is None or ev < min_ev):
+                continue
+            rows.append(row)
     rows = without_duplicate_props(rows)
     _attach_td_usage(session, rows)
     rows.sort(
@@ -771,31 +800,19 @@ def _attach_td_usage(session: Session, rows: list[dict[str, Any]]) -> None:
     grouped: dict[str, list] = {}
     for item in raw:
         grouped.setdefault(item["player_id"], []).append(item)
-    usage: dict[str, dict[str, float | int | None]] = {}
-    for player_id, games in grouped.items():
-        games.sort(key=lambda item: item["kickoff_utc"] or "", reverse=True)
-        recent = games[:6]
-        count = len(recent)
-
-        def avg(key: str) -> float | None:
-            if count == 0:
-                return None
-            total = sum(float(item[key] or 0) for item in recent)
-            if total <= 0:
-                return None
-            return total / count
-
-        usage[player_id] = {
-            "games": count,
-            "carries": avg("carries"),
-            "targets": avg("targets"),
-            "rz_targets": avg("rz_targets"),
-            "gl_carries": avg("gl_carries"),
-        }
     for row in rows:
-        player_id = row.get("player_id")
-        if row.get("market_id") == "anytime_td" and player_id in usage:
-            row["usage"] = usage[player_id]
+        if row.get("market_id") != "anytime_td":
+            continue
+        kick = as_utc(row.get("kickoff_utc"))
+        games = [g for g in grouped.get(row.get("player_id"), []) if kick and as_utc(g["kickoff_utc"]) and as_utc(g["kickoff_utc"]) < kick]
+        games.sort(key=lambda g: as_utc(g["kickoff_utc"]), reverse=True)
+        recent = games[:6]
+        if not recent:
+            continue
+        row["usage"] = {"games": len(recent)}
+        for key in ("carries", "targets", "rz_targets", "gl_carries"):
+            known = [float(item[key]) for item in recent if item[key] is not None]
+            row["usage"][key] = sum(known) / len(known) if known else None
 
 
 def without_duplicate_props(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

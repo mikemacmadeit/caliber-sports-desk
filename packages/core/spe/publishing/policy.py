@@ -111,17 +111,19 @@ def assess(row: dict, now: datetime | None = None) -> dict:
                 if minimum_decimal >= 2
                 else math.ceil(-100 / (minimum_decimal - 1))
             )
+    # A far-out quote must expire when the stricter two-hour window starts.
+    expiry = min(kick, observed + timedelta(minutes=max_fresh_minutes(kick, now))) if kick and observed else None
+    if expiry and kick - now > timedelta(hours=2):
+        near_boundary = kick - timedelta(hours=2)
+        if observed + timedelta(minutes=settings.odds_near_fresh_minutes) <= near_boundary:
+            expiry = min(expiry, near_boundary)
     return {
         "eligible": not reasons,
         "reasons": reasons,
         "policy_version": VERSION,
         "verified_at": observed.isoformat() if observed else None,
         "age_minutes": age,
-        "valid_until": min(
-            kick, observed + timedelta(minutes=max_fresh_minutes(kick, now))
-        ).isoformat()
-        if kick and observed
-        else None,
+        "valid_until": expiry.isoformat() if expiry else None,
         "minimum_american_odds": threshold,
         "research_only": True,
         "play_enabled": False,

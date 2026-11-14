@@ -111,10 +111,9 @@ def warm_and_publish(db):
     dates = sorted({kickoff_day(g.kickoff_utc) for g in games if as_utc(g.kickoff_utc) <= horizon})
     published = 0
     for date in dates:
-        all_rows = []
+        all_rows = list_props(db, None, None, None, "all", date)
         for market in WARM_MARKETS:
-            rows = list_props(db, market, None, None, "all", date)
-            all_rows.extend(rows)
+            rows = [r for r in all_rows if r["market_id"] == market]
             for league in ("all", "nfl", "fbs"):
                 write_entry(
                     market,

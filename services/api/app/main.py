@@ -371,6 +371,51 @@ def published_history(league: str | None = None, market: str | None = None,
     return history(session, league, market, offset, limit)
 
 
+@app.get("/v1/desk")
+def today_desk(
+    league: str = Query("all", pattern="^(all|nfl|fbs)$"),
+    date: str | None = None,
+    book: str | None = Query(None, max_length=100),
+    market: str | None = Query(None, pattern="^(anytime_td|receptions|receiving_yards|rushing_yards)$"),
+    search: str | None = Query(None, max_length=100),
+    saved: str | None = Query(None, max_length=2500),
+    offset: int = Query(0, ge=0, le=10000), limit: int = Query(30, ge=1, le=60),
+    session: Session = Depends(db_session),
+):
+    from spe.db.models import BoardSnapshot
+    from spe.db.base import as_utc
+    from spe.publishing.desk import build
+    from spe.props.board_cache import WARM_MARKETS, entry_key
+    selected = date or slate_today()
+    try:
+        datetime.strptime(selected, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(422, "Use a date in YYYY-MM-DD format")
+    now = datetime.now(UTC)
+    keys = ["props:" + entry_key(m, league, selected) for m in WARM_MARKETS]
+    snapshots = session.query(BoardSnapshot).filter(BoardSnapshot.key.in_(keys)).all()
+    games = games_for_slate(session, selected, league)
+    game_index = {g.game_id: g for g in games}
+    rows = []
+    for snapshot in snapshots:
+        for row in snapshot.payload.get("rows", []):
+            game = game_index.get(row.get("game_id"))
+            if game is not None:
+                rows.append({**row, "game_status": game.status, "kickoff_utc": as_utc(game.kickoff_utc).isoformat()})
+    payload = build(rows, now=now, book=book, market=market, search=search,
+                    saved=set(saved.split(",")) if saved is not None else None, offset=offset, limit=limit)
+    updated = min((as_utc(s.updated_at) for s in snapshots), default=None)
+    missing = len(snapshots) < len(keys)
+    stale = bool(updated and (now - updated).total_seconds() > 900)
+    upcoming = [g for g in games if as_utc(g.kickoff_utc) > now and g.status in {"scheduled", "pre", "upcoming"}]
+    status = "warming" if missing and upcoming else ("delayed" if stale and upcoming else "ready")
+    return {**payload, "date": selected, "league": league, "status": status,
+            "checked_at": now.isoformat(), "updated_at": updated.isoformat() if updated else None,
+            "games": [{"id": g.game_id, "league": g.league_id, "matchup": f"{g.away_team.abbreviation} at {g.home_team.abbreviation}",
+                       "kickoff": as_utc(g.kickoff_utc).isoformat()} for g in upcoming],
+            "note": "Experimental research. Qualification checks data and price; it does not validate the model's predictive accuracy."}
+
+
 @app.get("/v1/operations/status")
 def operations_status(session: Session = Depends(db_session)) -> dict[str, Any]:
     from spe.publishing.pipeline import health

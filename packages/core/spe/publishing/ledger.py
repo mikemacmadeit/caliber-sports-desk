@@ -175,12 +175,20 @@ def history(db, league=None, market=None, offset=0, limit=100):
     groups = defaultdict(
         lambda: {"win": 0, "loss": 0, "push": 0, "void": 0, "pending": 0, "units": 0.0}
     )
+    accuracy = defaultdict(list)
+    daily = defaultdict(float)
     total = 0
     for pick, settled in query.yield_per(500):
         total += 1
         group = groups[(pick.league_id, pick.market_id)]
         group[settled.result if settled else "pending"] += 1
         group["units"] += settled.units if settled else 0
+        if settled:
+            daily[as_utc(settled.settled_at).date().isoformat()] += settled.units
+            from spe.publishing.policy import finite
+            probability = finite(pick.snapshot.get("p"))
+            if settled.result in {"win", "loss"} and probability is not None and 0 < probability < 1:
+                accuracy[(pick.league_id, pick.market_id)].append((probability, int(settled.result == "win")))
     summaries = []
     for (lg, mk), group in groups.items():
         staked = group["win"] + group["loss"] + group["push"]
@@ -190,6 +198,7 @@ def history(db, league=None, market=None, offset=0, limit=100):
                 "market": mk,
                 **group,
                 "roi": group["units"] / staked if staked else None,
+                "accuracy": calibration_summary(accuracy[(lg, mk)]),
             }
         )
     records = []
@@ -209,14 +218,35 @@ def history(db, league=None, market=None, offset=0, limit=100):
                 "settled_at": as_utc(settled.settled_at).isoformat() if settled else None,
             }
         )
+    cumulative, series = 0.0, []
+    for day, units in sorted(daily.items()):
+        cumulative += units
+        series.append({"date": day, "units": round(cumulative, 4)})
     return {
         "rows": records,
         "total": total,
         "offset": offset,
         "limit": limit,
         "summaries": summaries,
+        "series": series,
         "methodology": "First qualifying prop per game and market, frozen before kickoff. One unit risked at the published price. ROI excludes voids and pending picks; pushes count as stakes. Missing stats stay pending. Research results, not proof of future returns.",
     }
+
+
+def calibration_summary(pairs):
+    """Score frozen probabilities only on binary, settled outcomes."""
+    bins = []
+    for low in range(0, 100, 10):
+        values = [(p, y) for p, y in pairs if low / 100 <= p < (low + 10) / 100]
+        if values:
+            bins.append({"range": f"{low}–{low + 10}%", "count": len(values),
+                         "predicted": sum(p for p, _ in values) / len(values),
+                         "observed": sum(y for _, y in values) / len(values)})
+    return {"graded": len(pairs),
+            "brier_score": sum((p - y) ** 2 for p, y in pairs) / len(pairs) if pairs else None,
+            "predicted_hit_rate": sum(p for p, _ in pairs) / len(pairs) if pairs else None,
+            "actual_hit_rate": sum(y for _, y in pairs) / len(pairs) if pairs else None,
+            "bins": bins}
 
 
 def ats_history(db, league=None, offset=0, limit=100):
