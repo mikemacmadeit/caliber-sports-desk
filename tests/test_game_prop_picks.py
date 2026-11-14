@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 from spe.props.game_picks import build_game_prop_picks
 
 
@@ -9,13 +11,14 @@ def _row(**overrides):
         "player_name": "Alex",
         "away_abbr": "AAA",
         "home_abbr": "BBB",
-        "kickoff_utc": "2026-11-09T23:15:00+00:00",
+        "kickoff_utc": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        "outcome_id": "o1", "bookmaker": "Book", "data_tier": "upcoming",
         "market_id": "anytime_td",
         "side": "yes",
         "line": None,
         "book_price": -110,
-        "price_freshness": {"status": "fresh", "is_current_opportunity": True},
-        "forecast": {"p_estimate": 0.58, "ev_after_haircut": 0.04, "availability_status": "active"},
+        "price_freshness": {"status": "fresh", "is_current_opportunity": True, "observed_at": datetime.now(UTC).isoformat()},
+        "forecast": {"p_estimate": 0.58, "ev_after_haircut": 0.04, "availability_status": "active", "model_version": "m1", "prediction_as_of": datetime.now(UTC).isoformat(), "data_cutoff": (datetime.now(UTC)-timedelta(minutes=1)).isoformat()},
     }
     forecast = overrides.pop("forecast", None)
     freshness = overrides.pop("price_freshness", None)
@@ -30,7 +33,7 @@ def _row(**overrides):
 def test_one_anytime_call_per_game_prefers_the_real_price():
     rows = [
         _row(player_id="backup", player_name="Backup", book_price=3000, forecast={"p_estimate": 0.26, "ev_after_haircut": 0.2}),
-        _row(player_id="starter", player_name="Starter", book_price=-140, forecast={"p_estimate": 0.62, "ev_after_haircut": 0.03}),
+        _row(player_id="starter", player_name="Starter", book_price=-140, forecast={"p_estimate": 0.62, "ev_after_haircut": 0.06}),
     ]
     picks = build_game_prop_picks(rows)
     assert len(picks) == 1
@@ -47,32 +50,21 @@ def test_soft_lines_and_catch_floors_stay_off():
     assert build_game_prop_picks(rows) == []
 
 
-def test_a_stale_slate_still_names_a_player():
-    rows = [
-        _row(price_freshness={"status": "stale", "is_current_opportunity": False}, book_price=-120, forecast={"p_estimate": 0.44, "ev_after_haircut": -0.02}),
-    ]
-    picks = build_game_prop_picks(rows)
-    assert picks[0]["stale"] is True
-    assert "The last price is stale." in picks[0]["sentence"]
+def test_a_stale_slate_has_no_recommendation():
+    assert build_game_prop_picks([_row(price_freshness={"status": "stale", "is_current_opportunity": False})]) == []
 
 
 def test_a_fresh_price_beats_a_stale_one():
     rows = [
         _row(player_id="old", player_name="Old", price_freshness={"status": "stale", "is_current_opportunity": False}, forecast={"p_estimate": 0.7, "ev_after_haircut": 0.2}),
-        _row(player_id="live", player_name="Live", forecast={"p_estimate": 0.56, "ev_after_haircut": 0.01}),
+        _row(player_id="live", player_name="Live", forecast={"p_estimate": 0.56, "ev_after_haircut": 0.05}),
     ]
     picks = build_game_prop_picks(rows)
     assert picks[0]["player_name"] == "Live"
 
 
-def test_names_the_line_when_the_price_is_ahead():
-    rows = [
-        _row(market_id="receiving_yards", side="over", line=57.5, book_price=-115, forecast={"p_estimate": 0.51, "ev_after_haircut": -0.02}),
-    ]
-    picks = build_game_prop_picks(rows, {"g1"})
-    assert picks[0]["price_ahead"] is True
-    assert picks[0]["loud"] is False
-    assert picks[0]["sentence"].endswith("The price is ahead of this chance.")
+def test_negative_value_is_not_recommended():
+    assert build_game_prop_picks([_row(forecast={"ev_after_haircut": -0.02})]) == []
 
 
 def test_closed_games_are_left_out():

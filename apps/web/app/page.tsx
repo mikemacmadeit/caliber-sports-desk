@@ -94,7 +94,7 @@ export default async function TodayPage({
 
       {shownOpen.length > 0 ? (
         <section className="space-y-4">
-          <Section title="The calls" meta={`${openCalls.length} still to come`} href={withQuery("/ats", { league, sort: "kickoff" })} />
+          <Section title="Matchup research" meta={`${openCalls.length} still to come`} href={withQuery("/ats", { league, sort: "kickoff" })} />
           <div className="grid gap-3 md:grid-cols-2">
             {shownOpen.map((row) => (
               <CallCard key={row.game_id} row={row} />
@@ -110,21 +110,21 @@ export default async function TodayPage({
 
       {selected ? (
         <section className="space-y-4">
-          <Section title="The props" meta="One call per market" href={withQuery("/props", { league, date: selected === today ? undefined : selected })} />
+          <Section title="Published opportunities" meta="Verified prices" href={withQuery("/props", { league, date: selected === today ? undefined : selected })} />
           <TodayPropPicks league={league} date={selected} initialCard={propCard} />
         </section>
       ) : null}
 
       {selected ? (
         <section className="space-y-4">
-          <Section title="The tickets" meta="Built from this day" href={withQuery("/parlays", { league, date: selected === today ? undefined : selected })} />
+          <Section title="Parlay research" meta="Built from this day" href={withQuery("/parlays", { league, date: selected === today ? undefined : selected })} />
           <TodayTickets league={league} date={selected} initialCard={ticketCard} />
         </section>
       ) : null}
 
       {settledCalls.length > 0 ? (
         <section className="space-y-4">
-          <Section title="What happened" meta={`${settledCalls.length} finals`} href="/track-record" />
+          <Section title="Recent matchup research" meta={`${settledCalls.length} finals`} href="/track-record" />
           <div className="grid gap-3 md:grid-cols-2">
             {settledCalls.slice(0, 4).map((row) => (
               <CallCard key={row.game_id} row={row} />

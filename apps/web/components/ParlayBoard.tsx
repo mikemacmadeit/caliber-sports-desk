@@ -6,6 +6,7 @@ import { kickoffParts, marketLabel } from "@/lib/format";
 export function ParlayBoard({ tickets }: { tickets: ParlayTicket[] }) {
   return (
     <div className="space-y-4">
+      <p className="text-sm text-mute">Experimental parlay research. Combined odds are estimates and may span sportsbooks; they are not a verified ticket quote or part of the published singles record.</p>
       {tickets.map((ticket, index) => {
         const tone = ticketTone(ticket.kind);
         return (

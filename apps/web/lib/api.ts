@@ -15,7 +15,7 @@ function cacheableGetPath(path: string): boolean {
 }
 
 export async function apiGet<T>(path: string, timeoutMs = 15000): Promise<T> {
-  const useCache = cacheableGetPath(path);
+  const useCache = cacheableGetPath(path) && !path.startsWith("/v1/props") && !path.startsWith("/v1/parlays");
   if (useCache) {
     const hit = getCache.get(path);
     if (hit && hit.expires > Date.now()) {
@@ -221,7 +221,10 @@ export type ResearchDetail = ResearchSummary & {
   }>;
 };
 
+export type Qualification = { eligible: boolean; reasons: string[]; verified_at: string | null; valid_until: string | null; minimum_american_odds: number | null };
 export type PropRow = {
+  qualification?: Qualification;
+  published_pick_id?: string | null;
   outcome_id: string;
   game_id: string;
   league_id: string;
@@ -263,6 +266,10 @@ export type PropRow = {
 };
 
 export type PropPick = {
+  pick_id?: string;
+  published_at?: string;
+  bookmaker?: string;
+  qualification?: Qualification;
   game_id: string;
   league_id: string;
   away_abbr?: string | null;
@@ -286,6 +293,7 @@ export type PropPickCard = {
   date: string;
   league: string;
   games_on_slate: number;
+  degraded?: boolean;
   picks: PropPick[];
   note: string;
   disclaimer: string;

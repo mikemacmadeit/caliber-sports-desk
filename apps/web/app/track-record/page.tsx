@@ -1,119 +1,40 @@
 import Link from "next/link";
-import type { AtsRow } from "@/components/AtsBoard";
 import { PageHeader } from "@/components/PageHeader";
-import { TodayPropPicks } from "@/components/TodayPropPicks";
-import { slateToday } from "@/lib/days";
 import { apiGet } from "@/lib/api";
-import { gradeWord, ledgerLines } from "@/lib/calls";
-import { kickoffParts } from "@/lib/format";
 
-export const metadata = {
-  title: "Ledger — Caliber",
-  description: "What the published calls did after the games ended.",
-};
-
-export default async function TrackRecordPage() {
-  const board = await apiGet<{ rows: AtsRow[] }>("/v1/ats?league=all&sort=kickoff", 60000).catch(() => null);
-  const rows = [...(board?.rows ?? [])].sort((a, b) => b.kickoff_utc.localeCompare(a.kickoff_utc));
-  const finals = rows.filter((row) => row.game_status === "final");
-  const open = rows.filter((row) => row.game_status !== "final");
-  const winRight = finals.filter((row) => row.pick_result === "correct").length;
-  const winWrong = finals.filter((row) => row.pick_result === "miss").length;
-  const coverRight = finals.filter((row) => row.ats_pick_result === "correct").length;
-  const coverWrong = finals.filter((row) => row.ats_pick_result === "miss").length;
-
-  return (
-    <div className="space-y-10">
-      <PageHeader
-        kicker="After the games"
-        title="The ledger"
-        lede="Each line is a call from the card, then what it did. Model scores and abstentions sit on Health."
-      />
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Record kicker="To win" right={winRight} wrong={winWrong} />
-        <Record kicker="Against the number" right={coverRight} wrong={coverWrong} />
-      </div>
-
-      {finals.length === 0 && open.length === 0 ? (
-        <p className="text-sm text-mute">No calls on the card yet.</p>
-      ) : null}
-
-      {finals.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Finals</h2>
-          <ul className="divide-y divide-white/10 border-y border-white/10">
-            {finals.slice(0, 40).map((row) => (
-              <LedgerRow key={row.game_id} row={row} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {open.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Still out</h2>
-          <ul className="divide-y divide-white/10 border-y border-white/10">
-            {open.slice(0, 20).map((row) => (
-              <LedgerRow key={row.game_id} row={row} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <section className="space-y-3">
-        <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Prop calls still out</h2>
-        <TodayPropPicks league="all" date={slateToday()} pending />
-      </section>
-
-      <Link href="/data-quality" className="inline-block font-display text-xl uppercase tracking-wide text-gold">
-        Model scores →
-      </Link>
-    </div>
-  );
-}
-
-function Record({ kicker, right, wrong }: { kicker: string; right: number; wrong: number }) {
-  const decided = right + wrong;
-  const rate = decided === 0 ? null : `${Math.round((right / decided) * 100)}%`;
-  return (
-    <div className="plate px-4 py-4">
-      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-mute">{kicker}</p>
-      <p className="mt-2 font-display text-5xl leading-none tracking-wide">
-        {right} right <span className="text-mute">·</span> {wrong} wrong
-      </p>
-      {rate ? <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-gold">{rate}</p> : null}
-    </div>
-  );
-}
-
-function LedgerRow({ row }: { row: AtsRow }) {
-  const lines = ledgerLines(row);
-  const when = kickoffParts(row.kickoff_utc);
-  return (
-    <li>
-      <Link href={`/games/${row.game_id}`} className="grid gap-1 py-3 sm:grid-cols-[9rem_1fr]">
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-mute">
-          {row.league_id} · {when.day}
-        </span>
-        <span>
-          <span className="block text-sm text-paper/70">
-            {row.away_team} at {row.home_team}
-            {row.game_status === "final" && row.away_score != null && row.home_score != null
-              ? ` · ${row.away_score}–${row.home_score}`
-              : ""}
-          </span>
-          <span className={`mt-1 block text-sm ${tone(row.pick_result)}`}>{lines.win}</span>
-          {lines.cover ? <span className={`mt-1 block text-sm ${tone(row.ats_pick_result)}`}>{lines.cover}</span> : null}
-        </span>
-      </Link>
-    </li>
-  );
-}
-
-function tone(result: AtsRow["pick_result"]) {
-  if (result === "correct") return "text-gold";
-  if (result === "miss") return "text-heat";
-  if (gradeWord(result) === "pending") return "text-mute";
-  return "text-paper";
+type Summary = { league: string; market: string; win: number; loss: number; push: number; void: number; pending: number; units: number; roi: number | null };
+type RecordRow = { pick_id: string; sentence: string; league_id: string; market_id: string; published_at: string; bookmaker: string; book_price: number; p: number; result: string; units: number | null; forecast?: { model_version?: string } };
+type History = { rows: RecordRow[]; summaries: Summary[]; total: number; methodology: string };
+const markets = [["all", "Published props"], ["anytime_td", "Anytime TD"], ["receptions", "Receptions"], ["rushing_yards", "Rushing yards"], ["receiving_yards", "Receiving yards"], ["point_spread", "ATS research"]];
+export default async function TrackRecordPage({ searchParams }: { searchParams: Promise<{ league?: string; market?: string; page?: string }> }) {
+  const params = await searchParams;
+  const league = ["all", "nfl", "fbs"].includes(params.league || "") ? params.league! : "all";
+  const market = markets.some(([key]) => key === params.market) ? params.market! : "all";
+  const page = Math.max(0, Math.min(10000, Number.parseInt(params.page || "0", 10) || 0));
+  const url = new URLSearchParams({ league, market, offset: String(page * 50), limit: "50" });
+  const data = await apiGet<History>(`/v1/published/history?${url}`, 10000).catch(() => null);
+  const href = (p: number, lg = league, mk = market) => `/track-record?${new URLSearchParams({ league: lg, market: mk, page: String(p) })}`;
+  return <div className="space-y-8">
+    <PageHeader kicker="Original picks · original prices" title="The permanent record" lede="Published before kickoff. Graded against recorded results. Losing picks stay visible." />
+    <nav className="flex flex-wrap gap-3" aria-label="League">{["all", "nfl", "fbs"].map(lg => <Link key={lg} href={href(0, lg)} className={lg === league ? "text-gold" : "text-mute"}>{lg.toUpperCase()}</Link>)}</nav>
+    <nav className="flex flex-wrap gap-3 text-sm" aria-label="Market">{markets.map(([mk, label]) => <Link key={mk} href={href(0, league, mk)} className={mk === market ? "text-gold" : "text-mute"}>{label}</Link>)}</nav>
+    {!data ? <p role="alert">The record is temporarily unavailable. Results have not been replaced with zeros.</p> : <>
+      <p className="max-w-3xl text-sm text-mute">{data.methodology}</p>
+      <div className="grid gap-3 md:grid-cols-2">{data.summaries.map(s => <article key={`${s.league}-${s.market}`} className="plate p-5">
+        <p className="font-mono text-xs uppercase text-mute">{s.league} · {s.market.replaceAll("_", " ")}</p>
+        <p className="mt-3 font-display text-3xl">{s.win} wins · {s.loss} losses</p>
+        <p className="mt-2 text-gold">{s.units >= 0 ? "+" : ""}{s.units.toFixed(2)} units · ROI {s.roi == null ? "—" : `${(s.roi * 100).toFixed(1)}%`}</p>
+        <p className="mt-2 text-sm text-mute">{s.push} pushes · {s.void} voids · {s.pending} pending</p>
+      </article>)}</div>
+      {data.total === 0 ? <p className="plate p-6">No published records yet for this filter. History starts when the first qualifying pick is saved before kickoff.</p> : null}
+      <div className="space-y-3">{data.rows.map(row => <article key={row.pick_id} className="plate p-5">
+        <p className="text-xs text-mute">{new Date(row.published_at).toLocaleString("en-US", { timeZone: "America/Chicago" })} Central · {row.league_id.toUpperCase()}</p>
+        <p className="mt-2">{row.sentence}</p>
+        <p className="mt-2 text-sm text-mute">{row.bookmaker} · {row.book_price > 0 ? "+" : ""}{row.book_price} · {Math.round(row.p * 100)}% at publication</p>
+        <p className="mt-2 text-gold">{row.result.toUpperCase()}{row.units != null ? ` · ${row.units >= 0 ? "+" : ""}${row.units.toFixed(2)} units` : ""}</p>
+        <details className="mt-3 text-xs text-mute"><summary>Publication details</summary><p className="mt-2 break-all">ID: {row.pick_id}<br />Model: {row.forecast?.model_version || "Recorded with prediction"}</p></details>
+      </article>)}</div>
+      <nav className="flex gap-6">{page > 0 ? <Link href={href(page - 1)}>← Newer</Link> : null}{(page + 1) * 50 < data.total ? <Link href={href(page + 1)}>Older →</Link> : null}</nav>
+    </>}
+  </div>;
 }

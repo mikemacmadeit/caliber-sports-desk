@@ -27,6 +27,9 @@ def cache_path() -> Path:
 
 
 def read_board(path: Path | None = None) -> dict[str, Any] | None:
+    if path is None:
+        from spe.publishing.store import read
+        return read("ats")
     target = path or cache_path()
     try:
         payload = json.loads(target.read_text(encoding="utf-8"))
@@ -38,6 +41,10 @@ def read_board(path: Path | None = None) -> dict[str, Any] | None:
 
 
 def write_board(payload: dict[str, Any], path: Path | None = None) -> Path:
+    if path is None:
+        from spe.publishing.store import write
+        write("ats", payload)
+        return cache_path()
     target = path or cache_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     body = dict(payload)
@@ -71,11 +78,6 @@ def refresh_board(session: Session, path: Path | None = None) -> dict[str, Any]:
     from spe.models.ats.predict import predict_upcoming_ats
 
     payload = predict_upcoming_ats(session, include_simulation=False)
-    # Never clobber a usable board with an empty rebuild (common on cold cloud DBs).
-    existing = read_board(path)
-    new_rows = payload.get("rows") or []
-    if existing and (existing.get("rows") or []) and not new_rows:
-        return existing
     write_board(payload, path)
     return payload
 
@@ -86,8 +88,11 @@ def load_board(session: Session, path: Path | None = None) -> dict[str, Any]:
     if cached and (cached.get("rows") or []) and is_fresh(cached):
         return cached
     if cached and (cached.get("rows") or []):
-        _refresh_in_background(path)
+        if settings.app_env != "prod":
+            _refresh_in_background(path)
         return cached
+    if settings.app_env == "prod":
+        return {"rows": [], "degraded": True, "reason": "awaiting_worker"}
     return refresh_board(session, path)
 
 

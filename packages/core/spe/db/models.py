@@ -935,3 +935,46 @@ class BacktestPrediction(Base):
     p: Mapped[float] = mapped_column(Float, nullable=False)
     y: Mapped[float] = mapped_column(Float, nullable=False)
     components: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class BoardSnapshot(Base):
+    """Shared worker/API board storage; caches are not customer history."""
+    __tablename__ = "board_snapshots"
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PublishedPick(Base):
+    """First qualifying selection per game/market. Never updated after publication."""
+    __tablename__ = "published_picks"
+    pick_id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
+    game_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    league_id: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    market_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    kickoff_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    __table_args__ = (UniqueConstraint("game_id", "market_id", name="uq_published_game_market"),)
+
+
+class PublishedResult(Base):
+    __tablename__ = "published_results"
+    pick_id: Mapped[str] = mapped_column(ForeignKey("published_picks.pick_id"), primary_key=True)
+    result: Mapped[str] = mapped_column(String(16), nullable=False)
+    actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    units: Mapped[float] = mapped_column(Float, nullable=False)
+    settled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    evidence: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
+class PublishedStat(Base):
+    """Explicitly observed market result; absent markets never become zero."""
+    __tablename__ = "published_stats"
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    game_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    market_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    actual: Mapped[float] = mapped_column(Float, nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source: Mapped[str] = mapped_column(String(128), nullable=False)

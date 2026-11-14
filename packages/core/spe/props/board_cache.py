@@ -67,6 +67,9 @@ def read_entry(
     date: str | None,
     path: Path | None = None,
 ) -> dict[str, Any] | None:
+    if path is None:
+        from spe.publishing.store import read
+        return read("props:" + entry_key(market, league, date))
     store = read_store(path)
     entry = (store.get("entries") or {}).get(entry_key(market, league, date))
     if not isinstance(entry, dict) or "rows" not in entry:
@@ -81,6 +84,11 @@ def write_entry(
     rows: list[dict[str, Any]],
     path: Path | None = None,
 ) -> dict[str, Any]:
+    if path is None:
+        from spe.publishing.store import write
+        return write("props:" + entry_key(market, league, date), {
+            "market": market or "all", "league": league or "all", "date": date or "all", "rows": rows,
+        })
     store = read_store(path)
     entries = dict(store.get("entries") or {})
     entry = {
@@ -153,9 +161,6 @@ def refresh_entry(
     from app.queries import list_props
 
     rows = list_props(session, market, None, None, league, date)
-    existing = read_entry(market, league, date, path)
-    if existing and (existing.get("rows") or []) and not rows:
-        return existing
     return write_entry(market, league, date, rows, path)
 
 
@@ -175,15 +180,20 @@ def load_props(
     API requests must use ``block_on_miss=False`` so a cold cache never stalls
     the public site. Workers may pass ``block_on_miss=True`` to warm boards.
     """
-    del session  # reserved for callers that already opened a DB session
+    if date is None and path is None:
+        from app.queries import slate_today
+        date = slate_today()
     cached = read_entry(market, league, date, path)
     if cached is not None:
-        rows = list(cached.get("rows") or [])
+        from spe.publishing.policy import annotate
+        rows = [annotate(row) for row in cached.get("rows") or []]
         if not is_fresh(cached):
-            _refresh_in_background(market, league, date, path)
+            if settings.app_env != "prod":
+                _refresh_in_background(market, league, date, path)
         return _filter_rows(rows, min_odds=min_odds, min_ev=min_ev)
     # No saved board yet: never block the website on a full rebuild.
-    _refresh_in_background(market, league, date, path)
+    if settings.app_env != "prod" and not block_on_miss:
+        _refresh_in_background(market, league, date, path)
     if block_on_miss:
         from spe.db.session import session_factory
 
@@ -222,8 +232,8 @@ def load_slate_props(
                 )
             )
         except Exception:
-            # One market must not take down the whole home-page card.
-            continue
+            # A storage outage is not an empty slate. Let the caller show an error.
+            raise
     return rows
 
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PriceFreshnessBadge, PropTable } from "@/components/PropTable";
 import { TeamMark } from "@/components/TeamMark";
 import type { PropRow } from "@/lib/api";
@@ -10,6 +10,8 @@ import { kickoffMs, kickoffParts } from "@/lib/format";
 import { presentTeam, type TeamMarkInfo } from "@/lib/teams";
 
 export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | "flat" }) {
+  const [, updateClock] = useState(0);
+  useEffect(() => { const timer = setInterval(() => updateClock(n => n + 1), 1000); return () => clearInterval(timer); }, []);
   const [query, setQuery] = useState("");
   const [gameId, setGameId] = useState("all");
   const [team, setTeam] = useState("all");
@@ -175,7 +177,7 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
               ))}
             </div>
           ) : (
-            <p className="plate px-5 py-6 text-sm text-mute">No one on this board has a real chance to score.</p>
+            <p className="plate px-5 py-6 text-sm text-mute">No research projection matches these filters.</p>
           )}
           {noPickGames.length > 0 ? (
             <div className="space-y-2">
@@ -197,9 +199,9 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
           ) : null}
           {priced.length > 0 ? (
             <>
-              <Section title="Better than the odds" count={priced.length} accent="gold" />
+              <Section title="Published opportunities" count={priced.length} accent="gold" />
               <p className="max-w-xl text-sm text-mute">
-                The sportsbook number is better than the chance, and the price is current. It can be a different player than the one above.
+                These selections passed the price and data checks and were saved before kickoff. Their original terms stay in the ledger.
               </p>
               <div className="grid gap-3 md:grid-cols-2">
                 {priced.map((row) => (

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Barlow_Condensed, JetBrains_Mono, Outfit } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import "./globals.css";
+import { PipelineStatus } from "@/components/PipelineStatus";
 
 const display = Barlow_Condensed({
   subsets: ["latin"],
@@ -37,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${display.variable} ${sans.variable} ${mono.variable} font-sans antialiased`}>
         <Suspense fallback={<main className="px-5 py-8 lg:px-10 lg:py-10">{children}</main>}>
-          <AppShell>{children}</AppShell>
+          <AppShell><PipelineStatus />{children}</AppShell>
         </Suspense>
       </body>
     </html>
