@@ -198,6 +198,10 @@ function DeskPickCard({ row }: { row: PropRow }) {
         <p className="font-mono uppercase tracking-wide">What could change this pick</p>
         {row.desk_analysis.risks.map(risk => <p key={risk} className="mt-1">{risk}</p>)}
         <p className="mt-2">New research model · live accuracy is still being measured.</p>
+        {row.desk_analysis.hybrid ? <p className="mt-2">
+          Combined team and player estimate: {pct(row.desk_analysis.hybrid.probability, 0)}.
+          {" "}Being tested alongside the current pick.
+        </p> : null}
       </div> : null}
       <PriceFreshnessBadge freshness={row.price_freshness || row.forecast.price_freshness} />
     </Link>

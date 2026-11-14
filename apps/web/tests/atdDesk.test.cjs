@@ -20,11 +20,10 @@ test('questionable and invalid estimates are excluded', () => {
  }
  for (const p of [NaN,Infinity,1.3,.21]) assert.equal(selectDeskTakes([row('p',p)]).length,0);
 });
-test('legacy role and price fallback stays deterministic', () => {
+test('a legacy response cannot manufacture an unrecorded pick', () => {
  const rows=[row('a'), row('b')];
- assert.equal(selectDeskTakes(rows)[0].player_id,'b');
- assert.equal(selectDeskTakes(rows.reverse())[0].player_id,'b');
- assert.equal(selectDeskTakes([{...row('b'),book_price:-900}]).length,0);
+ assert.deepEqual(selectDeskTakes(rows),[]);
+ assert.deepEqual(selectDeskTakes(rows.reverse()),[]);
 });
 test('expired selections disappear without promoting another player', () => {
  const expired={...row('p'),desk_selected:true,desk_analysis:{eligible:true,valid_until:new Date(Date.now()-1000).toISOString()}};

@@ -75,11 +75,13 @@ def _mean(rows, key, default=0.0):
 class OpportunityHistory:
     def __init__(self, records):
         self.players = defaultdict(list)
+        self.player_ids_by_team = defaultdict(set)
         self.teams = defaultdict(list)
         self.defenses = defaultdict(list)
         games = defaultdict(list)
         for r in records:
             self.players[(r["player_id"], r["team_id"])].append(r)
+            self.player_ids_by_team[r["team_id"]].add(r["player_id"])
             games[(r["game_id"], r["team_id"])].append(r)
         for (_, team), players in games.items():
             first = players[0]
@@ -130,6 +132,25 @@ class OpportunityHistory:
 
 def vector(features):
     return np.array([float(features.get(k) or 0) for k in FEATURES])
+
+
+def fit_logistic(x, y):
+    """Regularized opportunity fit, shared by standalone and hybrid training."""
+    center, scale = x.mean(axis=0), x.std(axis=0)
+    scale[scale < 1e-8] = 1
+    z = np.column_stack([np.ones(len(x)), (x - center) / scale])
+    b = np.zeros(z.shape[1])
+    penalty = np.eye(len(b)) * 10.0
+    penalty[0, 0] = 0
+    for _ in range(40):
+        p = 1 / (1 + np.exp(-np.clip(z @ b, -25, 25)))
+        h = z.T @ (z * (p * (1 - p))[:, None]) + penalty + np.eye(len(b)) * 1e-8
+        step = np.linalg.solve(h, z.T @ (p - y) + penalty @ b)
+        b -= step
+        if np.max(np.abs(step)) < 1e-7:
+            break
+    return {"features": FEATURES, "center": center.tolist(), "scale": scale.tolist(),
+            "intercept": float(b[0]), "coefficients": b[1:].tolist()}
 
 
 def predict(model, features):

@@ -113,6 +113,31 @@ def test_database_loader_handles_empty_history(db):
     assert load_history(db, "nfl", NOW) == []
 
 
+def test_charting_is_player_specific_and_survives_a_box_score_refresh(db):
+    from spe.db.models import Game, Player, PlayerGameStat
+    seed(db)
+    game = db.get(Game, "g")
+    game.status, game.data_tier = "final", "historical"
+    game.kickoff_utc = NOW - timedelta(days=7)
+    for pid in ("charted", "unknown"):
+        db.add(Player(player_id=pid, name=pid, position_group="RB", position="RB"))
+    db.flush()
+    provenance = dict(provider="nflverse", provider_record_id="test", observed_at=NOW,
+                      effective_at=game.kickoff_utc, ingested_at=NOW)
+    db.add(PlayerGameStat(game_id="g", player_id="charted", team_id="a", revision=1,
+        carries=8, gl_carries=3, rz_targets=1, quality_status="pbp_opportunities", **provenance))
+    db.add(PlayerGameStat(game_id="g", player_id="charted", team_id="a", revision=2,
+        carries=12, quality_status="ok", **provenance))
+    db.add(PlayerGameStat(game_id="g", player_id="unknown", team_id="a", revision=1,
+        carries=5, quality_status="ok", **provenance))
+    db.flush()
+    rows = {r["player_id"]: r for r in load_history(db, "nfl", NOW)}
+    assert rows["charted"]["carries"] == 12
+    assert rows["charted"]["gl_carries"] == 3
+    assert rows["unknown"]["gl_carries"] is None
+    assert rows["unknown"]["rz_targets"] is None
+
+
 def test_pregame_choice_is_frozen_and_not_replaced_after_kickoff(db):
     from spe.db.models import DeskDecision, ShadowPrediction
     seed(db)
@@ -133,7 +158,6 @@ def test_pregame_choice_is_frozen_and_not_replaced_after_kickoff(db):
 
 
 def test_review_flag_records_a_pass_and_does_not_keep_previous_pick(db):
-    from spe.db.models import DeskDecision
     seed(db)
     r = td_row()
     r["kickoff_utc"] = (NOW + timedelta(hours=1)).isoformat()

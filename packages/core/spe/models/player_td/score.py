@@ -325,6 +325,7 @@ def score_upcoming_player_td(
                         "p_atd": float(r.p_atd),
                         "p_atd_low": float(r.p_atd_low),
                         "p_atd_high": float(r.p_atd_high),
+                        "uncertainty_status": "unvalidated_sensitivity_range",
                         "availability_status": r.availability_status,
                         "missing_information": r.missing_information,
                     }
@@ -481,6 +482,7 @@ def _export_player_row(r: Any, league_id: str, *, research_features: bool) -> di
         "p_atd": float(r.p_atd),
         "p_atd_low": float(r.p_atd_low),
         "p_atd_high": float(r.p_atd_high),
+        "uncertainty_status": "unvalidated_sensitivity_range",
         "missing_information": list(r.missing_information)
         if isinstance(r.missing_information, list)
         else r.missing_information,

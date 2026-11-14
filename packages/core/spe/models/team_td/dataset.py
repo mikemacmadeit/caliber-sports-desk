@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from spe.analytics.definitions import SHRINKAGE_K
-from spe.analytics.engine import apply_opponent_adjustments, attach_game_context, team_game_metrics
+from spe.analytics.engine import attach_game_context, team_game_metrics
 from spe.db.models import Game
 from spe.eval.leakage import assert_event_time
 from spe.models.team_td.labels import team_game_labels
@@ -127,7 +127,7 @@ def build_team_td_frame(session: Session, league_id: str) -> pd.DataFrame:
     if games.empty or plays.empty:
         return pd.DataFrame()
     plays_x = attach_game_context(plays, games)
-    team_metrics = apply_opponent_adjustments(team_game_metrics(plays_x), league_id, leave_one_out=True)
+    team_metrics = team_game_metrics(plays_x)
     labels = team_game_labels(plays_x)
     if labels.empty or team_metrics.empty:
         return pd.DataFrame()

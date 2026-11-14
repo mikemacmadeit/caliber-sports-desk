@@ -14,7 +14,8 @@ import pandas as pd
 
 from spe.models.advanced import apply_beta, binary_probability, fit_log_beta
 from spe.models.metrics import apply_platt, brier_score, expected_calibration_error, log_loss, platt_calibrate
-from spe.models.player_td.shares import ShareWeights
+from spe.models.player_td.shares import ShareWeights, attach_shares, fit_share_weights
+from spe.models.player_td.temporal import split_games
 
 MATCHUP_FEATURES = (
     "opp_def_z",
@@ -40,6 +41,8 @@ class PlayerTdModel:
     platt_by_pos: dict[str, list[float]]
     train_end: str
     notes: list[str] = field(default_factory=list)
+    calibration_start: str | None = None
+    calibration_end: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -125,7 +128,7 @@ def uncertainty_bands(
     p: np.ndarray,
     p_active: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Validated-style bands: Poisson ±√λ mapped through 1-exp, mixed with inactivity."""
+    """Descriptive sensitivity ranges; not validated statistical confidence intervals."""
     lam = np.clip(np.asarray(lam, dtype=float), 1e-8, None)
     sd = np.sqrt(lam)
     p_hi_rate = poisson_atd_probability(lam + 1.64 * sd)
@@ -144,13 +147,14 @@ def uncertainty_bands(
 
 
 def fit_player_td_model(train: pd.DataFrame, league_id: str, train_end: str, weights: ShareWeights) -> PlayerTdModel:
-    train = train.copy()
-    if "lambda_player_td" not in train.columns:
-        train["lambda_rush_td"] = train["team_lambda_rush_td"] * train["rush_td_share"]
-        train["lambda_rec_td"] = train["team_lambda_pass_td"] * train["rec_td_share"]
-        train["lambda_player_td"] = train["lambda_rush_td"] + train["lambda_rec_td"]
-
-    y = train["y_atd"].to_numpy(dtype=float) if "y_atd" in train.columns else (train["anytime_tds"].fillna(0) > 0).astype(float)
+    train, calibration = split_games(train, 0.8)
+    # All fitted components, including shares, exclude the calibration period.
+    weights = fit_share_weights(train, league_id)
+    train = attach_shares(train, weights)
+    calibration = attach_shares(calibration, weights)
+    for part in (train, calibration):
+        part["lambda_player_td"] = (part["team_lambda_rush_td"] * part["rush_td_share"]
+                                    + part["team_lambda_pass_td"] * part["rec_td_share"])
     base = train["lambda_player_td"].to_numpy(dtype=float)
 
     # Opponent beta from opp_def_z when present.
@@ -186,17 +190,21 @@ def fit_player_td_model(train: pd.DataFrame, league_id: str, train_end: str, wei
         adjusted = apply_beta(base, z, beta)
         base = np.where(mask, adjusted, base)
 
-    p_raw = poisson_atd_probability(base)
-    a, b = platt_calibrate(p_raw, y)
+    # Calibrate frozen coefficients on later games, never on the fitting predictions.
+    a, b = 0.0, 1.0
     platt_by_pos: dict[str, list[float]] = {}
-    for pos, part in train.groupby("position_group"):
-        idx = part.index
-        # map to positions in train order
-        mask = train["position_group"].eq(pos).to_numpy()
-        if int(mask.sum()) < 80:
-            continue
-        aa, bb = platt_calibrate(p_raw[mask], y[mask])
-        platt_by_pos[str(pos)] = [aa, bb]
+    calibrated = len(calibration) >= 80 and (calibration["anytime_tds"].fillna(0) > 0).nunique() == 2
+    if calibrated:
+        cy = (calibration["anytime_tds"].fillna(0) > 0).to_numpy(dtype=float)
+        cp = poisson_atd_probability(apply_matchup_adjustments(
+            calibration["lambda_player_td"].to_numpy(), calibration,
+            feature_betas, feature_z, opp_beta))
+        a, b = platt_calibrate(cp, cy)
+        for pos in calibration["position_group"].unique():
+            mask = calibration["position_group"].eq(pos).to_numpy()
+            if int(mask.sum()) >= 80 and len(np.unique(cy[mask])) == 2:
+                aa, bb = platt_calibrate(cp[mask], cy[mask])
+                platt_by_pos[str(pos)] = [aa, bb]
 
     return PlayerTdModel(
         league_id=league_id,
@@ -207,8 +215,11 @@ def fit_player_td_model(train: pd.DataFrame, league_id: str, train_end: str, wei
         platt_a=float(a),
         platt_b=float(b),
         platt_by_pos=platt_by_pos,
-        train_end=train_end,
+        train_end=str(pd.to_datetime(train["kickoff_utc"], utc=True).max()),
+        calibration_start=str(calibration["kickoff_utc"].min()) if calibrated else None,
+        calibration_end=str(calibration["kickoff_utc"].max()) if calibrated else None,
         notes=[
+            "separate_temporal_calibration" if calibrated else "uncalibrated_insufficient_later_games",
             "phase3_player_td_v1",
             "team_lambda_x_share",
             "qb_pass_td_excluded",
@@ -222,6 +233,10 @@ def fit_player_td_model(train: pd.DataFrame, league_id: str, train_end: str, wei
 
 def predict_frame(model: PlayerTdModel, frame: pd.DataFrame) -> pd.DataFrame:
     out = frame.copy()
+    if "separate_temporal_calibration" in model.notes or "uncalibrated_insufficient_later_games" in model.notes:
+        out = attach_shares(out, ShareWeights.from_dict(model.share_weights))
+        out["lambda_player_td"] = (out["team_lambda_rush_td"] * out["rush_td_share"]
+                                  + out["team_lambda_pass_td"] * out["rec_td_share"])
     if "lambda_player_td" not in out.columns:
         out["lambda_rush_td"] = out["team_lambda_rush_td"] * out["rush_td_share"]
         out["lambda_rec_td"] = out["team_lambda_pass_td"] * out["rec_td_share"]
@@ -253,7 +268,8 @@ def predict_frame(model: PlayerTdModel, frame: pd.DataFrame) -> pd.DataFrame:
     if status is not None:
         st = status.fillna("").astype(str).str.lower()
         inactive = st.isin({"confirmed_inactive", "out"}) | (
-            st.eq("doubtful") & (pd.to_numeric(aprog, errors="coerce").fillna(1) <= 0.05)
+            st.eq("doubtful") & (pd.to_numeric(aprog, errors="coerce").fillna(1) <= 0.05
+                                if aprog is not None else False)
         )
         p = np.where(inactive.to_numpy(), np.minimum(p, 0.02), p)
         lam = np.where(inactive.to_numpy(), np.minimum(lam, 0.02), lam)
@@ -263,6 +279,7 @@ def predict_frame(model: PlayerTdModel, frame: pd.DataFrame) -> pd.DataFrame:
     out["p_atd"] = p
     out["p_atd_low"] = p_lo
     out["p_atd_high"] = p_hi
+    out["uncertainty_status"] = "unvalidated_sensitivity_range"
     out["p_active"] = p_active
     return out
 

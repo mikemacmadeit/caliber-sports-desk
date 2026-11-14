@@ -177,8 +177,9 @@ def _renorm_column(frame: pd.DataFrame, col: str, other: float) -> np.ndarray:
         mask = keys == key
         s = float(out[mask].sum())
         if s <= 1e-12:
-            n = int(mask.sum())
-            out[mask] = (1.0 - other) / max(n, 1)
+            # No supported recipient: leave all receiving mass unallocated.
+            # Uniform fallback here would restore receiving TDs to pocket QBs.
+            out[mask] = 0.0
         else:
             out[mask] = out[mask] / s * (1.0 - other)
     return out
