@@ -27,7 +27,8 @@ export function TodayPropPicks({ league, date, gameId, market, initialCard = nul
       } catch { if (!disposed) setError(true); }
       finally { clearTimeout(timer); }
     }
-    void refresh();
+    setError(Boolean(initialCard?.degraded));
+    if (!initialCard || initialCard.degraded) void refresh();
     const poll = setInterval(() => void refresh(), 60000);
     const clock = setInterval(() => setNow(Date.now()), 1000);
     return () => { disposed = true; controller?.abort(); clearInterval(poll); clearInterval(clock); };
@@ -35,7 +36,7 @@ export function TodayPropPicks({ league, date, gameId, market, initialCard = nul
   if (error) return <p role="status" className="text-sm text-mute">Updates are temporarily unavailable. Current opportunities are paused while prices are verified.</p>;
   if (!card) return <p className="text-sm text-mute">Checking published opportunities…</p>;
   const picks = card.picks.filter(p => (!gameId || p.game_id === gameId) && (!market || p.market_id === market) &&
-    p.qualification?.eligible && p.qualification.valid_until && Date.parse(p.qualification.valid_until) > now);
+    !p.locked && p.qualification?.eligible && p.qualification.valid_until && Date.parse(p.qualification.valid_until) > now);
   if (!picks.length) return <p className="plate px-5 py-6 text-sm text-mute">No qualifying opportunity right now. A pick needs a verified price, sufficient data, and enough estimated value.</p>;
   const odds = (n: number) => n > 0 ? `+${n}` : String(n);
   return <div className="grid gap-3 md:grid-cols-2">{picks.map(p => <article key={p.pick_id} className="plate px-5 py-5">

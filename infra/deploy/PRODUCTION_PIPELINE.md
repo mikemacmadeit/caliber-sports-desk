@@ -9,7 +9,7 @@ Settlement uses explicit market-specific ESPN summary results. Return touchdowns
 ## Release and first run
 
 1. Review and merge the code, then deploy API and workers together. Existing tables are retained; `init_db` creates the new additive tables. Take a database backup before production rollout and verify it is restorable.
-2. Apply `render.yaml`. Keep the existing `caliber-hourly` service name so the old hourly job is updated, rather than accidentally leaving duplicate odds jobs enabled. Set `ODDS_API_KEY` on the odds job, `API_SPORTS_KEY` and an identifying `NWS_USER_AGENT` on the input job. All jobs and the API must use the same Postgres database.
+2. For the existing Michael workspace, use `infra/deploy/render-production-jobs.yaml` with existing-resource adoption. It targets `caliber-hourly` and `caliber-scoreboard`, adds `caliber-inputs`, and references the existing `caliber-db-xtkn` database and `caliber-api-xtkn` credential values without copying secrets into Git. The API stays on its existing service and deploys from master. Do not create duplicate API/database resources from the generic root template. For a new independent installation, apply `render.yaml`. Keep the existing `caliber-hourly` service name so the old hourly job is updated, rather than accidentally leaving duplicate odds jobs enabled. Set `ODDS_API_KEY` on the odds job, `API_SPORTS_KEY` and an identifying `NWS_USER_AGENT` on the input job. All jobs and the API must use the same Postgres database.
 3. Run each lane once in the deployed environment:
    - `python -m worker.main production-cycle --lane inputs`
    - `python -m worker.main production-cycle --lane odds`
@@ -26,3 +26,7 @@ Settlement uses explicit market-specific ESPN summary results. Return touchdowns
 - API and workers share `board_snapshots`. Local JSON is retained only for explicit fixture paths; bundled snapshots are not the production cache.
 
 Test the scheduled lanes with real credentials on staging before a live release. This change does not configure hosting accounts, purchase provider plans, enable subscription billing, or establish a profitable model track record.
+
+## Netlify deployment fixes
+
+Fonts are bundled from pinned Fontsource packages so builds do not rely on Google Fonts downloads. The explicit Next.js API proxy replaces the old external rewrite. Current prices, picks, parlays, health, and any session-authenticated response use no-store; only anonymous schedule/model research responses use shared caching.
