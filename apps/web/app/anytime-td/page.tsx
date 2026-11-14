@@ -30,7 +30,7 @@ export default async function AnytimeTdPage({
     daysError = e instanceof Error ? e.message : "days unavailable";
   }
 
-  const selected = dateParam || days?.today || new Date().toISOString().slice(0, 10);
+  let selected = dateParam || days?.today || new Date().toISOString().slice(0, 10);
 
   // Parallel + short budgets: Netlify SSR dies around ~26–60s if these run in series.
   let data: { rows: PropRow[]; disclaimer: string } | null = null;
@@ -69,6 +69,32 @@ export default async function AnytimeTdPage({
     else propsError = propsResult.error;
     called = calledResult;
     scorecard = scoreResult;
+
+    // Landing on "today" with no TD prices is normal mid-week. Jump to the next
+    // slate day that already has a saved board so the page is not a dead end.
+    if (!dateParam && (data?.rows.length ?? 0) === 0 && days?.dates?.length) {
+      const candidates = days.dates.filter((d) => d > selected).slice(0, 4);
+      const probes = await Promise.all(
+        candidates.map((day) =>
+          apiGet<{ rows: PropRow[]; disclaimer: string }>(
+            `/v1/props?market=anytime_td&league=${league}&date=${day}`,
+            8000,
+          )
+            .then((value) => ({ day, value }))
+            .catch(() => null),
+        ),
+      );
+      const hit = probes.find((p) => p && (p.value.rows?.length ?? 0) > 0);
+      if (hit) {
+        selected = hit.day;
+        data = hit.value;
+        propsError = null;
+        called = await apiGet<{ rows: CalledRow[] }>(
+          `/v1/anytime-td/called?league=${league}&date=${selected}`,
+          8000,
+        ).catch(() => null);
+      }
+    }
   }
   const calledRows = called?.rows ?? [];
   const scoreRows = scorecard?.atd_scorecard?.rows || [];
@@ -143,12 +169,24 @@ export default async function AnytimeTdPage({
                 <p className="mt-3 max-w-xl text-sm text-mute">
                   The games are on the slate. Sportsbooks have not posted a touchdown price yet.
                 </p>
-                <Link
-                  href={withQuery("/", { league, date: selected === days.today ? undefined : selected })}
-                  className="mt-4 inline-block font-display text-2xl uppercase tracking-wide text-gold"
-                >
-                  Open the slate →
-                </Link>
+                {next ? (
+                  <Link
+                    href={withQuery("/anytime-td", {
+                      league: league === "all" ? undefined : league,
+                      date: days && next === days.today ? undefined : next,
+                    })}
+                    className="mt-4 inline-block font-display text-2xl uppercase tracking-wide text-gold"
+                  >
+                    Open {dayParts(next).weekday} {dayParts(next).monthDay} →
+                  </Link>
+                ) : (
+                  <Link
+                    href={withQuery("/", { league, date: selected === days.today ? undefined : selected })}
+                    className="mt-4 inline-block font-display text-2xl uppercase tracking-wide text-gold"
+                  >
+                    Open the slate →
+                  </Link>
+                )}
               </div>
             ) : (
               <EmptyDay
