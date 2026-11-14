@@ -166,9 +166,9 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
       {mode === "calls" && visible.length > 0 ? (
         <>
           {toolbar}
-          <Section title="Most likely to score" count={plays.length} accent="flare" />
+          <Section title="Desk picks" count={plays.length} accent="flare" />
           <p className="max-w-xl text-sm text-mute">
-            One name per game. The percentage is how often we expect a touchdown — not a promise, and not a bet.
+            One name per game. These are the ones we grade on the record — a touchdown is a win, no touchdown is a loss.
           </p>
           {plays.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-2">

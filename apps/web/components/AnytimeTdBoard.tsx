@@ -157,7 +157,7 @@ export function AnytimeTdBoard({
           <h2 className="font-display text-4xl uppercase leading-none tracking-wide">The board</h2>
           <p className="mt-2 max-w-xl text-sm text-mute">Every priced touchdown chance for the day.</p>
         </div>
-        <PropExplorer rows={data.rows} mode="calls" />
+        <PropExplorer rows={data.rows} mode="flat" />
       </section>
     </div>
   );
