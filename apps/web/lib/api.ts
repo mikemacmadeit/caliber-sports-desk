@@ -259,6 +259,8 @@ export type PropRow = {
   projection_source?: string | null;
   bookmaker: string | null;
   book_price: number | null;
+  /** Points this player's team is getting. Negative means his team is favored. */
+  team_spread?: number | null;
   source_timestamp: string | null;
   price_freshness?: PriceFreshness;
   best_available?: boolean;
@@ -268,6 +270,8 @@ export type PropRow = {
     targets?: number | null;
     rz_targets?: number | null;
     gl_carries?: number | null;
+    rush_td?: number | null;
+    rec_td?: number | null;
     games?: number | null;
   } | null;
   data_tier?: string;
