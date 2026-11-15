@@ -11,13 +11,11 @@ type DayCard = {
 };
 
 export function LedgerRecord({
-  apiBase,
   month,
   selected,
   league,
   title,
 }: {
-  apiBase: string;
   month: string;
   selected: string;
   league: string;
@@ -31,8 +29,7 @@ export function LedgerRecord({
     const timer = setTimeout(() => ctrl.abort(), 90000);
     setData(null);
     setFailed(false);
-    const base = apiBase.replace(/\/$/, "");
-    fetch(`${base}/v1/published/day?date=${selected}&league=${league}`, { signal: ctrl.signal })
+    fetch(`/api/backend/v1/published/day?date=${selected}&league=${league}`, { signal: ctrl.signal })
       .then((res) => {
         if (!res.ok) throw new Error(String(res.status));
         return res.json() as Promise<DayCard>;
@@ -44,7 +41,7 @@ export function LedgerRecord({
       clearTimeout(timer);
       ctrl.abort();
     };
-  }, [apiBase, selected, league]);
+  }, [selected, league]);
 
   return (
     <>

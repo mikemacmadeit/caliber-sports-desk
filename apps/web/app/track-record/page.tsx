@@ -3,8 +3,6 @@ import { LedgerRecord } from "@/components/LedgerRecord";
 import { PageHeader } from "@/components/PageHeader";
 import { dayParts, slateToday } from "@/lib/days";
 
-const API = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default async function TrackRecordPage({
   searchParams,
 }: {
@@ -31,7 +29,6 @@ export default async function TrackRecordPage({
         ))}
       </nav>
       <LedgerRecord
-        apiBase={API}
         month={month}
         selected={selected}
         league={league}
