@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { TeamMark } from "@/components/TeamMark";
 import type { ParlayLeg, ParlayTicket } from "@/lib/api";
 import { ticketLine } from "@/lib/calls";
 import { kickoffParts, marketLabel } from "@/lib/format";
+import { club } from "@/lib/teams";
 
 export function ParlayBoard({ tickets }: { tickets: ParlayTicket[] }) {
   return (
@@ -34,7 +36,9 @@ export function ParlayBoard({ tickets }: { tickets: ParlayTicket[] }) {
                 return (
                   <li key={`${ticket.id}-${leg.outcome_id}-${legIndex}`}>
                     <Link href={`/games/${leg.game_id}`} className={`grid grid-cols-[1fr_auto] items-center gap-3 py-3 ${rowTint(mark)}`}>
-                      <span className="min-w-0">
+                      <span className="flex min-w-0 items-center gap-3">
+                        <TeamMark team={club(leg.team || leg.player_name)} size="sm" />
+                        <span className="min-w-0">
                         <span className="block truncate font-display text-2xl uppercase leading-none tracking-wide text-paper">
                           {leg.player_name}
                         </span>
@@ -45,6 +49,7 @@ export function ParlayBoard({ tickets }: { tickets: ParlayTicket[] }) {
                         <span className={resultClass(mark)}>
                           {resultLabel(mark, leg.game_status)}
                           {actualText(leg)}
+                        </span>
                         </span>
                       </span>
                       <span className="flex items-center gap-3">

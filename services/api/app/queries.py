@@ -737,7 +737,7 @@ def _attach_prop_results(session: Session, rows: list[dict[str, Any]]) -> None:
         if prev is None or (stat.revision or 0) >= (prev.revision or 0):
             best[key] = stat
     published = {
-        (stat.game_id, stat.player_id, stat.market_id): stat.actual
+        (stat.game_id, stat.player_id, stat.market_id): stat
         for stat in session.scalars(select(PublishedStat).where(PublishedStat.game_id.in_(game_ids)))
     }
     for row in rows:
@@ -745,7 +745,12 @@ def _attach_prop_results(session: Session, rows: list[dict[str, Any]]) -> None:
         if game is None or game.status not in {"final", "post"}:
             row["result"] = "pending"
             continue
-        actual = published.get((row.get("game_id"), row.get("player_id"), row.get("market_id")))
+        saved = published.get((row.get("game_id"), row.get("player_id"), row.get("market_id")))
+        if saved is not None and str(saved.source or "") == "espn.summary.absent":
+            row["result"] = "void"
+            row["actual"] = None
+            continue
+        actual = None if saved is None else saved.actual
         if actual is None:
             stat = best.get((row.get("game_id"), row.get("player_id")))
             if stat is None:

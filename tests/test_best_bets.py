@@ -1,6 +1,6 @@
 """Desk shortlists: point edge on the number, and a price the chance beats."""
 
-from spe.desk.best_bets import price_shortlist, prop_desk_picks, spread_shortlist
+from spe.desk.best_bets import desk_price_cards, price_shortlist, prop_desk_picks, spread_shortlist
 
 
 def _spread(**kwargs):
@@ -110,6 +110,50 @@ def test_price_shortlist_keeps_a_stale_number_that_the_chance_beats():
     ]
     picked = price_shortlist(rows)
     assert [row["player_name"] for row in picked] == ["A"]
+
+
+def test_the_card_keeps_one_prop_per_game():
+    rows = [
+        {
+            "game_id": "g1",
+            "player_id": "best",
+            "market_id": "receiving_yards",
+            "player_name": "Best",
+            "model_lean": True,
+            "book_price": -110,
+            "side": "over",
+            "line": 40.5,
+            "pick": "Best over 40.5 receiving yards",
+            "forecast": {"p_estimate": 0.64, "availability_status": "active", "notes": "drop me"},
+            "offers": [{"book": "huge"}],
+        },
+        {
+            "game_id": "g1",
+            "player_id": "soft",
+            "market_id": "receptions",
+            "player_name": "Soft",
+            "model_lean": True,
+            "book_price": -110,
+            "side": "over",
+            "line": 5.5,
+            "forecast": {"p_estimate": 0.56, "availability_status": "active"},
+        },
+        {
+            "game_id": "g2",
+            "player_id": "other",
+            "market_id": "rushing_yards",
+            "player_name": "Other",
+            "model_lean": True,
+            "book_price": -110,
+            "side": "over",
+            "line": 20.5,
+            "forecast": {"p_estimate": 0.60, "availability_status": "active"},
+        },
+    ]
+    cards = desk_price_cards(rows)
+    assert {(card["game_id"], card["player_name"]) for card in cards} == {("g1", "Best"), ("g2", "Other")}
+    assert cards[0]["forecast"] == {"p_estimate": 0.64}
+    assert "offers" not in cards[0]
 
 
 def test_prop_desk_picks_are_counting_markets_not_touchdowns():

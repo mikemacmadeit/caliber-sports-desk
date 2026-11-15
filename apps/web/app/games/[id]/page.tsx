@@ -10,6 +10,7 @@ import { TeamMark } from "@/components/TeamMark";
 import { TodayPropPicks } from "@/components/TodayPropPicks";
 import { UsagePanel } from "@/components/UsagePanel";
 import { apiGet, type GameDetail } from "@/lib/api";
+import { finalsForDate, gradeFinishedCall } from "@/lib/gradeCalls";
 import { cToF, kickoff, kickoffDate, mpsToMph } from "@/lib/format";
 import { recommendationCopy, reasonLabel } from "@/lib/labels";
 import { presentTeam } from "@/lib/teams";
@@ -20,7 +21,10 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   const g = data.game;
   const away = presentTeam(g.away);
   const home = presentTeam(g.home);
-  const card = await loadCard(g.league_id, g.game_id);
+  const loaded = await loadCard(g.league_id, g.game_id);
+  const card = loaded
+    ? gradeFinishedCall(loaded, await finalsForDate(kickoffDate(g.kickoff_utc)))
+    : null;
   const explanation = data.research?.explanations?.[0];
   const call = recommendationCopy(explanation?.recommendation_status);
   const weatherTitle =

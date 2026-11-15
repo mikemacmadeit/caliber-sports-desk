@@ -44,10 +44,12 @@ export function QualifiedBoard({
   ];
   const wins = cards.filter((item) => item === "win").length;
   const losses = cards.filter((item) => item === "loss").length;
-  const pending = cards.length - wins - losses - cards.filter((item) => item === "push").length;
   const pushes = cards.filter((item) => item === "push").length;
+  const voids = prices.filter((row) => row.result === "void").length;
+  const pending = cards.length - wins - losses - pushes - voids;
   const parts = [`${wins} wins`, `${losses} losses`, `${pending} pending`];
   if (pushes) parts.push(`${pushes} pushes`);
+  if (voids) parts.push(`${voids} didn't play`);
 
   return (
     <div className="space-y-8">
@@ -115,8 +117,8 @@ function PriceCard({ row }: { row: QualifiedPrice }) {
         {chance == null ? "" : ` · ${pct(chance, 0)}`}
       </p>
       <p className={resultClass(mark)}>
-        {resultLabel(mark, row.game_status)}
-        {actualText(row)}
+        {resultLabel(mark, row.game_status, row.result)}
+        {row.result === "void" ? "" : actualText(row)}
       </p>
     </Link>
   );
@@ -137,7 +139,8 @@ function actualText(row: QualifiedPrice) {
   return ` · ${value} ${unit}`;
 }
 
-function resultLabel(mark: "win" | "loss" | "push" | null, status?: string | null) {
+function resultLabel(mark: "win" | "loss" | "push" | null, status?: string | null, result?: string | null) {
+  if (result === "void") return "Didn't play";
   if (mark === "win") return "Correct";
   if (mark === "loss") return "Wrong";
   if (mark === "push") return "Push";

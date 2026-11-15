@@ -38,6 +38,8 @@ export function TeamMark({
           src={team.logo}
           alt=""
           referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
           className="h-[78%] w-[78%] object-contain"
           onError={() => setFailed(true)}
         />

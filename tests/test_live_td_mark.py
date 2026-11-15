@@ -2,8 +2,8 @@
 
 from datetime import UTC, datetime, timedelta
 
-from spe.db.models import Game, League, ProviderIdMap, Season, Sport, Team, Venue
-from spe.desk.day_results import apply_recorded_results
+from spe.db.models import Game, League, ProviderIdMap, PublishedStat, Season, Sport, Team, Venue
+from spe.desk.day_results import _CHECKED, apply_recorded_results
 
 NOW = datetime(2026, 11, 15, 16, tzinfo=UTC)
 
@@ -190,6 +190,50 @@ def test_a_live_touchdown_is_green_and_a_blank_teammate_stays_open(db):
     assert by_name["Jahmyr Gibbs"] == "pending"
 
 
+def test_a_live_counting_line_is_replaced_by_the_final_box(db):
+    from spe.db.models import PublishedStat
+
+    _seed(db)
+    game = db.get(Game, "nfl:2026_10_NE_DET")
+    game.status = "final"
+    game.away_score = 24
+    game.home_score = 27
+    db.add(PublishedStat(
+        key="nfl:2026_10_NE_DET|nfl:sampson|receptions",
+        game_id="nfl:2026_10_NE_DET",
+        player_id="nfl:sampson",
+        market_id="receptions",
+        actual=3,
+        source="espn.summary.live",
+        observed_at=NOW,
+    ))
+    db.flush()
+    row = {
+        "game_id": "nfl:2026_10_NE_DET",
+        "player_id": "nfl:sampson",
+        "player_name": "Dylan Sampson",
+        "market_id": "receptions",
+        "side": "under",
+        "line": 3.5,
+    }
+    box = _box({("nfl:sampson", "Dylan Sampson"): 0})
+    box["header"]["competitions"][0]["status"]["type"]["name"] = "STATUS_FINAL"
+    athlete = box["boxscore"]["players"][0]["statistics"][0]["athletes"][0]
+    athlete["stats"] = ["4", "20", "0"]
+    calls = {"n": 0}
+
+    def fetch(league, event):
+        calls["n"] += 1
+        return box
+
+    apply_recorded_results(db, [], [row], fetch=fetch)
+    assert calls["n"] == 1
+    assert row["actual"] == 4
+    assert row["result"] == "loss"
+    apply_recorded_results(db, [], [row], fetch=lambda *_args: (_ for _ in ()).throw(AssertionError("final box was fetched twice")))
+    assert row["result"] == "loss"
+
+
 def test_a_final_game_without_a_box_is_graded(db):
     from spe.models.player_td.desk_replay import grade
 
@@ -208,3 +252,140 @@ def test_a_final_game_without_a_box_is_graded(db):
     apply_recorded_results(db, [], rows, fetch=lambda league, event: box)
     assert grade(db, game, "nfl:6963") == "blank"
     assert grade(db, game, "nfl:9139") == "scored"
+
+
+def _final_box(groups: list[tuple[str, list[str], list[dict]]]) -> dict:
+    return {
+        "header": {
+            "competitions": [{
+                "status": {"type": {"name": "STATUS_FINAL"}},
+                "competitors": [
+                    {"homeAway": "home", "score": "35"},
+                    {"homeAway": "away", "score": "10"},
+                ],
+            }],
+        },
+        "boxscore": {
+            "players": [{
+                "statistics": [
+                    {"name": name, "labels": labels, "athletes": athletes}
+                    for name, labels, athletes in groups
+                ],
+            }],
+        },
+    }
+
+
+def _athlete(player_id: str, name: str, stats: list[str]) -> dict:
+    return {"athlete": {"id": player_id.split(":")[-1], "displayName": name}, "stats": stats}
+
+
+def test_a_player_missing_from_the_final_box_is_void_not_a_loss(db):
+    _CHECKED.clear()
+    _seed(db)
+    game = db.get(Game, "nfl:2026_10_NE_DET")
+    game.status = "final"
+    db.add(PublishedStat(
+        key="nfl:2026_10_NE_DET|nfl:9139|receiving_yards",
+        game_id="nfl:2026_10_NE_DET",
+        player_id="nfl:9139",
+        market_id="receiving_yards",
+        actual=0,
+        observed_at=NOW,
+        source="espn.summary",
+    ))
+    db.commit()
+    row = {
+        "game_id": "nfl:2026_10_NE_DET",
+        "player_id": "nfl:9139",
+        "player_name": "Jahmyr Gibbs",
+        "market_id": "receiving_yards",
+        "side": "over",
+        "line": 39.5,
+    }
+    box = _final_box([("receiving", ["REC", "YDS", "TD"], [_athlete("nfl:6963", "Amon-Ra St. Brown", ["4", "40", "1"])])])
+    apply_recorded_results(db, [], [row], fetch=lambda league, event: box)
+    assert row["result"] == "void"
+    assert row["actual"] is None
+    stat = db.get(PublishedStat, "nfl:2026_10_NE_DET|nfl:9139|receiving_yards")
+    assert stat.source == "espn.summary.absent"
+
+
+def test_an_official_zero_for_a_missing_player_is_void(db):
+    _CHECKED.clear()
+    _seed(db)
+    game = db.get(Game, "nfl:2026_10_NE_DET")
+    game.status = "final"
+    db.add(PublishedStat(
+        key="nfl:2026_10_NE_DET|nfl:9139|receptions",
+        game_id="nfl:2026_10_NE_DET",
+        player_id="nfl:9139",
+        market_id="receptions",
+        actual=0,
+        observed_at=NOW,
+        source="espn.summary.final",
+    ))
+    db.commit()
+    row = {
+        "game_id": "nfl:2026_10_NE_DET",
+        "player_id": "nfl:9139",
+        "player_name": "Jahmyr Gibbs",
+        "market_id": "receptions",
+        "side": "over",
+        "line": 4.5,
+    }
+    box = _final_box([("receiving", ["REC", "YDS", "TD"], [_athlete("nfl:6963", "Amon-Ra St. Brown", ["4", "40", "1"])])])
+    apply_recorded_results(db, [], [row], fetch=lambda league, event: box)
+    assert row["result"] == "void"
+    assert row["actual"] is None
+
+
+def test_a_live_rushing_total_is_replaced_by_the_final_box(db):
+    _CHECKED.clear()
+    _seed(db)
+    game = db.get(Game, "nfl:2026_10_NE_DET")
+    game.status = "final"
+    db.add(PublishedStat(
+        key="nfl:2026_10_NE_DET|nfl:9139|rushing_yards",
+        game_id="nfl:2026_10_NE_DET",
+        player_id="nfl:9139",
+        market_id="rushing_yards",
+        actual=16,
+        observed_at=NOW,
+        source="espn.summary.live",
+    ))
+    db.commit()
+    row = {
+        "game_id": "nfl:2026_10_NE_DET",
+        "player_id": "nfl:9139",
+        "player_name": "Jahmyr Gibbs",
+        "market_id": "rushing_yards",
+        "side": "under",
+        "line": 54.5,
+    }
+    box = _final_box([("rushing", ["CAR", "YDS", "TD"], [_athlete("nfl:9139", "Jahmyr Gibbs", ["12", "25", "1"])])])
+    apply_recorded_results(db, [], [row], fetch=lambda league, event: box)
+    assert row["result"] == "win"
+    assert row["actual"] == 25
+
+
+def test_a_game_still_marked_scheduled_grades_once_the_box_is_final(db):
+    _CHECKED.clear()
+    _seed(db)
+    game = db.get(Game, "nfl:2026_10_NE_DET")
+    game.status = "scheduled"
+    game.kickoff_utc = NOW - timedelta(hours=6)
+    db.commit()
+    row = {
+        "game_id": "nfl:2026_10_NE_DET",
+        "player_id": "nfl:9139",
+        "player_name": "Jahmyr Gibbs",
+        "market_id": "receiving_yards",
+        "side": "over",
+        "line": 60.5,
+    }
+    box = _final_box([("receiving", ["REC", "YDS", "TD"], [_athlete("nfl:9139", "Jahmyr Gibbs", ["1", "3", "0"])])])
+    apply_recorded_results(db, [], [row], fetch=lambda league, event: box)
+    assert game.status == "final"
+    assert row["result"] == "loss"
+    assert row["actual"] == 3

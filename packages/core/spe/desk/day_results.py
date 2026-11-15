@@ -1,7 +1,8 @@
 """Grade the day's shown picks from the recorded game and box score.
 
-A box that fails to load stays pending. A finished box that omits a player,
-or omits one of that player's counting stats, recorded a zero.
+A box that fails to load stays pending. A listed player who has no line for a
+counting stat recorded a zero. A player who never appears did not play, so that
+counting prop is void rather than a made-up zero.
 """
 
 from __future__ import annotations
@@ -21,6 +22,11 @@ from spe.shadow.settle import _grade
 
 COUNTING = ("receptions", "rushing_yards", "receiving_yards")
 TOUCHDOWN = "anytime_td"
+# A live box is not the grade. Only this source is the official final number.
+OFFICIAL_BOX = "espn.summary.final"
+# A confirmed zero stays on this source so the page does not download the box again.
+COUNTED_BOX = "espn.summary.counted"
+ABSENT_BOX = "espn.summary.absent"
 _CHECKED: set[str] = set()
 
 
@@ -42,7 +48,7 @@ def apply_recorded_results(
     for row in spreads:
         _grade_spread(row, games.get(row.get("game_id")))
     stats = {
-        (stat.game_id, stat.player_id, stat.market_id): stat.actual
+        (stat.game_id, stat.player_id, stat.market_id): stat
         for stat in session.scalars(
             select(PublishedStat).where(
                 PublishedStat.game_id.in_(game_ids),
@@ -54,7 +60,12 @@ def apply_recorded_results(
         game = games.get(row.get("game_id"))
         status = None if game is None else str(game.status or "").lower()
         row["game_status"] = status
-        actual = stats.get((row.get("game_id"), row.get("player_id"), row.get("market_id")))
+        stat = stats.get((row.get("game_id"), row.get("player_id"), row.get("market_id")))
+        if stat is not None and str(stat.source or "") == ABSENT_BOX:
+            row["result"] = "void"
+            row["actual"] = None
+            continue
+        actual = None if stat is None else stat.actual
         if actual is None or status not in {"final", "post", "in_progress"}:
             row["result"] = "pending"
             continue
@@ -107,7 +118,7 @@ def _fill_counting_stats(
     *,
     fetch,
 ) -> None:
-    missing = _missing_stats(session, rows)
+    missing = _missing_stats(session, games, rows)
     live_touchdowns = _live_touchdowns(session, games, rows)
     missing_games = {item[0] for item in missing}
     touchdown_games = {item[0] for item in live_touchdowns}
@@ -155,6 +166,9 @@ def _fill_counting_stats(
         staged: dict[str, PublishedStat] = {}
         for _game_id, player_id, name, market, key in refreshing:
             person = by_espn.get(str(player_id).split(":")[-1]) or by_name.get(normalize_name(name))
+            if person is None and finished and market in COUNTING:
+                _mark_absent(session, staged, key, game_id, player_id, market, now)
+                continue
             markets = None if person is None else (person.get("markets") or {})
             actual = box_actual(markets, market, final=finished)
             if actual is None:
@@ -173,8 +187,10 @@ def _fill_counting_stats(
             # A live touchdown can show green. It is not the official final box.
             if market == TOUCHDOWN and not finished:
                 stat.source = "espn.live"
+            elif finished:
+                stat.source = COUNTED_BOX if market in COUNTING else "espn.summary"
             else:
-                stat.source = "espn.summary" if finished else "espn.summary.live"
+                stat.source = "espn.summary.live"
     session.flush()
 
 
@@ -277,19 +293,24 @@ def _live_touchdowns(
 def _needs_a_box(game: Game, missing_games: set[str], now: datetime) -> bool:
     """A game that has not kicked off has no box. Fetching it only slows the page."""
     status = str(game.status or "").lower()
-    if status in {"canceled", "cancelled"} or game.game_id in _CHECKED:
+    if status in {"canceled", "cancelled"}:
         return False
-    if status in {"final", "post"}:
+    if game.game_id in _CHECKED and game.game_id not in missing_games:
+        return False
+    if status in {"final", "post", "in_progress", "halftime"}:
         return game.game_id in missing_games
-    if status in {"in_progress", "halftime"}:
-        return True
     kick = game.kickoff_utc
     if kick is not None and kick.tzinfo is None:
         kick = kick.replace(tzinfo=UTC)
     return kick is None or kick <= now
 
 
-def _missing_stats(session: Session, rows: list[dict[str, Any]]) -> list[tuple[str, str, str, str, str]]:
+def _missing_stats(
+    session: Session,
+    games: dict[str, Game],
+    rows: list[dict[str, Any]],
+) -> list[tuple[str, str, str, str, str]]:
+    """Stats with no box yet, plus a live number that still needs the final box."""
     wanted: list[tuple[str, str, str, str, str]] = []
     for row in rows:
         game_id = str(row.get("game_id") or "")
@@ -300,10 +321,48 @@ def _missing_stats(session: Session, rows: list[dict[str, Any]]) -> list[tuple[s
         wanted.append((game_id, player_id, str(row.get("player_name") or ""), market, f"{game_id}|{player_id}|{market}"))
     if not wanted:
         return []
-    existing = set(
-        session.scalars(select(PublishedStat.key).where(PublishedStat.key.in_([item[4] for item in wanted])))
-    )
-    return [item for item in wanted if item[4] not in existing]
+    existing = {
+        stat.key: stat
+        for stat in session.scalars(select(PublishedStat).where(PublishedStat.key.in_([item[4] for item in wanted])))
+    }
+    refresh: list[tuple[str, str, str, str, str]] = []
+    for item in wanted:
+        stat = existing.get(item[4])
+        if stat is None:
+            refresh.append(item)
+            continue
+        game = games.get(item[0])
+        status = "" if game is None else str(game.status or "").lower()
+        source = str(stat.source or "")
+        # An old official zero may be a player the box never listed. Check once.
+        if status in {"final", "post"} and source == OFFICIAL_BOX and (stat.actual or 0) == 0:
+            refresh.append(item)
+            continue
+        if status in {"final", "post"} and source not in {OFFICIAL_BOX, COUNTED_BOX, ABSENT_BOX}:
+            refresh.append(item)
+    return refresh
+
+
+def _mark_absent(
+    session: Session,
+    staged: dict[str, PublishedStat],
+    key: str,
+    game_id: str,
+    player_id: str,
+    market: str,
+    now: datetime,
+) -> None:
+    """A finished box that never lists the player is a void, not a counting zero."""
+    stat = staged.get(key)
+    if stat is None:
+        stat = session.get(PublishedStat, key)
+    if stat is None:
+        stat = PublishedStat(key=key, game_id=game_id, player_id=player_id, market_id=market)
+        session.add(stat)
+    staged[key] = stat
+    stat.actual = 0
+    stat.observed_at = now
+    stat.source = ABSENT_BOX
 
 
 def _apply_summary(game: Game, payload: dict[str, Any]) -> bool:

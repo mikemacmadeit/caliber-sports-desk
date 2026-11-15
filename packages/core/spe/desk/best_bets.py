@@ -88,6 +88,37 @@ def desk_shortlist(rows: list[dict[str, Any]], *, limit: int = DESK_LIMIT) -> li
     return select_desk_takes(rows)[:limit]
 
 
+def desk_price_cards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One counting prop per game, with only the fields the card renders."""
+    from spe.props.game_picks import select_desk_props
+
+    return [_price_card(row) for row in select_desk_props(rows)]
+
+
+def _price_card(row: dict[str, Any]) -> dict[str, Any]:
+    forecast = row.get("forecast") if isinstance(row.get("forecast"), dict) else {}
+    return {
+        "game_id": row.get("game_id"),
+        "player_id": row.get("player_id"),
+        "player_name": row.get("player_name"),
+        "team": row.get("team"),
+        "away_abbr": row.get("away_abbr"),
+        "home_abbr": row.get("home_abbr"),
+        "market_id": row.get("market_id"),
+        "book_price": row.get("book_price"),
+        "bookmaker": row.get("bookmaker"),
+        "kickoff_utc": row.get("kickoff_utc"),
+        "game_status": row.get("game_status"),
+        "result": row.get("result"),
+        "actual": row.get("actual"),
+        "pick": row.get("pick"),
+        "side": row.get("side"),
+        "line": row.get("line"),
+        "league_id": row.get("league_id"),
+        "forecast": {"p_estimate": forecast.get("p_estimate")},
+    }
+
+
 def prop_desk_picks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Every model-side counting prop for the day. Touchdowns stay off this card."""
     picks = [row for row in rows if _prop_side(row)]
@@ -117,7 +148,7 @@ def build_best_bets(*, league: str, date: str) -> dict[str, Any]:
         "date": date,
         "league": league or "all",
         "spreads": spreads,
-        "prices": prop_desk_picks(prop_rows),
+        "prices": desk_price_cards(prop_rows),
         "scorers": [],
     }
 

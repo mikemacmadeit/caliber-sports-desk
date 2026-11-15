@@ -7,8 +7,10 @@ import { SlateBoard } from "@/components/SlateBoard";
 import { TodayPropPicks } from "@/components/TodayPropPicks";
 import { TodayTickets } from "@/components/TodayTickets";
 import type { AtsRow } from "@/components/AtsBoard";
+import savedBoard from "@/lib/ats/board.json";
 import { apiGet, type ParlayCard, type PropPickCard, type SlateGame, type SlateResponse } from "@/lib/api";
 import { dayParts, type SlateDays, withQuery } from "@/lib/days";
+import { finalsForDate, gradeFinishedCall } from "@/lib/gradeCalls";
 import { kickoffDate } from "@/lib/format";
 
 export default async function TodayPage({
@@ -32,7 +34,7 @@ export default async function TodayPage({
   // Always open on today unless the URL asks for another day.
   const selectedEarly = dateParam || todayEarly;
   try {
-    const [slate, board, picks, tickets] = await Promise.all([
+    const [slate, board, picks, tickets, finals] = await Promise.all([
       apiGet<SlateResponse>(`/v1/slate?league=${league}&date=${selectedEarly}`, 20000),
       apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff`, 15000).catch(() => ({
         rows: [] as AtsRow[],
@@ -40,9 +42,16 @@ export default async function TodayPage({
       // Server → API direct (API_URL). Avoid the browser → Netlify proxy path that 500s.
       apiGet<PropPickCard>(`/v1/props/picks?league=${league}&date=${selectedEarly}`, 15000).catch(() => null),
       apiGet<ParlayCard>(`/v1/parlays/card?league=${league}&date=${selectedEarly}`, 15000).catch(() => null),
+      finalsForDate(selectedEarly),
     ]);
     data = slate;
-    calls = board.rows.filter((row) => kickoffDate(row.kickoff_utc) === selectedEarly);
+    const live = board.rows.filter((row) => kickoffDate(row.kickoff_utc) === selectedEarly);
+    const source = live.length
+      ? live
+      : (savedBoard.rows as AtsRow[]).filter(
+          (row) => kickoffDate(row.kickoff_utc) === selectedEarly && (league === "all" || row.league_id === league),
+        );
+    calls = source.map((row) => gradeFinishedCall(row, finals));
     propCard = picks;
     ticketCard = tickets;
   } catch (e) {

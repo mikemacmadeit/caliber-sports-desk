@@ -1,3 +1,5 @@
+import storedMarks from "./team-marks.json";
+
 export type Club = {
   abbr: string;
   city: string;
@@ -9,6 +11,17 @@ export type Club = {
 
 const NFL = "https://a.espncdn.com/i/teamlogos/nfl/500";
 const NCAA = "https://a.espncdn.com/i/teamlogos/ncaa/500";
+
+type StoredMark = {
+  abbr: string;
+  city: string;
+  nick: string;
+  primary: string;
+  secondary: string;
+  logo: string;
+};
+
+const STORED = storedMarks as Record<string, StoredMark>;
 
 const NFL_ABBR = new Set([
   "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX",
@@ -35,9 +48,24 @@ const CLUBS: Record<string, Club> = {
   TEX: { abbr: "TEX", city: "Texas", nick: "Longhorns", primary: "#BF5700", secondary: "#333F48", logo: `${NCAA}/251.png` },
 };
 
+function fromStored(name: string | null | undefined): Club | null {
+  const row = STORED[(name || "").trim().toLowerCase()];
+  if (!row?.logo) return null;
+  return {
+    abbr: row.abbr,
+    city: row.city || row.abbr,
+    nick: row.nick || row.abbr,
+    primary: row.primary || "#2C3848",
+    secondary: row.secondary || "#F4F6FB",
+    logo: row.logo,
+  };
+}
+
 export function club(abbr: string | null | undefined): Club {
   const key = (abbr || "").toUpperCase();
   if (CLUBS[key]) return CLUBS[key];
+  const stored = fromStored(abbr);
+  if (stored) return stored;
   if (NFL_ABBR.has(key)) {
     return {
       abbr: key,
@@ -86,6 +114,7 @@ export function presentTeam(team: {
     };
   }
   if (known) return known;
+  if (base.logo) return base;
   return {
     ...base,
     city: team.name || base.city,
