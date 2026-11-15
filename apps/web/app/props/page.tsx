@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { DayStrip, EmptyDay } from "@/components/DayStrip";
 import { LeagueToggle } from "@/components/LeagueToggle";
 import { PageHeader } from "@/components/PageHeader";
@@ -25,7 +26,7 @@ export default async function PropsPage({
   let days: SlateDays | null = null;
   let daysError: string | null = null;
   try {
-    days = await apiGet<SlateDays>(`/v1/days?league=${league}`, 30000);
+    days = await apiGet<SlateDays>(`/v1/days?league=${league}`, 10000);
   } catch (e) {
     daysError = e instanceof Error ? e.message : "days unavailable";
   }
@@ -36,7 +37,7 @@ export default async function PropsPage({
   try {
     data = await apiGet<{ rows: PropRow[] }>(
       `/v1/props?market=${market}&league=${league}&date=${selected}`,
-      60000,
+      15000,
     );
   } catch (e) {
     propsError = e instanceof Error ? e.message : "props unavailable";
@@ -44,19 +45,6 @@ export default async function PropsPage({
 
   const next = days?.dates.find((d) => d > selected) ?? null;
   const rows = data?.rows ?? [];
-  let deskCalls: PropDeskCall[] = [];
-  let deskLocked = false;
-  let deskError: string | null = null;
-  try {
-    const desk = await apiGet<{ calls?: PropDeskCall[]; locked?: boolean }>(
-      `/v1/props/desk?league=${league}&date=${selected}`,
-      45000,
-    );
-    deskCalls = desk.calls ?? [];
-    deskLocked = Boolean(desk.locked);
-  } catch (e) {
-    deskError = e instanceof Error ? e.message : "desk picks unavailable";
-  }
 
   return (
     <div className="space-y-8">
@@ -96,24 +84,9 @@ export default async function PropsPage({
           <p className="mt-1">Refresh after the API is back — this page no longer hard-crashes on a timeout.</p>
         </div>
       )}
-      {deskCalls.length > 0 ? <DeskRecord calls={deskCalls} /> : null}
-      <section className="space-y-3">
-        <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Desk picks</h2>
-        {deskError ? (
-          <p className="text-sm text-mute">The desk’s prop picks did not load.</p>
-        ) : deskCalls.length > 0 ? (
-          <PropDesk calls={deskCalls} />
-        ) : (
-          <div className="plate px-6 py-8">
-            <p className="font-display text-4xl uppercase leading-none">No prop call for this day</p>
-            <p className="mt-3 max-w-xl text-sm text-mute">
-              {deskLocked
-                ? "The calls open when the games kick off."
-                : "A call is the strongest receptions, receiving, or rushing line on a team favored by a touchdown or more. Close games stay off the card."}
-            </p>
-          </div>
-        )}
-      </section>
+      <Suspense fallback={<DeskWaiting />}>
+        <DeskSection league={league} date={selected} />
+      </Suspense>
       <DayTally rows={rows} />
       <TodayPropPicks league={league} date={selected} market={market} hideWhenEmpty />
       <div className="flex flex-wrap gap-2">
@@ -171,6 +144,53 @@ export default async function PropsPage({
         <PropExplorer rows={rows} mode="flat" />
       )}
     </div>
+  );
+}
+
+async function DeskSection({ league, date }: { league: string; date: string }) {
+  let deskCalls: PropDeskCall[] = [];
+  let deskLocked = false;
+  let deskError: string | null = null;
+  try {
+    const desk = await apiGet<{ calls?: PropDeskCall[]; locked?: boolean }>(
+      `/v1/props/desk?league=${league}&date=${date}`,
+      12000,
+    );
+    deskCalls = desk.calls ?? [];
+    deskLocked = Boolean(desk.locked);
+  } catch (e) {
+    deskError = e instanceof Error ? e.message : "desk picks unavailable";
+  }
+  return (
+    <>
+      {deskCalls.length > 0 ? <DeskRecord calls={deskCalls} /> : null}
+      <section className="space-y-3">
+        <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Desk picks</h2>
+        {deskError ? (
+          <p className="text-sm text-mute">The prices below are up. The desk picks are still loading.</p>
+        ) : deskCalls.length > 0 ? (
+          <PropDesk calls={deskCalls} />
+        ) : (
+          <div className="plate px-6 py-8">
+            <p className="font-display text-4xl uppercase leading-none">No prop call for this day</p>
+            <p className="mt-3 max-w-xl text-sm text-mute">
+              {deskLocked
+                ? "The calls open when the games kick off."
+                : "A call is the strongest receptions, receiving, or rushing line on a team favored by a touchdown or more. Close games stay off the card."}
+            </p>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+function DeskWaiting() {
+  return (
+    <section className="space-y-3">
+      <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Desk picks</h2>
+      <p className="text-sm text-mute">Loading the desk picks. The prices below are already up.</p>
+    </section>
   );
 }
 
