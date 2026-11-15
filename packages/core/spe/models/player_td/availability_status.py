@@ -23,7 +23,11 @@ def resolved_reports(reports):
     """
     chosen = {}
     absent = {}
+    practice = {}
     for r in reports:
+        if getattr(r, 'practice_status', None) and (r.player_id not in practice or
+                as_utc(r.reported_at) > as_utc(practice[r.player_id].reported_at)):
+            practice[r.player_id] = r
         status = normalize(r.designation)
         key = (status in GAME_STATUS, as_utc(r.reported_at), status in INACTIVE)
         if status in INACTIVE and (r.player_id not in absent or as_utc(r.reported_at)>as_utc(absent[r.player_id].reported_at)):
@@ -41,5 +45,8 @@ def resolved_reports(reports):
             chosen[pid]=(None,r,normalize(r.designation))
     return {pid: {'status':status, 'raw_status':r.designation, 'source':r.source,
             'observed_at':as_utc(r.observed_at).isoformat() if r.observed_at else None,
-            'reported_at':as_utc(r.reported_at).isoformat()}
+            'reported_at':as_utc(r.reported_at).isoformat(),
+            'practice_status':practice[pid].practice_status if pid in practice else None,
+            'practice_reported_at':as_utc(practice[pid].reported_at).isoformat() if pid in practice else None,
+            'practice_source':practice[pid].source if pid in practice else None}
             for pid, (_,r,status) in chosen.items()}

@@ -29,7 +29,7 @@ def _source(path, modified):
     return frame, hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def build_inputs(game, candidates, cutoff, source_path):
+def build_inputs(game, candidates, cutoff, source_path, *, historical_replay=False):
     """No current-game data, no network, and no changes to candidate inputs."""
     cutoff = as_utc(cutoff)
     if cutoff >= as_utc(game['kickoff']):
@@ -38,7 +38,7 @@ def build_inputs(game, candidates, cutoff, source_path):
     if not path.exists():
         raise InputsUnavailable('Cached NFL play-by-play is unavailable')
     modified = path.stat().st_mtime_ns
-    if datetime.fromtimestamp(modified / 1e9, UTC) > cutoff:
+    if not historical_replay and datetime.fromtimestamp(modified / 1e9, UTC) > cutoff:
         raise InputsUnavailable('Play-by-play cache was observed after the prediction cutoff')
     frame, source_hash = _source(str(path.resolve()), modified)
     # Retain the same conservative date-only lag used in the two experiments.
@@ -111,4 +111,6 @@ def build_inputs(game, candidates, cutoff, source_path):
                       'offense_games':offense_games, 'defense_games':defense_games}
     return {'game':game, 'information_cutoff':cutoff.isoformat(), 'teams':teams,
             'possession_samples':pace_samples, 'source_pbp_sha256':source_hash,
-            'source_observed_at':datetime.fromtimestamp(modified / 1e9, UTC).isoformat()}
+            'source_observed_at':datetime.fromtimestamp(modified / 1e9, UTC).isoformat(),
+            **({'reconstructed_historical_inputs':True,
+                'timing_limitation':'Revised plays retrieved later; prior-game availability assumed after 48 hours.'} if historical_replay else {})}

@@ -39,6 +39,15 @@ def ensure_refresh(date):
                     # It retains prior good data on partial source failure.
                     refresh_nflverse_desk(db)
                 db.commit()
+                if simulation:
+                    from spe.ingest.nfl_matchup_evidence import refresh as refresh_matchups
+                    refresh_matchups(db)
+                if simulation and simulation.get('weekly_context'):
+                    from spe.ingest.nws_live import ingest_nws_forecasts
+                    # Free, pregame forecasts; the adapter's 90-minute freshness
+                    # check avoids requesting weather on every card refresh.
+                    ingest_nws_forecasts(db, horizon_hours=48)
+                    db.commit()
             with session_factory() as db:
                 for attempt in range(2):
                     try:

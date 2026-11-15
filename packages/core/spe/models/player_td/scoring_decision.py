@@ -24,6 +24,10 @@ def evaluate(row):
     caution = []
     if simulation.get('status') == 'unavailable':
         caution.append('Game-flow simulation unavailable; using the original model estimate')
+    weekly = simulation.get('weekly_context') or {}
+    caution.extend(weekly.get('role_flags', []))
+    if weekly.get('weather_status') == 'sensitivity_active':
+        caution.append('Outdoor weather stress test is included in the range; its effect is not yet fitted')
     if availability not in ('active', 'available', 'healthy'):
         caution.append('Game-day participation is unconfirmed')
     if availability in ('questionable', 'uncertain'):

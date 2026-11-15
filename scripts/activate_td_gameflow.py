@@ -20,7 +20,7 @@ def dump(path, value):
     path.write_text(json.dumps(value, indent=2, default=str), encoding='utf-8')
 
 
-def run(day, output):
+def run(day, output, *, weekly_context=False, calibration=None):
     if output.exists():raise ValueError('Use a new output directory to preserve prior runs')
     output.mkdir(parents=True)
     now = datetime.now(UTC)
@@ -31,6 +31,8 @@ def run(day, output):
     if not current or current['version'] != 'desk_combined_v11':
         raise ValueError('Expected the current pinned NFL v11 model')
     with session_factory() as db:
+        from spe.ingest.nfl_matchup_evidence import refresh as refresh_matchups
+        refresh_matchups(db, now=now)
         games = [g for g in db.query(Game).filter(Game.league_id == 'nfl')
                  if as_utc(g.kickoff_utc).astimezone(ZoneInfo('America/Chicago')).date().isoformat() == day
                  and g.data_tier not in ('demo', 'alias')]
@@ -54,6 +56,15 @@ def run(day, output):
                 db.add(BoardSnapshot(key=key, payload=item['payload'], updated_at=item['updated_at']))
         db.commit()
     simulation = {'version':VERSION, 'draws':50000, 'seed':20261115}
+    if weekly_context:
+        from spe.models.player_td.weekly_context import VERSION as CONTEXT_VERSION
+        simulation['weekly_context'] = CONTEXT_VERSION
+    if calibration:
+        from spe.models.player_td.gameflow_calibration import load_calibration
+        pinned = json.loads(calibration.read_text())
+        fitted, status = load_calibration(pinned, current['artifact_sha256'], now)
+        if fitted is None:raise ValueError(status)
+        simulation['calibration'] = pinned
     config.setdefault(day, {})['nfl'] = {**current, 'simulation':simulation}
     config.setdefault('local_defaults', {})['nfl'] = {**current, 'effective_from':day, 'simulation':simulation}
     config.setdefault('research_defaults', {})['nfl'] = {**current, 'effective_from':day, 'simulation':simulation}
@@ -104,5 +115,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--date', required=True)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--weekly-context', action='store_true')
+    parser.add_argument('--calibration-config', type=Path)
     args = parser.parse_args()
-    run(args.date, args.output)
+    run(args.date, args.output, weekly_context=args.weekly_context, calibration=args.calibration_config)

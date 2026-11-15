@@ -374,6 +374,10 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
                 if pid not in offers or american_to_implied(tick.price_american) < american_to_implied(offers[pid].price_american):
                     offers[pid] = tick
             candidates = []
+            personnel = None
+            if prospective and lg == 'nfl' and retrain and retrain.get('simulation', {}).get('weekly_context'):
+                from spe.models.player_td.weekly_context import capture_personnel
+                personnel = capture_personnel(db, game, cutoff)
             from spe.models.player_td.scouting_report import capture_matchup, capture_personnel, model_fields, build_report
             fitted_fields = model_fields(model)
             for team_id, opponent_id, home in ((game.home_team_id, game.away_team_id, True), (game.away_team_id, game.home_team_id, False)):
@@ -461,6 +465,9 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
                             "evidence_timing": "Revised historical plays; availability assumed 48 hours after prior games."},
                         "retrospective": not prospective, "generated_at": now.isoformat()})
             simulation_run = None
+            if personnel is not None:
+                for candidate in candidates:
+                    candidate['desk_analysis']['current_context']['personnel'] = personnel
             if prospective and lg == 'nfl' and retrain and retrain.get('simulation'):
                 from spe.models.player_td.gameflow_stage import apply
                 candidates, simulation_run = apply(candidates, model, game, cutoff, retrain['simulation'])

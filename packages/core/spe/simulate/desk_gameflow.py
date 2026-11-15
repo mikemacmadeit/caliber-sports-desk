@@ -25,7 +25,7 @@ def _shares(team, channel, state, role_strength=1., unavailable=(), recent_role=
         ratio = posterior/overall if overall else 1.
         # Declared shrinkage/bounds protect sparse game-state splits.
         weights[i] *= np.clip(ratio, .5, 2.)**role_strength
-        if recent_role and player['position'] in ('RB','FB'):
+        if recent_role == 'all' or (recent_role and player['position'] in ('RB','FB')):
             recent_total=team['usage_totals'][channel]['latest']
             recent=(record['latest']+8*overall)/(recent_total+8)
             weights[i] *= np.clip(recent/overall if overall else 1., .25, 4.)

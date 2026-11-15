@@ -9,7 +9,6 @@ import logging
 
 from spe.config import settings
 from spe.db.base import as_utc
-from spe.models.player_td.scoring_paths import calibrated
 from spe.simulate.desk_gameflow import simulate
 from spe.simulate.desk_gameflow_inputs import InputsUnavailable, build_inputs, digest
 
@@ -46,9 +45,20 @@ def apply(candidates, model, game, cutoff, config):
         # Same engine and fixed parameters as the two experiments. Controls are
         # covered by tests; only gameflow supplies the published point estimate.
         results = {name:simulate(inputs, draws=draws, seed=seed, **options) for name, options in VARIANTS}
+        context_assessment = None
+        if config.get('weekly_context'):
+            from spe.models.player_td.weekly_context import scenarios, VERSION as CONTEXT_VERSION
+            if config['weekly_context'] != CONTEXT_VERSION:
+                raise ValueError('Unsupported weekly context configuration')
+            extra, context_assessment = scenarios(inputs, rows)
+            for name, scenario_inputs, options in extra:
+                results[name] = simulate(scenario_inputs, draws=draws, seed=seed, **options)
         lookup = {name:{p['id']:p for p in run['players']} for name, run in results.items()}
         input_hash = digest({'inputs':inputs, 'model_sha256':model['artifact_sha256'],
-                             'baseline':{r['player_id']:r['forecast']['p_estimate'] for r in rows}})
+                             'baseline':{r['player_id']:r['forecast']['p_estimate'] for r in rows},
+                             'weekly_context':context_assessment})
+        from spe.models.player_td.gameflow_calibration import load_calibration, probability as calibrate_simulation
+        calibration, calibration_status = load_calibration(config.get('calibration'), model['artifact_sha256'], cutoff)
         for row in rows:
             pid = row['player_id']
             if pid not in lookup['gameflow']:
@@ -58,7 +68,7 @@ def apply(candidates, model, game, cutoff, config):
             combined = analysis['combination']
             paths = combined['scoring_paths']
             baseline = row['forecast']['p_estimate']
-            scenarios = {name:calibrated(model, paths['baseline_probability'], players[pid]['raw_probability'])
+            scenarios = {name:calibrate_simulation(calibration, model, paths['baseline_probability'], players[pid]['raw_probability'])
                          for name, players in lookup.items()}
             probability = scenarios['gameflow']
             raw = lookup['gameflow'][pid]
@@ -68,7 +78,12 @@ def apply(candidates, model, game, cutoff, config):
                 'baseline_probability':baseline, 'raw_probability':raw['raw_probability'],
                 'adjusted_probability':probability, 'scenario_probabilities':scenarios,
                 'raw_monte_carlo_standard_error':raw['mc_se'], 'probability_low':low, 'probability_high':high,
-                'total_simulated_games':draws * len(VARIANTS), 'source_pbp_sha256':inputs['source_pbp_sha256']}
+                'total_simulated_games':draws * len(results), 'source_pbp_sha256':inputs['source_pbp_sha256'],
+                'calibration':calibration_status,
+                **({'weekly_context':{**context_assessment['players'][pid],
+                    'weather_status':context_assessment['weather_status'],
+                    'scenario_assumptions':context_assessment['scenario_assumptions'],
+                    'point_estimate_effect':context_assessment['point_estimate_effect']}} if context_assessment else {})}
             combined.update(pre_simulation_probability=baseline, probability=probability, combined_probability=probability)
             paths.update(probability_low=low, probability_high=high)
             row['forecast'].update(p_estimate=probability, simulation_version=VERSION,
@@ -76,7 +91,8 @@ def apply(candidates, model, game, cutoff, config):
             analysis['risks'] = list(dict.fromkeys([*analysis.get('risks', []), NOTE]))
         return rows, {**base, 'status':'active', 'input_sha256':input_hash, 'inputs':inputs,
                       'results':results, 'model_artifact_sha256':model['artifact_sha256'],
-                      'completed_at':datetime.now(UTC).isoformat(), 'total_simulated_games':draws * len(VARIANTS)}
+                      'completed_at':datetime.now(UTC).isoformat(), 'total_simulated_games':draws * len(results),
+                      'weekly_context':context_assessment, 'calibration':calibration_status}
     except (InputsUnavailable, OSError, ValueError, KeyError) as exc:
         # Preserve the complete original forecast on missing data; never publish
         # half-updated rows or disguise a fallback as a simulated pick.

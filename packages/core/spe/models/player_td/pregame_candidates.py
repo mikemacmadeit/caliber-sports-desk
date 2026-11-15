@@ -27,7 +27,7 @@ def save_candidates(db, game, rows, selected, now, model_sha, challenger=None, *
             'desk_analysis':{'features':analysis.get('features'), 'combination':analysis.get('combination'),
                 'scouting_inputs':analysis.get('scouting_inputs'), 'vacated_workload':analysis.get('vacated_workload'),
                 'fitted_feature_names':analysis.get('fitted_feature_names'), 'simulation':analysis.get('simulation'),
-                'current_context':{k:context.get(k) for k in ('availability','depth','weather','nflverse_context')}}}))
+                'current_context':{k:context.get(k) for k in ('availability','depth','weather','nflverse_context','personnel')}}}))
     payload={'game_id':game.game_id,'kickoff_utc':kick.isoformat(),'captured_at':now.isoformat(),
              'model_artifact_sha256':model_sha,'selected_player_id':selected.get('player_id') if selected else None,
              'market_context':deepcopy(rows[0].get('market_context')) if rows else None,
