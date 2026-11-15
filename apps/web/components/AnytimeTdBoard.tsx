@@ -169,9 +169,18 @@ export function AnytimeTdBoard({
   );
 }
 
+function extraResult(row: PropRow, result: string) {
+  const alternative = row.decision?.value_candidate;
+  return Boolean(
+    alternative &&
+    alternative.player_id !== row.player_id &&
+    row.decision_results?.value_candidate?.result === result,
+  );
+}
+
 function DailyTdResults({ rows, date, filter, onFilter }: { rows: PropRow[]; date: string; filter: string; onFilter: (value: string) => void }) {
-  const wins = rows.filter(r => r.result === "scored").length;
-  const losses = rows.filter(r => r.result === "blank").length;
+  const wins = rows.filter(r => r.result === "scored").length + rows.filter(r => extraResult(r, "scored")).length;
+  const losses = rows.filter(r => r.result === "blank").length + rows.filter(r => extraResult(r, "blank")).length;
   const pending = rows.length - wins - losses;
   const awaiting = rows.filter(r => r.result === "awaiting_box").length;
   return <div className="plate space-y-3 p-4" aria-label="Daily touchdown results">
