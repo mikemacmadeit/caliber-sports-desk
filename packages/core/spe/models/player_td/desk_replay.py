@@ -40,6 +40,9 @@ def requested_retrain(date, league):
     dated=config.get(date, {}).get(league)
     if dated:
         return dated
+    standing=config.get('research_defaults',{}).get(league)
+    if standing and date>=standing.get('effective_from','9999-01-01'):
+        return {**standing,'standing':True}
     local=config.get('local_defaults',{}).get(league)
     if settings.app_env=='dev' and local and date>=local.get('effective_from','9999-01-01'):
         return {**local,'standing_local':True}
@@ -220,7 +223,7 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
         if revised and not prospective:
             cache_key = f"scorer-replay-v1:{game.game_id}:{model['artifact_sha256']}"
         if retrain:
-            cache_key = guarded_key if retrain.get('standing_local') else f"retrained-desk-v1:{game.game_id}:{model['artifact_sha256']}"
+            cache_key = guarded_key if retrain.get('standing_local') or retrain.get('standing') else f"retrained-desk-v1:{game.game_id}:{model['artifact_sha256']}"
         if reconstructed:
             cache_key = f"corrected-inputs-v1:{game.game_id}:{model['artifact_sha256']}:{retrain.get('input_revision', 1)}"
         saved = db.get(BoardSnapshot, cache_key)
@@ -383,6 +386,10 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
                                 (["PFR snap counts via nflverse"] if lg == 'nfl' and f.get('snap_games') else []),
                             "evidence_timing": "Revised historical plays; availability assumed 48 hours after prior games."},
                         "retrospective": not prospective, "generated_at": now.isoformat()})
+            simulation_run = None
+            if prospective and lg == 'nfl' and retrain and retrain.get('simulation'):
+                from spe.models.player_td.gameflow_stage import apply
+                candidates, simulation_run = apply(candidates, model, game, cutoff, retrain['simulation'])
             if prospective or revised:
                 from spe.models.player_td.selection_safety import assess
                 for candidate in candidates:
@@ -402,7 +409,8 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
                 if chosen and challenger:
                     chosen = {**chosen, 'challenger_comparison':challenger}
             from spe.models.player_td.pregame_candidates import save_candidates
-            save_candidates(db, game, candidates, chosen, now, model['artifact_sha256'], challenger)
+            save_candidates(db, game, candidates, chosen, now, model['artifact_sha256'], challenger,
+                            simulation=simulation_run)
             from spe.models.player_td.selection_safety import POLICY_VERSION
             payload = {"row": chosen, "evaluated": True, "selection_version": SELECTION_VERSION,
                        "model_version": model['version'], "model_artifact_sha256": model['artifact_sha256'],

@@ -19,8 +19,11 @@ def evaluate(row):
     high = max(p, path.get('probability_high', p), path.get('baseline_probability', p))
     blockers = exclusions(row)
     context = (row.get('desk_analysis') or {}).get('current_context') or {}
+    simulation = (row.get('desk_analysis') or {}).get('simulation') or {}
     availability = (context.get('availability') or {}).get('status')
     caution = []
+    if simulation.get('status') == 'unavailable':
+        caution.append('Game-flow simulation unavailable; using the original model estimate')
     if availability not in ('active', 'available', 'healthy'):
         caution.append('Game-day participation is unconfirmed')
     if availability in ('questionable', 'uncertain'):
@@ -53,6 +56,7 @@ def evaluate(row):
             for k in ('recent_measured_opportunity_games','recent_measured_touches','role_complete_boxes','role_recent_appearance_rate')
             if k in (row.get('desk_analysis') or {}).get('features',{})},
             'current_context':{k:context.get(k) for k in ('availability','depth') if context.get(k)}},
+        **({'simulation':simulation} if simulation else {}),
         'cautions': caution+football['cautions'], 'blockers': blockers,
         'price_status': 'conditional_value' if supported else 'no_supported_value' if quote else 'no_fresh_price',
         'uncertainty_note': 'Range spans declared role scenarios and component disagreement; it is not a confidence interval.'}
@@ -79,6 +83,8 @@ def choose(rows):
             'decision':{'version':VERSION,'selected':value,'most_likely':cases[leader['player_id']],
                 'alternatives':list(cases.values())}})
     reason = 'Our most likely scorer after considering workload, scoring opportunities, team expectations and the opponent. Price is assessed separately and does not replace this pick with a less likely scorer.'
+    if ((selected.get('desk_analysis') or {}).get('simulation') or {}).get('status') == 'active':
+        reason = 'Our most likely scorer after matchup and workload analysis followed by game-flow simulations. Price is assessed separately and does not replace this pick with a less likely scorer.'
     decision = {'version':VERSION, 'status':case['price_status'], 'reason':reason,
         'most_likely':cases[leader['player_id']], 'value_candidate':value, 'selected':case,
         'eligible_candidates':len(eligible), 'price_supported_candidates':sum(c['price_supported'] for c in cases.values()),

@@ -1,0 +1,33 @@
+{
+  "2026-11-15": {
+    "nfl": {
+      "version": "desk_combined_v11",
+      "artifact_sha256": "e97ecf81f026002529855b5b4d34ce8066b3395e682663af2110e416db2bce5a",
+      "use_validated_model": false,
+      "reconstruct_public_pregame": false,
+      "requested_at": "2026-11-15T14:26:41.460701+00:00",
+      "reason": "User-requested local scoring-case research run. Not a production promotion; validation results stay visible.",
+      "simulation": {
+        "version": "desk_gameflow_v1",
+        "draws": 50000,
+        "seed": 20261115
+      }
+    }
+  },
+  "research_defaults": {
+    "nfl": {
+      "version": "desk_combined_v11",
+      "artifact_sha256": "e97ecf81f026002529855b5b4d34ce8066b3395e682663af2110e416db2bce5a",
+      "use_validated_model": false,
+      "reconstruct_public_pregame": false,
+      "requested_at": "2026-11-15T14:26:41.460701+00:00",
+      "reason": "User-requested local scoring-case research run. Not a production promotion; validation results stay visible.",
+      "effective_from": "2026-11-15",
+      "simulation": {
+        "version": "desk_gameflow_v1",
+        "draws": 50000,
+        "seed": 20261115
+      }
+    }
+  }
+}

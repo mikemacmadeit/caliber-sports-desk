@@ -31,7 +31,9 @@ def ensure_refresh(date):
                 status = refresh_nfl_availability(db)
                 if status.get('status') == 'unavailable':
                     logging.getLogger(__name__).warning('NFL availability refresh unavailable: %s', status)
-                if settings.app_env=='dev':
+                from spe.models.player_td.desk_replay import requested_retrain
+                simulation = (requested_retrain(date, 'nfl') or {}).get('simulation')
+                if settings.app_env=='dev' or simulation:
                     from spe.ingest.nflverse_desk import refresh_nflverse_desk
                     # This free-source job has its own six-hour due check.
                     # It retains prior good data on partial source failure.
