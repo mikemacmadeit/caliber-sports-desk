@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { PropRow } from "@/lib/api";
+import type { PropRow, TdCustomerExplanation, TdDecisionCandidate } from "@/lib/api";
 import { PropExplorer } from "@/components/PropExplorer";
 import { TeamMark } from "@/components/TeamMark";
 import { dayParts } from "@/lib/days";
@@ -128,7 +128,7 @@ export function AnytimeTdBoard({
         <div className="border-b border-white/10 pb-2">
           <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Anytime touchdown picks</h2>
           <p className="mt-2 max-w-xl text-sm text-mute">
-              Our main pick is the player we estimate is most likely to score. Each card explains his role, the matchup and the price. Cheaper alternatives appear separately. Green means a touchdown; red means no touchdown.
+              Our most likely scorer, plus a better-priced alternative when there is a strong football case. Green means a touchdown; red means no touchdown.
           </p>
         </div>
         {error ? <p role="alert" className="text-heat">The replay could not refresh. Any cards shown are from the last successful load.</p> : null}
@@ -185,28 +185,37 @@ function DeskPickCard({ row }: { row: PropRow }) {
   const chance = row.forecast.p_estimate;
   const won = row.result === "scored", lost = row.result === "blank";
   const report = row.desk_analysis?.scouting_report;
-  const resultLabel = won ? "Touchdown - win" : lost ? "No touchdown - loss" : row.result === "awaiting_box" ? "Game finished - waiting for the player result" : "Not settled yet";
+  const resultLabel = won ? "Touchdown - win" : lost ? "No touchdown - loss" : row.result === "awaiting_box" ? "Game finished - waiting for the player result" : row.game_status === "in_progress" ? "In progress" : null;
   return <article className={`relative rounded-xl border p-5 ${won ? "border-green-500 bg-green-950/50" : lost ? "border-red-500 bg-red-950/50" : "plate"}`}>
     {won || lost ? <span aria-label={won ? "Win" : "Loss"} className={`absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-xl font-bold ${won ? "bg-green-500 text-black" : "bg-red-500 text-white"}`}>{won ? "\u2713" : "\u2715"}</span> : null}
     <p className="pr-8 text-xs text-mute">{row.league_id === "fbs" ? "College football" : "NFL"} · {row.away_abbr} at {row.home_abbr} · {when.day}, {when.time}</p>
     <div className="mt-4 flex items-center gap-3">
       <TeamMark team={club} size="sm" />
-      <div><p className="text-xs font-semibold uppercase tracking-wide text-gold">{row.locked ? "Subscriber pick" : report?.customer?.label || "Our touchdown pick"}</p>
+      <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-gold">{row.locked ? "Subscriber pick" : report?.customer?.label || "Our touchdown pick"}</p>
         <Link href={`/games/${row.game_id}`} className="font-display text-3xl leading-tight hover:text-gold">{row.locked ? "Pregame pick locked" : row.player_name}</Link>
         {!row.locked ? <p className="mt-1 text-xs text-mute">{({QB:"Quarterback",RB:"Running back",FB:"Fullback",WR:"Wide receiver",TE:"Tight end"} as Record<string,string>)[row.position || ""] || row.position} · {row.team}</p> : null}
       </div>
     </div>
     <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-black/15 p-3">
       <div><p className="text-xs text-mute">Estimated chance to score</p><p className="mt-1 font-display text-3xl text-gold">{chance == null ? "—" : pct(chance, 0)}</p></div>
-      <div><p className="text-xs text-mute">Saved sportsbook odds</p><p className="mt-1 font-mono text-2xl">{american(row.book_price)}</p></div>
+      <div><p className="text-xs text-mute">Saved odds</p><p className="mt-1 font-mono text-2xl">{american(row.book_price)}</p></div>
     </div>
-    <p className={`mt-3 text-sm font-semibold ${won ? "text-green-300" : lost ? "text-red-300" : "text-mute"}`}>{resultLabel}{row.final_score ? ` · Final ${row.final_score}` : ""}</p>
+    {resultLabel || row.final_score ? <p className={`mt-3 text-sm font-semibold ${won ? "text-green-300" : lost ? "text-red-300" : "text-mute"}`}>{resultLabel}{row.final_score ? `${resultLabel ? " · " : ""}Final ${row.final_score}` : ""}</p> : null}
     {row.retrospective !== false && !row.locked ? <p className="mt-1 text-xs text-mute">Past-game rerun · not an original pregame pick</p> : null}
     {row.locked ? <p className="mt-4 text-sm text-mute">Sign in with a subscription to see the pick and explanation.</p> : <>
-      {row.selection_readiness?.status === "provisional" ? <p className="mt-3 rounded border border-amber-400/30 p-2 text-xs text-amber-200">{row.retrospective === false ? "Check playing status and role before kickoff." : "Playing status or role was not fully confirmed when this pick was made."}</p> : null}
-      {report?.customer ? <CustomerCase row={row} /> : <p className="mt-3 text-sm text-paper/80">{deskPickReason(row)}</p>}
+      {row.selection_readiness?.status === "provisional" ? <p className="mt-3 text-xs text-amber-200">{row.retrospective === false ? "Check playing status and role before kickoff." : "Playing status or role was not fully confirmed when this pick was made."}</p> : null}
+      {report?.customer ? <PickHighlights copy={report.customer} candidate={row.decision?.most_likely} opponent={row.opponent} /> : <p className="mt-3 text-sm text-paper/80">{deskPickReason(row)}</p>}
+      <PriceNote candidate={row.decision?.most_likely} />
       {row.decision ? <PriceDecision row={row} /> : null}
-      {report ? <ScoringCase row={row} /> : row.desk_analysis ? <details className="mt-3 text-xs text-mute"><summary className="cursor-pointer">Sources and notes</summary>
+      {report || row.decision?.value_candidate?.customer ? <details className="mt-4 border-t border-paper/15 pt-3">
+        <summary className="cursor-pointer text-sm font-semibold text-gold">More analysis</summary>
+        <div className="mt-4 space-y-5">
+          {report?.customer ? <CustomerDetails copy={report.customer} name={row.player_name} /> : null}
+          {row.decision?.value_candidate?.customer ? <CustomerDetails copy={row.decision.value_candidate.customer} name={row.decision.value_candidate.name} /> : null}
+          {row.decision ? <PlayerComparison row={row} /> : null}
+          {report ? <ScoringCase row={row} /> : null}
+        </div>
+      </details> : row.desk_analysis ? <details className="mt-3 text-xs text-mute"><summary className="cursor-pointer">Sources and notes</summary>
         {[...(row.desk_analysis.reasons || []), ...(row.desk_analysis.risks || [])].map((text, i) => <p key={i} className="mt-2">{text}</p>)}
         {row.desk_analysis.current_context?.weather ? <p className="mt-2">Weather is shown for context and has not changed this estimate.</p> : null}
       </details> : null}
@@ -214,23 +223,56 @@ function DeskPickCard({ row }: { row: PropRow }) {
   </article>;
 }
 
-function CustomerCase({ row }: { row: PropRow }) {
-  const copy = row.desk_analysis?.scouting_report?.customer;
-  if (!copy || row.locked) return null;
-  return <div className="mt-4 space-y-4 text-sm leading-relaxed">
-    <section><h3 className="font-semibold text-paper">Why we picked him</h3><p className="mt-1 text-paper/80">{copy.why}</p><p className="mt-2 text-paper/80">{copy.matchup}</p></section>
-    <section><h3 className="font-semibold text-amber-200">What could go wrong?</h3><p className="mt-1 text-paper/75">{copy.caution}</p></section>
-    <section><h3 className="font-semibold text-paper">Is the price worth it?</h3><p className="mt-1 text-paper/80">{copy.price}</p><p className="mt-1 text-xs text-mute">Odds can change. Check the current price with your sportsbook.</p></section>
-    {copy.comparison ? <details><summary className="cursor-pointer font-semibold text-gold">{copy.comparison.heading}</summary><p className="mt-2 text-paper/80">{copy.comparison.text}</p></details> : null}
+function firstSentence(text: string): string {
+  return text.trim().split(/(?<=[.!?])\s+(?=[A-Z])/)[0] || "";
+}
+
+function PickHighlights({ copy, candidate, opponent }: { copy: TdCustomerExplanation; candidate?: TdDecisionCandidate; opponent: string }) {
+  const research = candidate?.research;
+  const qb = research?.quarterback;
+  const receiving = candidate?.position === "WR" || candidate?.position === "TE";
+  const role = receiving && qb?.usable && qb.player_redzone_targets > 0
+    ? `${qb.player_redzone_targets} red-zone targets and ${qb.receiving_tds} receiving TDs with ${qb.name || "the expected quarterback"} across ${qb.games} games.`
+    : firstSentence(copy.why);
+  const defense = research?.opponent;
+  const games = research?.opponent_games || 0;
+  const group = candidate?.position === "TE" ? "tight ends" : candidate?.position === "WR" ? "wide receivers" : candidate?.position === "QB" ? "quarterbacks" : "running backs";
+  const matchup = defense && games > 0 && (receiving ? defense.targets > 0 : defense.carries > 0)
+    ? receiving
+      ? `${opponent} allowed ${defense.receiving_tds} receiving TDs and ${(defense.receiving_yards / games).toFixed(0)} yards per game to ${group} across ${games} games.`
+      : `${opponent} allowed ${(defense.rushing_yards / defense.carries).toFixed(1)} yards per carry and ${defense.rushing_tds} rushing TDs to ${group} across ${games} games.`
+    : firstSentence(copy.matchup);
+  return <ul aria-label="Key reasons" className="mt-3 list-disc space-y-1.5 pl-4 text-sm leading-relaxed text-paper/85">
+    {[role, matchup].filter(Boolean).map((fact, i) => <li key={i}>{fact}</li>)}
+  </ul>;
+}
+
+function PriceNote({ candidate }: { candidate?: TdDecisionCandidate }) {
+  if (!candidate || candidate.price_supported) return null;
+  const stale = candidate.price_status === "no_fresh_price";
+  return <p className="mt-2 text-xs text-amber-200">
+    {stale ? "Check current odds. " : ""}
+    {candidate.minimum_american != null ? `Target odds: ${american(candidate.minimum_american)} or better.` : stale ? "" : "Saved odds do not pass our value check."}
+  </p>;
+}
+
+function CustomerDetails({ copy, name }: { copy: TdCustomerExplanation; name: string }) {
+  return <section className="space-y-3 text-sm leading-relaxed">
+    <h3 className="font-semibold text-paper">{name}</h3>
+    <p className="text-paper/80">{copy.why}</p><p className="text-paper/80">{copy.matchup}</p>
+    {copy.evidence?.length ? <ul className="list-disc space-y-2 pl-4 text-paper/80">{copy.evidence.map((fact, i) => <li key={i}>{fact}</li>)}</ul> : null}
+    <p className="text-paper/75"><span className="font-semibold text-amber-200">The risk: </span>{copy.caution}</p>
+    <p className="text-paper/80">{copy.price}</p>
+    {copy.comparison ? <div><h4 className="font-semibold text-paper">{copy.comparison.heading}</h4><p className="mt-1 text-paper/80">{copy.comparison.text}</p></div> : null}
     <p className="text-xs text-mute">{copy.research_note}</p>
-  </div>;
+  </section>;
 }
 
 function DailyDecisionResults({ rows }: { rows: PropRow[] }) {
   const captured = rows.filter(r => !r.locked && r.retrospective === false && r.decision);
   if (!captured.length) return null;
   return <section aria-label="Separate pregame strategy records" className="grid gap-3 sm:grid-cols-2">
-    {([['most_likely', 'Main-pick record'], ['value_candidate', 'Value-alternative record']] as const).map(([lane, label]) => {
+    {([['most_likely', 'Main-pick record'], ['value_candidate', 'Alternative-pick record']] as const).map(([lane, label]) => {
       const results = captured.map(r => r.decision_results?.[lane]).filter(Boolean);
       const wins = results.filter(r => r?.result === 'scored').length;
       const losses = results.filter(r => r?.result === 'blank').length;
@@ -238,6 +280,7 @@ function DailyDecisionResults({ rows }: { rows: PropRow[] }) {
         <p className="font-semibold">{label}</p>
         <p className="mt-1">{wins} wins · {losses} losses · {results.length - wins - losses} pending</p>
         <p className="mt-1 text-xs text-mute">Picks saved before kickoff. Past-game reruns are excluded.</p>
+        {lane === 'value_candidate' ? <p className="mt-1 text-xs text-mute">{results.filter(r => r?.bet_qualified).length} had fresh odds that passed the value check. Scorer results and betting returns are tracked separately.</p> : null}
       </div>;
     })}
   </section>;
@@ -248,28 +291,28 @@ function PriceDecision({ row }: { row: PropRow }) {
   if (!d || row.locked) return null;
   const value = d.value_candidate;
   const settled = row.decision_results?.value_candidate?.result;
-  return <section aria-label="Scorer and price decision" className="mt-5 space-y-3 border-t border-paper/15 pt-4 text-sm">
-      {value && value.player_id !== row.player_id ? <div className={`relative rounded-lg border p-4 ${settled === 'scored' ? 'border-green-500 bg-green-950/40' : settled === 'blank' ? 'border-red-500 bg-red-950/40' : 'border-gold/30 bg-black/15'}`}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-gold">Better-priced alternative</p>
-        <p className="mt-1 font-display text-2xl">{value.name}</p>
-        <p className="mt-1">{pct(value.probability, 0)} chance to score · {american(value.american)} saved odds.</p>
+  return <section aria-label="Scorer and price decision" className="mt-4 border-t border-paper/15 pt-4 text-sm">
+      {value && value.player_id !== row.player_id ? <div className={`rounded-lg p-3 ${settled === 'scored' ? 'border border-green-500 bg-green-950/40' : settled === 'blank' ? 'border border-red-500 bg-red-950/40' : 'bg-black/15'}`}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gold">{value.american == null ? "Matchup alternative" : "Better-priced alternative"}</p>
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><p className="font-display text-2xl">{value.name}</p><p className="text-xs text-mute">{pct(value.probability, 0)} chance · <span className="font-mono text-paper">{american(value.american)}</span> saved odds</p></div>
         <DecisionResult result={settled} />
-        {value.customer ? <div className="mt-3 space-y-3 leading-relaxed">
-          <p className="text-paper/85">{value.customer.why}</p>
-          <p className="text-paper/80">{value.customer.matchup}</p>
-          <p className="text-paper/80"><span className="font-semibold text-amber-200">The risk: </span>{value.customer.caution}</p>
-          <p className="text-paper/80">{value.customer.price}</p>
-          {value.customer.comparison ? <details><summary className="cursor-pointer text-gold">{value.customer.comparison.heading}</summary><p className="mt-2">{value.customer.comparison.text}</p></details> : null}
-        </div> : <p className="mt-2 text-paper/75">A lower scoring chance with a better payout. Supporting evidence was not saved with this older pick.</p>}
-      </div> : <div className="rounded-lg border border-paper/15 p-3"><p className="font-semibold">No convincing better-priced alternative</p><p className="mt-1 text-xs text-mute">We need both a sound football reason and worthwhile odds. We have not found a separate player who meets those checks at the saved prices.</p></div>}
-      <details><summary className="cursor-pointer font-semibold text-gold">Compare other players</summary>
-      <div className="overflow-x-auto"><table className="w-full text-left text-xs"><caption className="sr-only">Scoring chances and saved odds for other players</caption>
-        <thead className="text-mute"><tr><th scope="col" className="py-2">Player</th><th scope="col">Chance to score</th><th scope="col">Saved odds</th></tr></thead>
-        <tbody>{d.alternatives.map(p => <tr key={p.player_id} className="border-t border-paper/10"><th scope="row" className="py-2 pr-2 font-normal">{p.name}</th><td>{pct(p.probability, 0)}</td><td>{american(p.american)}</td></tr>)}</tbody>
-      </table></div>
-      <p className="text-xs text-mute">Main picks and value alternatives have separate records. A price to watch is not a value pick.</p>
-      </details>
+        {value.customer ? <PickHighlights copy={value.customer} candidate={value} opponent={value.team === row.team ? row.opponent : row.team} /> : <p className="mt-2 text-xs text-mute">Detailed reasoning was not saved with this pick.</p>}
+        {value.customer?.caution.includes("before kickoff") || value.cautions?.some(c => /injury designation|playing status/i.test(c)) ? <p className="mt-2 text-xs text-amber-200">Check playing status before kickoff.</p> : null}
+        <PriceNote candidate={value} />
+      </div> : <p className="text-xs text-mute">{d.alternative_status === "withheld_availability" ? "Alternative withheld while playing status is checked." : "No separate alternative meets our football criteria."}</p>}
   </section>;
+}
+
+function PlayerComparison({ row }: { row: PropRow }) {
+  const d = row.decision;
+  if (!d || row.locked || !d.alternatives.length) return null;
+  return <details className="text-sm"><summary className="cursor-pointer font-semibold text-gold">Compare other players</summary>
+      <div className="overflow-x-auto"><table className="w-full text-left text-xs"><caption className="sr-only">Scoring chances and saved odds for other players</caption>
+        <thead className="text-mute"><tr><th scope="col" className="py-2">Player</th><th scope="col">Chance to score</th><th scope="col">Saved odds</th><th scope="col">Football case</th></tr></thead>
+        <tbody>{d.alternatives.map(p => <tr key={p.player_id} className="border-t border-paper/10"><th scope="row" className="py-2 pr-2 font-normal">{p.name}</th><td>{pct(p.probability, 0)}</td><td>{american(p.american)}</td><td>{p.research_rank?.advantages.map(a => ({opponent_scoring_area_weakness:'Opponent weakness',quarterback_redzone_role:'QB red-zone connection',growing_role:'Growing role',concentrated_scoring_role:'Scoring-area role',game_script_role:'Game-script role'}[a] || a)).join('; ') || 'No distinct advantage established'}</td></tr>)}</tbody>
+      </table></div>
+      <p className="text-xs text-mute">Main and alternative scorers have separate hit records. Only a fresh qualifying price can count toward hypothetical betting returns.</p>
+      </details>;
 }
 
 function DecisionResult({ result }: { result?: string }) {

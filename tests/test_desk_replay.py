@@ -157,7 +157,8 @@ def test_replay_source_refresh_does_not_invent_missing_player_zero(db, monkeypat
 
 
 @pytest.mark.parametrize("alternative_present", [True, False])
-def test_replay_source_refresh_grades_saved_alternative_independently(db, monkeypatch, alternative_present):
+@pytest.mark.parametrize("price_supported", [True, False])
+def test_replay_source_refresh_grades_saved_alternative_independently(db, monkeypatch, alternative_present, price_supported):
     import copy
     from spe.db.models import BoardSnapshot
     import spe.models.player_td.desk_replay_results as results
@@ -174,7 +175,7 @@ def test_replay_source_refresh_grades_saved_alternative_independently(db, monkey
     row = {"game_id":"g", "player_id":"p", "player_name":"Main Runner", "league_id":"nfl",
         "kickoff_utc":game.kickoff_utc.isoformat(), "decision":{
             "most_likely":{"player_id":"p", "name":"Main Runner"},
-            "value_candidate":{"player_id":"alt", "name":"Alternative Receiver", "price_supported":True},
+            "value_candidate":{"player_id":"alt", "name":"Alternative Receiver", "price_supported":price_supported, "research_selected":True},
             "alternatives":[{"player_id":"comparison", "name":"Not A Pick"}]}}
     original = copy.deepcopy(row)
     saved = BoardSnapshot(key="scorer-desk-v1:g", updated_at=NOW, payload={"row":row})

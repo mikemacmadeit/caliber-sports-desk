@@ -44,6 +44,9 @@ async function run() {
   const explicitToday = await render({league:'nfl', date:today});
   assert.ok(explicitToday.includes('No games today') && !explicitToday.includes('data-board='));
   assert.ok(explicitToday.includes('href="/anytime-td?league=fbs&amp;date=2026-11-14"'), 'An explicitly chosen day survives league switching');
+  assert.ok(explicitToday.includes('href="/anytime-td?league=nfl&amp;date=2026-11-14&amp;view=research"'), 'Model notes retain the explicit date');
+  const notes = await render({league:'nfl', date:today, view:'research'});
+  assert.ok(notes.includes('href="/anytime-td?league=nfl&amp;date=2026-11-14"'), 'Returning from model notes retains the explicit date');
   const previousDay = await render({league:'nfl', date:'2026-11-13'});
   assert.ok(previousDay.includes('No games Fri, Nov 13') && !previousDay.includes('data-board='));
   const explicitSunday = await render({league:'nfl', date:'2026-11-15'});

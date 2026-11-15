@@ -216,9 +216,9 @@ def load_combined_model(league, *, research_candidate=False, version=None):
     try:
         body = path.read_bytes()
         m = json.loads(body)
-        if m.get("version") not in (VERSION, "desk_combined_v10", "desk_combined_v9", "desk_combined_v8", "desk_combined_v7", "desk_combined_v6", "desk_combined_v5", "desk_combined_v3", "desk_combined_v2") or m.get("league") != league or (not research_candidate and not m.get("live_enabled")):
+        if m.get("version") not in (VERSION, "desk_combined_v11", "desk_combined_v10", "desk_combined_v9", "desk_combined_v8", "desk_combined_v7", "desk_combined_v6", "desk_combined_v5", "desk_combined_v3", "desk_combined_v2") or m.get("league") != league or (not research_candidate and not m.get("live_enabled")):
             return None
-        if m.get('version') == 'desk_combined_v10':
+        if m.get('version') in ('desk_combined_v10','desk_combined_v11'):
             from spe.models.player_td.scoring_paths import validate
             if league != 'nfl' or not validate(m.get('scoring_paths')):
                 return None

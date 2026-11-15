@@ -35,7 +35,7 @@ for (const result of ['pending','awaiting_box']) {
   const html = renderToStaticMarkup(React.createElement(context.exports.TestCard,{row:{...base,result}}));
   assert.ok(!html.includes('border-red-500'));
   assert.ok(!html.includes('border-green-500'));
-  assert.ok(html.includes(result === 'pending' ? 'Not settled yet' : 'waiting for the player result'));
+  assert.ok(result === 'pending' ? !html.includes('Not settled yet') : html.includes('waiting for the player result'));
 }
 console.log('Replay card rendering passed: green/check, red/X, final score, replay labels, and ungraded states.');
 const provisional = renderToStaticMarkup(React.createElement(context.exports.TestCard,{row:{...base,retrospective:false,selection_readiness:{status:'provisional',reasons:['Starting quarterback role is not verified']}}}));
@@ -65,22 +65,46 @@ const lockedScoutingHtml=renderToStaticMarkup(React.createElement(context.export
 assert.ok(!lockedScoutingHtml.includes('<details') && !lockedScoutingHtml.includes('Other Runner'));
 console.log('Scouting report rendering passed: expandable case, alternatives, value, no wrapping link, and subscription gate.');
 const readable = {version:'customer_td_v1',label:'Most likely scorer',chance:'60% chance',
+  evidence:['With the current quarterback he led the team in red-zone targets.'],
   why:'The runner gets most of the carries near the goal line.',matchup:'The opponent has allowed running backs to finish these chances.',
   caution:'A teammate also gets carries.',price:'A winning $10 bet earns $20 profit.',comparison:null,research_note:'Estimates are being evaluated.'};
 const twoChoiceRow={...scoutingRow,retrospective:false,desk_analysis:{...scoutingRow.desk_analysis,
   scouting_report:{...scoutingRow.desk_analysis.scouting_report,customer:readable}},
-  decision:{value_candidate:{player_id:'alt',name:'Other Receiver',probability:.4,american:250,price_supported:true,
+  decision:{value_candidate:{player_id:'alt',name:'Other Receiver',team:'TEST',position:'TE',probability:.4,american:250,price_supported:true,
+    research:{opponent_games:6,quarterback:{usable:true,name:'Current QB',games:6,player_redzone_targets:8,receiving_tds:4},
+      opponent:{targets:60,receiving_yards:445,receiving_tds:3,carries:0,rushing_yards:0,rushing_tds:0}},
     customer:{...readable,label:'Better-priced alternative',why:'The receiver has recent end-zone targets.',matchup:'This defense has struggled with those throws.',caution:'He gets fewer opportunities.'}},alternatives:[]},
   decision_results:{value_candidate:{result:'blank'}}};
 const readableHtml=renderToStaticMarkup(React.createElement(context.exports.TestCard,{row:twoChoiceRow}));
-assert.ok(readableHtml.includes('Estimated chance to score') && readableHtml.includes('Saved sportsbook odds'));
-assert.ok(readableHtml.includes('Why we picked him') && readableHtml.includes('Is the price worth it?'));
+assert.ok(readableHtml.includes('Estimated chance to score') && readableHtml.includes('Saved odds'));
+assert.ok(readableHtml.includes('More analysis') && readableHtml.includes('With the current quarterback'));
+// Native details stay closed initially. Verify useful facts are visible while
+// the longer explanation, payout lesson and risk discussion remain available.
+function collapsed(html) {
+  let depth=0, visible='';
+  for (const token of html.split(/(<\/?details\b[^>]*>)/)) {
+    if (/^<details\b/.test(token)) depth++;
+    else if (/^<\/details>/.test(token)) depth--;
+    else if (!depth) visible+=token;
+  }
+  return visible;
+}
+const visible=collapsed(readableHtml);
+assert.equal((visible.match(/aria-label="Key reasons"/g)||[]).length,2);
+assert.equal((visible.match(/<li\b/g)||[]).length,4);
+assert.ok(visible.includes('8 red-zone targets and 4 receiving TDs with Current QB across 6 games'));
+assert.ok(visible.includes('3 receiving TDs and 74 yards per game to tight ends across 6 games'));
+assert.ok(!visible.includes('A winning $10 bet') && !visible.includes('He gets fewer opportunities'));
+assert.ok(!readableHtml.includes('<details open'));
+const staleHtml=renderToStaticMarkup(React.createElement(context.exports.TestCard,{row:{...twoChoiceRow,decision:{...twoChoiceRow.decision,
+  value_candidate:{...twoChoiceRow.decision.value_candidate,price_supported:false,price_status:'no_fresh_price',minimum_american:190}}}}));
+assert.ok(collapsed(staleHtml).includes('Other Receiver') && collapsed(staleHtml).includes('Check current odds') && collapsed(staleHtml).includes('+190'));
 assert.ok(readableHtml.includes('Better-priced alternative') && readableHtml.includes('recent end-zone targets'));
 assert.ok(readableHtml.includes('He gets fewer opportunities') && readableHtml.includes('border-red-500'));
 assert.ok(!readableHtml.includes('Touchdown ?') && !readableHtml.includes('chance ?'));
 const lockedTwo=renderToStaticMarkup(React.createElement(context.exports.TestCard,{row:{...twoChoiceRow,locked:true}}));
 assert.ok(!lockedTwo.includes('Other Receiver') && !lockedTwo.includes('recent end-zone targets'));
-console.log('Two-choice card passed: readable football cases, separate alternative result, and protected pregame details.');
+console.log('Two-choice card passed: four concise reasons, collapsed research, visible odds warnings, separate results, and protected pregame details.');
 const selectorSource = fs.readFileSync('apps/web/lib/atdDeskTakes.ts','utf8');
 const selectors = {exports:{}};
 vm.runInNewContext(ts.transpileModule(selectorSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,selectors);

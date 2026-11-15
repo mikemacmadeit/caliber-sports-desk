@@ -36,7 +36,14 @@ def revised_policy_requested(date):
 
 def requested_retrain(date, league):
     path = settings.parquet_dir / 'models' / 'desk_retrain_runs.json'
-    return (json.loads(path.read_text()) if path.exists() else {}).get(date, {}).get(league)
+    config=json.loads(path.read_text()) if path.exists() else {}
+    dated=config.get(date, {}).get(league)
+    if dated:
+        return dated
+    local=config.get('local_defaults',{}).get(league)
+    if settings.app_env=='dev' and local and date>=local.get('effective_from','9999-01-01'):
+        return {**local,'standing_local':True}
+    return None
 
 
 def load_replay_model(date, league):
@@ -58,7 +65,7 @@ def grade(db, game, player):
     if game.status != "final":
         return "pending"
     official = db.get(PublishedStat, f"{game.game_id}|{player}|anytime_td")
-    if official and official.source.startswith("espn.summary:"):
+    if official and official.source.startswith("espn.summary"):
         return "scored" if official.actual > 0 else "blank"
     stats = db.scalars(select(PlayerGameStat).where(
         PlayerGameStat.game_id == game.game_id, PlayerGameStat.player_id == player,
@@ -123,7 +130,11 @@ def select_game_scorer(rows, *, value_aware=False):
     scoring_side = [row for row in eligible if _team_expected_to_score(row, MIN_TEAM_IMPLIED_POINTS)]
     if scoring_side and len(scoring_side) < len(eligible):
         eligible = scoring_side
-    chosen = max(eligible, key=lambda r: (r['forecast']['p_estimate'], r['player_id']))
+    # Saturday's names under 40% scored once in nine tries. A pass beats that group.
+    eligible = [row for row in eligible if _chance(row) >= MIN_SCORING_CHANCE]
+    if not eligible:
+        return None
+    chosen = max(eligible, key=lambda r: (_chance(r), r["player_id"]))
     value_policy = None
     if value_aware:
         from spe.models.player_td.scorer_value import choose
@@ -138,6 +149,13 @@ def select_game_scorer(rows, *, value_aware=False):
             'selection_warnings': warnings,
             **({'value_selection':value_policy,'selection_reason':value_policy['reason']} if value_policy else {}),
             'best_candidate_probability': chosen['forecast']['p_estimate']}
+
+
+def _chance(row) -> float:
+    value = (row.get("forecast") or {}).get("p_estimate")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return 0.0
+    return float(value)
 
 
 def _team_expected_to_score(row, floor):
@@ -197,7 +215,7 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
         if revised and not prospective:
             cache_key = f"scorer-replay-v1:{game.game_id}:{model['artifact_sha256']}"
         if retrain:
-            cache_key = f"retrained-desk-v1:{game.game_id}:{model['artifact_sha256']}"
+            cache_key = guarded_key if retrain.get('standing_local') else f"retrained-desk-v1:{game.game_id}:{model['artifact_sha256']}"
         if reconstructed:
             cache_key = f"corrected-inputs-v1:{game.game_id}:{model['artifact_sha256']}:{retrain.get('input_revision', 1)}"
         saved = db.get(BoardSnapshot, cache_key)
@@ -264,7 +282,7 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
             ticks = db.execute(select(Outcome.player_id, OddsTick).join(OddsTick, OddsTick.outcome_id == Outcome.outcome_id).where(
                 Outcome.game_id == game.game_id, Outcome.market_id == "anytime_td", OddsTick.is_live.is_(False),
                 OddsTick.captured_at <= cutoff, OddsTick.observed_at <= cutoff,
-                OddsTick.captured_at >= cutoff - timedelta(hours=24),
+                OddsTick.captured_at >= cutoff - timedelta(days=7),
                 OddsTick.quality_status.notin_(("invalid", "quarantined"))).order_by(OddsTick.captured_at)).all()
             per_book = {}
             for pid, tick in ticks:
@@ -295,7 +313,14 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
                     if exclusions({'position':candidate['position'],'forecast':{'p_estimate':.5},
                         'desk_analysis':{'features':candidate['features'],'current_context':current_by_player[pid]}}):
                         team_excluded.add(pid)
-                allocation = allocator.allocate(model, team, opponent, cutoff, home, team_excluded, market=context)
+                starters = [r['player_id'] for r in team_rows if r['position']=='QB' and r['player_id'] not in team_excluded
+                    and (current_by_player[r['player_id']].get('depth') or {}).get('rank')==1]
+                allocation_context = {**context, **({'starting_qb_id':starters[0]} if len(starters)==1 else {})}
+                research_model = None
+                if lg=='nfl' and prospective and not model.get('scoring_paths'):
+                    research_model=load_combined_model('nfl',research_candidate=True,version='desk_combined_v11')
+                allocation_model = {**model,'scoring_paths':research_model['scoring_paths']} if research_model and research_model.get('scoring_paths') else model
+                allocation = allocator.allocate(allocation_model, team, opponent, cutoff, home, team_excluded, market=allocation_context)
                 if not allocation:
                     continue
                 scouting_inputs = capture_matchup(history, team, opponent, cutoff)
@@ -310,6 +335,12 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
                     f = candidate['features']
                     f.update(market_features(context, home, model.get("market_total_trained", True)))
                     combined = combined_prediction(model, f, allocation, pid)
+                    if research_model and research_model.get('scoring_paths'):
+                        from spe.models.player_td.matchup_research import attach_unfitted_research
+                        combined=attach_unfitted_research(combined,allocation,pid,research_model['artifact_sha256'])
+                    qb = ((combined.get('scoring_paths') or {}).get('research') or {}).get('quarterback')
+                    if qb and players.get(qb.get('player_id')):
+                        qb['name'] = players[qb['player_id']].name
                     from spe.models.player_td.desk_evidence import explanations, current_context
                     evidence_reasons, evidence_risks = explanations(f)
                     if reconstructed:
@@ -410,13 +441,14 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
             for lane in ('most_likely', 'value_candidate'):
                 entry = chosen['decision'].get(lane)
                 # A merely interesting point estimate is not a recorded value bet.
-                if entry and (lane == 'most_likely' or entry.get('price_supported')):
+                if entry and (lane == 'most_likely' or entry.get('research_selected') or entry.get('price_supported')):
                     lane_result = grade(db, game, entry['player_id'])
                     price = entry.get('american')
                     profit = None
-                    if lane == 'value_candidate' and price and lane_result in ('scored', 'blank'):
+                    if lane == 'value_candidate' and entry.get('price_supported') and price and lane_result in ('scored', 'blank'):
                         profit = (price/100 if price > 0 else 100/abs(price)) if lane_result == 'scored' else -1.
-                    decision_results[lane] = {'result': lane_result, 'hypothetical_unit_profit': profit}
+                    decision_results[lane] = {'result': lane_result, 'hypothetical_unit_profit': profit,
+                        'bet_qualified':bool(lane=='value_candidate' and entry.get('price_supported'))}
         rows.append({**chosen, "desk_analysis":analysis, "result": result, "game_status": game.status,
                      **({'decision_results':decision_results} if decision_results else {}),
                      "selection_readiness": readiness(chosen, as_utc(chosen.get('forecast',{}).get('data_cutoff')) or cutoff),
@@ -428,7 +460,9 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
             'wins':sum(r['result']=='scored' for r in recorded),
             'losses':sum(r['result']=='blank' for r in recorded),
             'pending':sum(r['result'] not in ('scored','blank') for r in recorded),
-            'hypothetical_unit_profit':sum(r.get('hypothetical_unit_profit') or 0 for r in recorded) if lane=='value_candidate' else None}
+            'priced_bets':sum(bool(r.get('bet_qualified')) for r in recorded),
+            'hypothetical_unit_profit':sum(r['hypothetical_unit_profit'] for r in recorded if r.get('hypothetical_unit_profit') is not None)
+                if lane=='value_candidate' and any(r.get('hypothetical_unit_profit') is not None for r in recorded) else None}
     return {"date": date, "league": league, "rows": rows, "unavailable_games": unavailable,
             "decision_record": decision_record,
             "selection_version": "highest_chance_scorer_v2" if revised else SELECTION_VERSION,

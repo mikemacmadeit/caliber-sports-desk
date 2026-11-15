@@ -241,7 +241,8 @@ def test_artifact_guard_rejects_negative_probability_weights_and_missing_paths()
     assert not validate(m)
 
 
-def test_saved_strategy_lanes_grade_separately_without_reselecting_final(db, monkeypatch):
+@pytest.mark.parametrize('fresh', [True, False])
+def test_saved_strategy_lanes_grade_separately_without_reselecting_final(db, monkeypatch, fresh):
     from spe.db.models import BoardSnapshot, Player, PublishedStat
     import spe.models.player_td.desk_replay as replay
     from test_publication_pipeline import NOW, seed
@@ -253,7 +254,12 @@ def test_saved_strategy_lanes_grade_separately_without_reselecting_final(db, mon
         db.flush()
         db.add(PublishedStat(key='g|'+pid+'|anytime_td',game_id='g',player_id=pid,
             market_id='anytime_td',actual=actual,source='espn.summary:test',observed_at=NOW))
-    pick=choose([priced('leader',.7,-300),priced('value',.5,160,.45)])
+    candidates=[priced('leader',.7,-300),priced('value',.5,160,.45)]
+    if not fresh:
+        from spe.db.base import as_utc
+        for r in candidates:
+            r['source_timestamp']=r['price_source_at']=(as_utc(r['forecast']['data_cutoff'])-timedelta(hours=12)).isoformat()
+    pick=choose(candidates)
     pick.update(game_id='g',kickoff_utc=game.kickoff_utc.isoformat(),retrospective=False)
     snapshot=deepcopy(pick)
     db.add(BoardSnapshot(key='scorer-desk-v1:g',updated_at=NOW-timedelta(hours=6),payload={'row':pick,'evaluated':True}))
@@ -263,7 +269,8 @@ def test_saved_strategy_lanes_grade_separately_without_reselecting_final(db, mon
     board=replay.replay_day(db,'2026-11-15',now=NOW,cached_only=True)
     assert board['decision_record']['most_likely']['losses']==1
     assert board['decision_record']['value_candidate']['wins']==1
-    assert board['decision_record']['value_candidate']['hypothetical_unit_profit']==pytest.approx(1.6)
+    assert board['decision_record']['value_candidate']['hypothetical_unit_profit']==(pytest.approx(1.6) if fresh else None)
+    assert board['decision_record']['value_candidate']['priced_bets']==int(fresh)
     assert board['rows'][0]['player_id']=='leader'
     assert db.get(BoardSnapshot,'scorer-desk-v1:g').payload['row']==snapshot
 

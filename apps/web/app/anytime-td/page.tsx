@@ -34,12 +34,12 @@ export default async function AnytimeTdPage({
   const when = days && selected === days.today ? "today" : dayParts(selected).monthDay;
   const researchHref = withQuery("/anytime-td", {
     league: league === "all" ? undefined : league,
-    date: days && selected === days.today ? undefined : selected,
+    date: dateParam || (selected === today ? undefined : selected),
     view: "research",
   });
   const boardHref = withQuery("/anytime-td", {
     league: league === "all" ? undefined : league,
-    date: days && selected === days.today ? undefined : selected,
+    date: dateParam || (selected === today ? undefined : selected),
   });
 
   let research: ResearchFinderPayload | null = null;

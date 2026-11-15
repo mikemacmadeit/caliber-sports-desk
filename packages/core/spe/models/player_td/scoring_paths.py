@@ -14,6 +14,7 @@ from spe.analytics.td_scoring_paths import PATHS, LABELS
 from spe.models.player_td.nflverse_context import _available
 
 VERSION = 'scoring_paths_v1'
+CONTEXT_VERSION = 'scoring_paths_v2'
 SHARE_PRIOR = 3.
 CONVERSION_PRIOR = 25.
 
@@ -81,6 +82,9 @@ def project(history, model, team, opponent, cutoff, base, unavailable=(), contex
         return None
     offense, defense, players = profiles
     excluded = set(unavailable)
+    from spe.models.player_td.matchup_research import build, contextual_share
+    research = build(offense, defense, players, excluded, context)
+    contextual = model['scoring_paths'].get('version') == CONTEXT_VERSION
     priors = model['scoring_paths']['rates']
     live = {p: v for p,v in players.items() if p not in excluded and p in base['players']}
     details = {p: {'paths': [], 'rush_lambda': 0., 'rec_lambda': 0.} for p in live}
@@ -109,6 +113,9 @@ def project(history, model, team, opponent, cutoff, base, unavailable=(), contex
                 channel_share = sum(_sum(m, kind) for m in ps)/max(1., sum(_sum(m, kind) for m in ts))
                 shares[pid][scenario] = (sum(_count(m, path) for m in ps)+SHARE_PRIOR*channel_share)/(sum(_count(m, path) for m in ts)+SHARE_PRIOR)
             shares[pid]['central'] = (shares[pid]['longer_role']+shares[pid]['recent_role'])/2
+            if contextual:
+                for scenario in ('central','longer_role','recent_role'):
+                    shares[pid][scenario] = contextual_share(shares[pid][scenario],path,info['series'],offense,research[pid])
         for pid, info in live.items():
             own_rate, own_n = rate(info['series'])
             opp_rate, opp_n = rate(defense, info['position'])
@@ -153,6 +160,8 @@ def project(history, model, team, opponent, cutoff, base, unavailable=(), contex
             for pid in live:
                 scenarios[name][pid][kind+'_lambda'] = base['team_expected_tds'][kind]*weights[pid][kind]/max(total+reserve, 1e-9)
     for pid, detail in details.items():
+        detail['research'] = research[pid]
+        detail['quarterback_conditioning_active'] = contextual and research[pid]['quarterback']['usable']
         detail.update(scenarios['central'][pid])
         detail['probability'] = -math.expm1(-detail['rush_lambda']-detail['rec_lambda'])
         detail['scenario_probabilities'] = {name: -math.expm1(-values[pid]['rush_lambda']-values[pid]['rec_lambda']) for name,values in scenarios.items()}
@@ -160,7 +169,7 @@ def project(history, model, team, opponent, cutoff, base, unavailable=(), contex
         detail['opponent_games'] = len(defense)
         detail['role_uncertainty'] = 'Five declared workload scenarios; not a statistical confidence interval.'
         detail['paths'].sort(key=lambda r: -r['unscaled_expected_tds'])
-    return {'version': VERSION, 'players': details, 'team_expected_tds': base['team_expected_tds'],
+    return {'version': model['scoring_paths']['version'], 'players': details, 'team_expected_tds': base['team_expected_tds'],
         'excluded_players': sorted(excluded), 'pool_size': len(live),
         'sources': ['nflverse prior-game play-by-play'],
         'limitations': ['No complete routes, man/zone splits or verified upcoming play calls.',
@@ -175,7 +184,7 @@ def calibrated(model, baseline_probability, path_probability):
 
 
 def validate(config):
-    if not isinstance(config, dict) or config.get('version') != VERSION:
+    if not isinstance(config, dict) or config.get('version') not in (VERSION, CONTEXT_VERSION):
         return False
     try:
         w = config['calibration']

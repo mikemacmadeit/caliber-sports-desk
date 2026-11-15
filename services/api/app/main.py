@@ -83,6 +83,9 @@ app.include_router(auth_router)
 
 
 def _viewer_is_subscribed(request: Request) -> bool:
+    # The local desk is the operator's own board. Production still requires a subscription.
+    if settings.app_env == "dev":
+        return True
     from spe.db.session import session_factory
 
     from app.access import request_is_subscribed
@@ -436,37 +439,11 @@ def prop_desk(
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     """One receptions, receiving, or rushing call per game. Touchdowns stay off."""
-    from sqlalchemy import select
-
-    from spe.db.models import ClosingLine
     from spe.desk.day_results import apply_recorded_results
-    from spe.models.prop_projection import apply_matchup, load_defense
-    from spe.props.board_cache import load_slate_props
-    from spe.props.game_picks import attach_team_spreads, select_desk_props
+    from spe.props.game_picks import load_desk_props
 
     selected = date or slate_today()
-    rows = load_slate_props(session, league, selected)
-    game_ids = {row.get("game_id") for row in rows if row.get("game_id")}
-    home_team = {
-        game.game_id: game.home_team_id
-        for game in session.scalars(select(Game).where(Game.game_id.in_(game_ids)))
-    }
-    home_spread: dict[str, float] = {}
-    for line in session.scalars(
-        select(ClosingLine).where(ClosingLine.market_id == "point_spread", ClosingLine.game_id.in_(game_ids))
-    ):
-        if line.home_line is not None:
-            home_spread.setdefault(line.game_id, float(line.home_line))
-    attach_team_spreads(rows, home_team, home_spread)
-    tables = {
-        league_id: load_defense(session, league_id)
-        for league_id in {str(row.get("league_id") or "") for row in rows if row.get("league_id")}
-    }
-    for row in rows:
-        table = tables.get(str(row.get("league_id") or ""))
-        if table is not None:
-            apply_matchup(row, table)
-    chosen = select_desk_props(rows)
+    chosen = load_desk_props(session, league, selected)
     index = {row.get("game_id"): session.get(Game, row.get("game_id")) for row in chosen if row.get("game_id")}
     try:
         apply_recorded_results(session, [], chosen)
@@ -541,11 +518,12 @@ def _matchup_note(row: dict[str, Any]) -> str | None:
 def prop_picks(league: str = Query(default="all"), date: str | None = None,
                session: Session = Depends(db_session)) -> dict[str, Any]:
     from spe.props.board_cache import load_slate_props, read_entry, WARM_MARKETS
-    from spe.publishing.ledger import current_picks, day_picks, settle
+    from spe.publishing.ledger import current_picks, day_picks, record_frozen_desk_picks, settle
     selected = date or slate_today()
     games = games_for_slate(session, selected, league)
     rows = load_slate_props(session, league, selected)
     degraded = bool(games) and any(read_entry(market, league, selected) is None for market in WARM_MARKETS)
+    record_frozen_desk_picks(session)
     settle(session)
     return {"date": selected, "league": league, "games_on_slate": len(games), "degraded": degraded,
             "picks": current_picks(session, rows),
@@ -558,10 +536,26 @@ def prop_picks(league: str = Query(default="all"), date: str | None = None,
 def published_history(league: str | None = None, market: str | None = None,
                       offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200),
                       session: Session = Depends(db_session)) -> dict[str, Any]:
-    from spe.publishing.ledger import history, ats_history
+    from spe.publishing.ledger import history, ats_history, record_frozen_desk_picks, settle
     if market == "point_spread":
         return ats_history(session, league, offset, limit)
+    record_frozen_desk_picks(session)
+    settle(session)
     return history(session, league, market, offset, limit)
+
+
+@app.get("/v1/published/day")
+def published_day(
+    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    league: str = Query(default="all"),
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    from spe.publishing.ledger import ledger_day, slate_dates
+
+    payload = ledger_day(session, date, league)
+    payload["dates"] = slate_dates(session)
+    payload["disclaimer"] = disclaimer()
+    return payload
 
 
 @app.get("/v1/desk")

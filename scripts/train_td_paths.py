@@ -24,7 +24,7 @@ from spe.models.player_td.scoring_paths import prior_rates, VERSION
 from train_desk_combined import metrics, paired_brier_interval
 
 
-def train(database, output):
+def train(database, output, contextual=False):
     output.mkdir(parents=True, exist_ok=True)
     plan = {'version': 'desk_combined_v10', 'cutoff_exclusive': '2026-11-14',
         'fit_end': '2025-10-15', 'calibration_end': '2025-12-15', 'validation_end': '2026-02-15',
@@ -35,6 +35,10 @@ def train(database, output):
             '2026 has been inspected before; it is not an untouched test.',
             'No historical executable prices: no ROI or value-selection performance claim.',
             'Same seasons used in earlier design work: prospective evaluation remains necessary.']}
+    if contextual:
+        plan['version']='desk_combined_v11'
+        plan['design']='Fixed QB-specific scoring-area share posterior (eight opportunities prior, half-weight), then refit component calibration on the original calibration dates only. No tuning to today or Sharp selections.'
+        plan['limitations'].append('Historical expected QB inferred from last completed game; current verified depth overrides are unavailable historically.')
     (output/'plan.json').write_text(json.dumps(plan, indent=2))
     with sqlite3.connect(database.resolve().as_uri()+'?mode=ro', uri=True) as db:
         db.row_factory = sqlite3.Row
@@ -55,7 +59,7 @@ def train(database, output):
         cached = output/f'context_{year}.json'
         signature = [(p.name,p.stat().st_size,p.stat().st_mtime_ns) for p in
             (cache_dir()/f'play_by_play_{year}.parquet',cache_dir()/f'snap_counts_{year}.parquet')]
-        digest = hashlib.sha256(json.dumps(signature).encode()).hexdigest()
+        digest = hashlib.sha256(json.dumps([signature, 'scoring_path_context_v2']).encode()).hexdigest()
         prior = json.loads(cached.read_text()) if cached.exists() else {}
         if prior.get('signature') == digest:
             rows = prior['rows']
@@ -72,11 +76,17 @@ def train(database, output):
     allocator = AllocationHistory(history)
     baseline = json.loads(Path('data/parquet/models/nfl_desk_combined_v9_candidate.json').read_text())
     deployed = json.loads(Path('data/parquet/models/nfl_desk_combined_v2.json').read_text())
+    previous = json.loads(Path('data/parquet/models/nfl_desk_combined_v10_candidate.json').read_text())
     model = copy.deepcopy(baseline)
     model.update(version='desk_combined_v10', live_enabled=False,
         scoring_paths={'version':VERSION,'rates':prior_rates(records,plan['fit_end']), 'calibration':[0.,.5,.5]},
         decision_engine='scoring_case_v1', design=plan)
-    rows, caches = [], {k:{} for k in ('candidate','v9','v2')}
+    if contextual:
+        from spe.models.player_td.scoring_paths import CONTEXT_VERSION
+        model['version']='desk_combined_v11'
+        model['scoring_paths']['version']=CONTEXT_VERSION
+        model['decision_engine']='scoring_case_v4'
+    rows, caches = [], {k:{} for k in ('candidate','v9','v2','v10')}
     for i,r in enumerate(records):
         date = r['kickoff_utc'].isoformat()
         if date < plan['fit_end']: continue
@@ -85,7 +95,7 @@ def train(database, output):
         if not f or not all(market.get(k) is not None for k in ('home_handicap','total')) or f['days_since_appearance'] > 21: continue
         f.update(market_features(market,r['team_id']==r['home_team_id'],True))
         predictions = {}
-        for name, m in (('candidate',model),('v9',baseline),('v2',deployed)):
+        for name, m in (('candidate',model),('v9',baseline),('v2',deployed),('v10',previous)):
             key=(r['game_id'],r['team_id'])
             if key not in caches[name]:
                 caches[name][key]=allocator.allocate(m,r['team_id'],r['opponent_id'],r['kickoff_utc'],r['team_id']==r['home_team_id'],market=market)
@@ -95,7 +105,8 @@ def train(database, output):
         if path.get('status') != 'active': continue
         rows.append({'game_id':r['game_id'],'player_id':r['player_id'],'kickoff_utc':r['kickoff_utc'],
             'label':int((r['rush_td'] or 0)+(r['rec_td'] or 0)>0),
-            'base': predictions['v9']['probability'], 'deployed':predictions['v2']['probability'], 'path':path['probability']})
+            'base': predictions['v9']['probability'], 'deployed':predictions['v2']['probability'],
+            'previous':predictions['v10']['probability'], 'path':path['probability']})
     parts = {'calibration':[r for r in rows if r['kickoff_utc'].isoformat()<plan['calibration_end']],
         'validation':[r for r in rows if plan['calibration_end']<=r['kickoff_utc'].isoformat()<plan['validation_end']],
         'examined_2026':[r for r in rows if r['kickoff_utc'].isoformat()>='2026-08-01']}
@@ -112,15 +123,16 @@ def train(database, output):
     for key, part in parts.items():
         p=sigmoid(np.array([[1.,logit(r['base']),logit(r['path'])] for r in part])@fitted.x)
         report[key]={'candidate':metrics(part,p),'v9':metrics(part,np.array([r['base'] for r in part])),
+            'v10':metrics(part,np.array([r['previous'] for r in part])),
             'v2':metrics(part,np.array([r['deployed'] for r in part])),
             'paired_brier_vs_v9':paired_brier_interval(part,p,np.array([r['base'] for r in part]))}
         for r,v in zip(part,p): r['candidate']=float(v)
     v=report['validation']; candidate=v['candidate']
-    report['promotion_gate_passed']=all(candidate['one_per_game']['hits']>v[k]['one_per_game']['hits'] and candidate['brier']<=v[k]['brier'] and candidate['log_loss']<=v[k]['log_loss'] for k in ('v9','v2'))
+    report['promotion_gate_passed']=all(candidate['one_per_game']['hits']>v[k]['one_per_game']['hits'] and candidate['brier']<=v[k]['brier'] and candidate['log_loss']<=v[k]['log_loss'] for k in ('v9','v2','v10'))
     # Flag is evidence only. Publication stays an explicit, date-scoped operation.
     model['validation']=report
     model['source_sha256']=hashlib.sha256(json.dumps(rows,default=str,sort_keys=True).encode()).hexdigest()
-    (output/'nfl_desk_combined_v10_candidate.json').write_text(json.dumps(model,indent=2))
+    (output/(model['version'].replace('desk_','nfl_desk_',1)+'_candidate.json')).write_text(json.dumps(model,indent=2))
     (output/'matched_predictions.json').write_text(json.dumps(parts,default=str))
     print(json.dumps({'calibration':fitted.x.tolist(),**report},indent=2),flush=True)
 
@@ -129,5 +141,6 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--database',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--contextual',action='store_true')
     args=parser.parse_args()
-    train(args.database,args.output)
+    train(args.database,args.output,args.contextual)

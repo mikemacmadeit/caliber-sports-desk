@@ -1,6 +1,7 @@
 """Grade the day's shown picks from the recorded game and box score.
 
-A final game with no listed stat stays pending. A missing box is not a zero.
+A box that fails to load stays pending. A finished box that omits a player,
+or omits one of that player's counting stats, recorded a zero.
 """
 
 from __future__ import annotations
@@ -13,8 +14,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from spe.db.models import Game, PublishedStat
-from spe.identity.match import match_name
+from spe.identity.match import normalize_name
 from spe.models.ats.predict import grade_displayed_pick
+from spe.publishing.boxes import box_actual, parse
 from spe.shadow.settle import _grade
 
 COUNTING = ("receptions", "rushing_yards", "receiving_yards")
@@ -35,9 +37,9 @@ def apply_recorded_results(
         game.game_id: game
         for game in session.scalars(select(Game).where(Game.game_id.in_(game_ids)))
     }
+    _fill_counting_stats(session, games, prices, fetch=fetch)
     for row in spreads:
         _grade_spread(row, games.get(row.get("game_id")))
-    _fill_counting_stats(session, games, prices, fetch=fetch)
     stats = {
         (stat.game_id, stat.player_id, stat.market_id): stat.actual
         for stat in session.scalars(
@@ -101,40 +103,20 @@ def _fill_counting_stats(
     *,
     fetch,
 ) -> None:
-    catalog = _catalog(rows)
-    finals = [
+    missing = _missing_stats(session, rows)
+    missing_games = {item[0] for item in missing}
+    needed = [
         game
         for game in games.values()
-        if str(game.status).lower() in {"final", "post"}
-        and game.game_id in catalog
-        and game.game_id not in _CHECKED
+        if game.game_id not in _CHECKED
+        and str(game.status or "").lower() not in {"canceled", "cancelled"}
+        and (str(game.status or "").lower() not in {"final", "post"} or game.game_id in missing_games)
     ]
-    live = [
-        game
-        for game in games.values()
-        if str(game.status).lower() == "in_progress" and game.game_id in catalog
-    ]
-    if not finals and not live:
-        return
-    have = set(
-        session.scalars(
-            select(PublishedStat.game_id).where(
-                PublishedStat.game_id.in_([game.game_id for game in finals]),
-                PublishedStat.market_id.in_(COUNTING),
-                PublishedStat.source == "espn.summary",
-            )
-        )
-    ) if finals else set()
-    needed = [game for game in finals if game.game_id not in have]
-    _CHECKED.update(game.game_id for game in finals if game.game_id in have)
-    needed.extend(live)
     if not needed:
         return
     from spe.ingest.espn_box import _fetch_summary
-    from spe.publishing.boxes import parse
 
     loader = fetch or _fetch_summary
-    live_ids = {game.game_id for game in live}
 
     def load(game: Game) -> tuple[str, dict[str, Any] | None]:
         event_id = game.game_id.split(":")[-1] if game.game_id.startswith("espn:") else None
@@ -147,47 +129,78 @@ def _fill_counting_stats(
         loaded = list(pool.map(load, needed))
     now = datetime.now(UTC)
     for game_id, payload in loaded:
-        if payload is None:
+        game = games.get(game_id)
+        if game is None or payload is None:
             continue
-        if game_id not in live_ids:
+        finished = _apply_summary(game, payload)
+        people = parse(payload)
+        if finished and (people or game_id not in missing_games):
             _CHECKED.add(game_id)
-        names = catalog.get(game_id) or []
-        if not names:
+        if not people:
             continue
-        for person in parse(payload):
-            decision = match_name(str(person.get("name") or ""), names)
-            if decision.review_status != "auto" or not decision.canonical_id:
+        by_espn = {str(person.get("espn_id")): person for person in people if person.get("espn_id")}
+        by_name = {normalize_name(str(person.get("name") or "")): person for person in people}
+        for wanted_game, player_id, name, market, key in missing:
+            if wanted_game != game_id:
                 continue
-            markets = person.get("markets") or {}
-            for market in COUNTING:
-                if market not in markets:
-                    continue
-                key = f"{game_id}|{decision.canonical_id}|{market}"
-                stat = session.get(PublishedStat, key)
-                if stat is None:
-                    stat = PublishedStat(
-                        key=key,
-                        game_id=game_id,
-                        player_id=decision.canonical_id,
-                        market_id=market,
-                    )
-                    session.add(stat)
-                stat.actual = float(markets[market])
-                stat.observed_at = now
-                stat.source = "espn.summary.live" if game_id in live_ids else "espn.summary"
+            person = by_espn.get(str(player_id).split(":")[-1]) or by_name.get(normalize_name(name))
+            markets = None if person is None else (person.get("markets") or {})
+            actual = box_actual(markets, market, final=finished)
+            if actual is None:
+                continue
+            stat = session.get(PublishedStat, key)
+            if stat is None:
+                stat = PublishedStat(key=key, game_id=game_id, player_id=player_id, market_id=market)
+                session.add(stat)
+            stat.actual = actual
+            stat.observed_at = now
+            stat.source = "espn.summary" if finished else "espn.summary.live"
     session.flush()
 
 
-def _catalog(rows: list[dict[str, Any]]) -> dict[str, list[tuple[str, str]]]:
-    catalog: dict[str, list[tuple[str, str]]] = {}
+def _missing_stats(session: Session, rows: list[dict[str, Any]]) -> list[tuple[str, str, str, str, str]]:
+    wanted: list[tuple[str, str, str, str, str]] = []
     for row in rows:
         game_id = str(row.get("game_id") or "")
         player_id = str(row.get("player_id") or "")
-        name = str(row.get("player_name") or "")
-        if not game_id or not player_id or not name:
+        market = str(row.get("market_id") or "")
+        if market not in COUNTING or not game_id or not player_id:
             continue
-        pair = (player_id, name)
-        found = catalog.setdefault(game_id, [])
-        if pair not in found:
-            found.append(pair)
-    return catalog
+        wanted.append((game_id, player_id, str(row.get("player_name") or ""), market, f"{game_id}|{player_id}|{market}"))
+    if not wanted:
+        return []
+    existing = set(
+        session.scalars(select(PublishedStat.key).where(PublishedStat.key.in_([item[4] for item in wanted])))
+    )
+    return [item for item in wanted if item[4] not in existing]
+
+
+def _apply_summary(game: Game, payload: dict[str, Any]) -> bool:
+    """Copy a final score onto the game. Returns whether the game is now final."""
+    header = payload.get("header") if isinstance(payload.get("header"), dict) else {}
+    competitions = header.get("competitions") or []
+    if not competitions or not isinstance(competitions[0], dict):
+        return str(game.status or "").lower() in {"final", "post"}
+    competition = competitions[0]
+    status_name = str(((competition.get("status") or {}).get("type") or {}).get("name") or "")
+    scores: dict[str, int] = {}
+    for side in competition.get("competitors") or []:
+        if not isinstance(side, dict):
+            continue
+        place = str(side.get("homeAway") or "")
+        try:
+            scores[place] = int(side.get("score"))
+        except (TypeError, ValueError):
+            continue
+    if status_name in {"STATUS_FINAL", "STATUS_FULL_TIME"} and "home" in scores and "away" in scores:
+        game.status = "final"
+        game.home_score = scores["home"]
+        game.away_score = scores["away"]
+        return True
+    if str(game.status or "").lower() != "final" and status_name in {"STATUS_IN_PROGRESS", "STATUS_HALFTIME", "STATUS_END_PERIOD"}:
+        if "home" in scores and "away" in scores:
+            game.status = "in_progress"
+            game.home_score = scores["home"]
+            game.away_score = scores["away"]
+    return str(game.status or "").lower() in {"final", "post"}
+

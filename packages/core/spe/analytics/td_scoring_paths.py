@@ -35,7 +35,7 @@ def bucket(kind, yardline, air=None):
 
 
 def _new():
-    return {'version': 1, 'buckets': {}, 'by_position': {}, 'states': {}, 'passers': {}}
+    return {'version': 2, 'buckets': {}, 'by_position': {}, 'states': {}, 'passers': {}}
 
 
 def aggregate(frame, positions):
@@ -62,9 +62,16 @@ def aggregate(frame, positions):
             item = result[(str(r['game_id']), str(r['posteam']), entity)]
             add_bins(item['buckets'], key, td, yards)
             add_bins(item['by_position'].setdefault(pos, {}), key, td, yards)
+            # A separate audit total; not in PATHS and never added to TD mass.
+            inside20 = kind == 'rec' and finite(r.get('yl')) is not None and r['yl'] <= 20
+            if inside20:
+                add_bins(item['buckets'], 'rec_inside20', td, yards)
+                add_bins(item['by_position'][pos], 'rec_inside20', td, yards)
             if state:
                 add_bins(item['states'].setdefault(state, {}), key, td, yards)
             passer = r.get('passer_player_id')
             if kind == 'rec' and isinstance(passer, str) and passer:
                 add_bins(item['passers'].setdefault(passer, {}), key, td, yards)
+                if inside20:
+                    add_bins(item['passers'][passer], 'rec_inside20', td, yards)
     return result

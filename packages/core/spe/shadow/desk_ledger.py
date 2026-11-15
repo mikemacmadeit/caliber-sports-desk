@@ -96,6 +96,43 @@ def freeze_desk_rows(db, rows, now=None, *, include_started=False):
     return saved
 
 
+def grade_desk_scorer(settlement: str | None, actual: float | None) -> str:
+    """A recorded box grades the scorer. An unfinished box stays pending."""
+    if settlement in {"win", "loss", "push"}:
+        return settlement
+    if actual is None:
+        return "pending"
+    return "win" if float(actual) > 0 else "loss"
+
+
+def chosen_desk_predictions(db, games):
+    """The one pre-kickoff scorer still standing for each game."""
+    from spe.shadow.atd_desk_takes import is_desk_take
+
+    if not games:
+        return []
+    game_ids = [game.game_id for game in games]
+    decisions = latest_decisions(db, game_ids)
+    preds = db.scalars(
+        select(ShadowPrediction).where(
+            ShadowPrediction.game_id.in_(game_ids),
+            ShadowPrediction.market_id == "anytime_td",
+        )
+    )
+    chosen = {}
+    for pred in preds:
+        if not is_desk_take(pred):
+            continue
+        decision = decisions.get(pred.game_id)
+        if decision and (decision.payload or {}).get("shadow_id") != pred.shadow_id:
+            continue
+        prior = chosen.get(pred.game_id)
+        taken = str((pred.components or {}).get("desk_take_at") or "")
+        if prior is None or taken >= str((prior.components or {}).get("desk_take_at") or ""):
+            chosen[pred.game_id] = pred
+    return list(chosen.values())
+
+
 def current_desk_ids(db):
     return {r.payload["shadow_id"] for r in latest_decisions(db).values()
             if (r.payload or {}).get("shadow_id")}

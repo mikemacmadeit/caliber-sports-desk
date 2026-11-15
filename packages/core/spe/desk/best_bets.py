@@ -187,7 +187,21 @@ def _spread_card(row: dict[str, Any], edge: float) -> dict[str, Any]:
         "pick_market": "spread",
         "ats_pick_result": result,
         "edge_points": round(edge, 1),
+        "book_price": _side_price(row),
     }
+
+
+def _side_price(row: dict[str, Any]) -> int | None:
+    """The posted juice on the side we named. A missing price stays missing."""
+    raw = row.get("away_spread_price") if row.get("ats_side") == "away" else row.get("home_spread_price")
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    if isinstance(raw, float) and raw != raw:
+        return None
+    price = int(raw)
+    if abs(price) < 100:
+        return None
+    return price
 
 
 def _prop_side(row: dict[str, Any]) -> bool:

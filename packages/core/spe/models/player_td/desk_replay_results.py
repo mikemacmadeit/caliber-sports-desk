@@ -47,7 +47,7 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
                 choice = (row.get("decision") or {}).get(lane)
                 if not choice or not choice.get("player_id") or not choice.get("name"):
                     continue
-                if lane == "value_candidate" and not choice.get("price_supported"):
+                if lane == "value_candidate" and not (choice.get("research_selected") or choice.get("price_supported")):
                     continue
                 selected[(row["game_id"], choice["player_id"])] = {
                     **row, "player_id": choice["player_id"], "player_name": choice["name"]}

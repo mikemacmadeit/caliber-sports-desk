@@ -220,9 +220,9 @@ export function PropTable({ rows, call }: { rows: PropRow[]; call?: "scorer" }) 
                 <td className="px-4 py-3">
                   <div
                     className="whitespace-nowrap font-mono text-[11px] uppercase tracking-wider"
-                    title={r.forecast.reason_codes.join(" · ")}
+                    title={(r.forecast.reason_codes ?? []).join(" · ")}
                   >
-                    {r.forecast.availability_status.replaceAll("_", " ")}
+                    {(r.forecast.availability_status ?? "unknown").replaceAll("_", " ")}
                   </div>
                   <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-mute">
                     {r.forecast.model_version}

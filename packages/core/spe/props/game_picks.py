@@ -53,6 +53,38 @@ def attach_team_spreads(
         row["team_spread"] = float(home_line) if team_id == home_team else -float(home_line)
 
 
+def load_desk_props(session, league: str, date: str) -> list[dict[str, Any]]:
+    """The prop calls the desk gives out: one per game, on a clear favorite."""
+    from sqlalchemy import select
+
+    from spe.db.models import ClosingLine, Game
+    from spe.models.prop_projection import apply_matchup, load_defense
+    from spe.props.board_cache import load_slate_props
+
+    rows = load_slate_props(session, league, date)
+    game_ids = {row.get("game_id") for row in rows if row.get("game_id")}
+    home_team = {
+        game.game_id: game.home_team_id
+        for game in session.scalars(select(Game).where(Game.game_id.in_(game_ids or {"__none__"})))
+    }
+    home_spread: dict[str, float] = {}
+    for line in session.scalars(
+        select(ClosingLine).where(ClosingLine.market_id == "point_spread", ClosingLine.game_id.in_(game_ids or {"__none__"}))
+    ):
+        if line.home_line is not None:
+            home_spread.setdefault(line.game_id, float(line.home_line))
+    attach_team_spreads(rows, home_team, home_spread)
+    tables = {
+        league_id: load_defense(session, league_id)
+        for league_id in {str(row.get("league_id") or "") for row in rows if row.get("league_id")}
+    }
+    for row in rows:
+        table = tables.get(str(row.get("league_id") or ""))
+        if table is not None:
+            apply_matchup(row, table)
+    return select_desk_props(rows)
+
+
 def select_desk_props(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One counting prop per game, for a team favored by a touchdown or more.
 

@@ -6,6 +6,7 @@ import time
 from spe.config import settings
 
 _lock = threading.Lock()
+_source_lock = threading.Lock()
 _states = {}
 
 
@@ -25,11 +26,18 @@ def ensure_refresh(date):
             from spe.db.session import session_factory
             from spe.models.player_td.desk_replay import replay_day
             from sqlalchemy.exc import IntegrityError
-            with session_factory() as db:
+            with _source_lock, session_factory() as db:
                 from spe.ingest.nfl_availability import refresh_nfl_availability
                 status = refresh_nfl_availability(db)
                 if status.get('status') == 'unavailable':
                     logging.getLogger(__name__).warning('NFL availability refresh unavailable: %s', status)
+                if settings.app_env=='dev':
+                    from spe.ingest.nflverse_desk import refresh_nflverse_desk
+                    # This free-source job has its own six-hour due check.
+                    # It retains prior good data on partial source failure.
+                    refresh_nflverse_desk(db)
+                db.commit()
+            with session_factory() as db:
                 for attempt in range(2):
                     try:
                         replay_day(db, date, 'all')

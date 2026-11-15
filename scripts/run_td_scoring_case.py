@@ -49,11 +49,11 @@ def run(day, source, output, context_file=None):
     dump(output/'scoring-case-preserved.json',archives)
     body=source.read_bytes()
     artifact=json.loads(body)
-    if artifact.get('version')!='desk_combined_v10' or artifact.get('league')!='nfl':
+    if artifact.get('version') not in ('desk_combined_v10','desk_combined_v11') or artifact.get('league')!='nfl':
         raise ValueError('Expected an NFL scoring-path candidate artifact')
-    target=settings.parquet_dir/'models/nfl_desk_combined_v10_candidate.json'
+    target=settings.parquet_dir/('models/nfl_'+artifact['version']+'_candidate.json')
     target.write_bytes(body)
-    model=load_combined_model('nfl',research_candidate=True,version='desk_combined_v10')
+    model=load_combined_model('nfl',research_candidate=True,version=artifact['version'])
     if not model: raise ValueError('Candidate artifact failed schema validation')
     if context_file:
         from spe.ingest.nflverse_desk import store_context

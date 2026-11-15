@@ -8,18 +8,24 @@ MIN_MODEL_EDGE = .03
 MAX_PRICE_AGE_HOURS = 2
 
 
-def quote_value(row):
+def reference_quote(row):
     price=row.get('book_price'); p=(row.get('forecast') or {}).get('p_estimate')
     cutoff=as_utc((row.get('forecast') or {}).get('data_cutoff'))
     captured=as_utc(row.get('source_timestamp'))
     source=as_utc(row.get('price_source_at') or row.get('source_timestamp'))
     if not all(isinstance(x,(int,float)) and not isinstance(x,bool) and math.isfinite(x) for x in (price,p)) or abs(price)<100 or not 0<p<=1:
         return None
-    if not cutoff or not captured or not source or not 0 <= (cutoff-source).total_seconds() <= MAX_PRICE_AGE_HOURS*3600 or not source <= captured <= cutoff:
+    if not cutoff or not captured or not source or not source <= captured <= cutoff:
         return None
     decimal=1+price/100 if price>0 else 1+100/abs(price)
     return {'break_even':american_to_implied(price), 'model_edge':p-american_to_implied(price),
-        'expected_return':p*decimal-1, 'decimal':decimal}
+        'expected_return':p*decimal-1, 'decimal':decimal,
+        'age_hours':(cutoff-source).total_seconds()/3600}
+
+
+def quote_value(row):
+    quote = reference_quote(row)
+    return quote if quote and quote['age_hours'] <= MAX_PRICE_AGE_HOURS else None
 
 
 def choose(eligible):

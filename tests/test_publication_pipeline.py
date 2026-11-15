@@ -13,7 +13,8 @@ from spe.db.models import (
     JobRun,
 )
 from spe.publishing.policy import assess
-from spe.publishing.ledger import publish, current_picks, day_picks, settle, history
+from spe.db.models import DeskDecision
+from spe.publishing.ledger import publish, current_picks, day_picks, settle, history, record_frozen_desk_picks
 from spe.publishing.pipeline import run_step, health
 from spe.publishing.store import read, write
 from spe.publishing.boxes import parse
@@ -390,3 +391,157 @@ def test_ats_history_uses_frozen_line_and_price(db):
     assert result["rows"][0]["book_price"] == -110
     assert result["rows"][0]["forecast"]["model_version"] == "frozen-model"
     assert result["summaries"][0]["units"] == pytest.approx(100 / 110)
+
+
+def _desk_row():
+    return {
+        "game_id": "g",
+        "league_id": "nfl",
+        "market_id": "anytime_td",
+        "player_id": "p",
+        "player_name": "Scorer",
+        "side": "yes",
+        "book_price": 150,
+        "bookmaker": "DraftKings",
+        "forecast": {"p_estimate": 0.42, "model_version": "desk"},
+        "kickoff_utc": NOW.isoformat(),
+    }
+
+
+def test_last_prekick_desk_pick_is_graded_on_the_public_record(db):
+    game = seed(db)
+    game.kickoff_utc = NOW
+    game.status = "final"
+    game.home_score = 24
+    game.away_score = 17
+    db.add(
+        DeskDecision(
+            game_id="g",
+            decided_at=NOW - timedelta(hours=2),
+            payload={"row": _desk_row(), "kickoff_utc": NOW.isoformat(), "game_id": "g"},
+        )
+    )
+    db.add(
+        DeskDecision(
+            game_id="g",
+            decided_at=NOW + timedelta(hours=1),
+            payload={"row": None, "kickoff_utc": NOW.isoformat(), "game_id": "g"},
+        )
+    )
+    db.commit()
+    assert record_frozen_desk_picks(db)["recorded"] == 1
+    db.add(
+        PublishedStat(
+            key="g|p|anytime_td",
+            game_id="g",
+            player_id="p",
+            market_id="anytime_td",
+            actual=1,
+            observed_at=NOW,
+            source="test",
+        )
+    )
+    db.commit()
+    settle(db)
+    db.commit()
+    record = history(db)
+    assert record["total"] == 1
+    assert record["rows"][0]["result"] == "win"
+    assert record["rows"][0]["player_name"] == "Scorer"
+    assert record["rows"][0]["sentence"].startswith("Scorer anytime touchdown")
+
+
+def test_a_recorded_touchdown_grades_the_desk_scorer():
+    from spe.shadow.desk_ledger import grade_desk_scorer
+
+    assert grade_desk_scorer("pending", 1) == "win"
+    assert grade_desk_scorer("blocked", 0) == "loss"
+    assert grade_desk_scorer("win", 0) == "win"
+    assert grade_desk_scorer("pending", None) == "pending"
+
+
+def test_a_finished_box_records_an_omitted_stat_as_zero():
+    from spe.publishing.boxes import box_actual
+
+    assert box_actual({"receiving_yards": 32}, "receiving_yards", final=True) == 32
+    assert box_actual({"rushing_yards": 89}, "receiving_yards", final=True) == 0
+    assert box_actual(None, "anytime_td", final=True) == 0
+    assert box_actual({"rushing_yards": 43}, "anytime_td", final=True) is None
+    assert box_actual(None, "receptions", final=False) is None
+
+
+def test_a_day_card_keeps_spreads_props_and_touchdowns():
+    from spe.publishing.ledger import _ledger_rows, _ledger_summary
+
+    rows = _ledger_rows(
+        [
+            {
+                "game_id": "g",
+                "league_id": "fbs",
+                "ats_pick_label": "Home -3.5",
+                "ats_pick_result": "correct",
+                "away_team": "Away",
+                "home_team": "Home",
+                "away_score": 10,
+                "home_score": 20,
+                "game_status": "final",
+                "kickoff_utc": "2026-11-14T17:00:00+00:00",
+            }
+        ],
+        [
+            {
+                "outcome_id": "o",
+                "game_id": "g",
+                "player_id": "p",
+                "market_id": "receptions",
+                "league_id": "fbs",
+                "pick": "Runner over 4.5 receptions",
+                "bookmaker": "FanDuel",
+                "book_price": -110,
+                "actual": 6,
+                "result": "win",
+                "kickoff_utc": "2026-11-14T17:00:00+00:00",
+            }
+        ],
+        [
+            {
+                "pick_id": "td",
+                "game_id": "g2",
+                "league_id": "fbs",
+                "sentence": "Scorer anytime touchdown.",
+                "bookmaker": "DraftKings",
+                "book_price": 150,
+                "result": "loss",
+                "units": -1,
+                "kickoff_utc": "2026-11-14T20:00:00+00:00",
+            }
+        ],
+    )
+    assert [row["result"] for row in rows] == ["win", "win", "loss"]
+    assert rows[0]["sentence"] == "Home -3.5"
+    assert "Final 10–20" in rows[0]["detail"]
+    assert rows[1]["detail"] == "FanDuel · -110 · Actual 6"
+    summary = _ledger_summary(rows)
+    assert summary["win"] == 2 and summary["loss"] == 1
+
+
+def test_a_pass_before_kickoff_stays_off_the_public_record(db):
+    game = seed(db)
+    game.kickoff_utc = NOW
+    db.add(
+        DeskDecision(
+            game_id="g",
+            decided_at=NOW - timedelta(hours=3),
+            payload={"row": _desk_row(), "kickoff_utc": NOW.isoformat(), "game_id": "g"},
+        )
+    )
+    db.add(
+        DeskDecision(
+            game_id="g",
+            decided_at=NOW - timedelta(hours=1),
+            payload={"row": None, "kickoff_utc": NOW.isoformat(), "game_id": "g"},
+        )
+    )
+    db.commit()
+    assert record_frozen_desk_picks(db)["recorded"] == 0
+    assert history(db)["total"] == 0

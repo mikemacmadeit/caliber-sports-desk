@@ -1025,29 +1025,11 @@ def _desk_rows(session: Session, games: list[Game], is_desk_take) -> list[dict[s
     if not games:
         return []
     by_game = {game.game_id: game for game in games}
-    from spe.shadow.desk_ledger import latest_decisions
-    decisions = latest_decisions(session, list(by_game))
-    preds = list(
-        session.scalars(
-            select(ShadowPrediction).where(
-                ShadowPrediction.game_id.in_(list(by_game)),
-                ShadowPrediction.market_id == "anytime_td",
-            )
-        )
-    )
-    chosen: dict[str, ShadowPrediction] = {}
-    for pred in preds:
-        if not is_desk_take(pred):
-            continue
-        decision = decisions.get(pred.game_id)
-        if decision and (decision.payload or {}).get("shadow_id") != pred.shadow_id:
-            continue
-        prior = chosen.get(pred.game_id)
-        if prior is None or _called_at(pred) >= _called_at(prior):
-            chosen[pred.game_id] = pred
-    if not chosen:
+    from spe.shadow.desk_ledger import chosen_desk_predictions
+
+    picks = chosen_desk_predictions(session, games)
+    if not picks:
         return []
-    picks = list(chosen.values())
     player_ids = [pred.player_id for pred in picks]
     players = {
         player.player_id: player

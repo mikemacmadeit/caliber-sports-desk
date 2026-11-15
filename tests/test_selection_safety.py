@@ -92,12 +92,15 @@ def test_requested_revised_replay_keeps_legacy_snapshot_and_uses_new_policy(db,m
 
 def test_game_scorer_names_leader_despite_price_and_information_warnings():
     from spe.models.player_td.desk_replay import select_game_scorer
-    r=candidate();r['forecast']['p_estimate']=.35;r['book_price']=None
+    r=candidate();r['forecast']['p_estimate']=.46;r['book_price']=None
     r['selection_safety']=assess(r,NOW,True)
-    alternative=copy.deepcopy(r);alternative['player_id']='other';alternative['forecast']['p_estimate']=.30
+    alternative=copy.deepcopy(r);alternative['player_id']='other';alternative['forecast']['p_estimate']=.42
     result=select_game_scorer([alternative,r])
     assert result['player_id']=='p'
     assert result['selection_warnings']
+    low=copy.deepcopy(r);low['forecast']['p_estimate']=.35
+    lower=copy.deepcopy(alternative);lower['forecast']['p_estimate']=.30
+    assert select_game_scorer([low, lower]) is None
     r['desk_analysis']['current_context']['availability']['status']='out'
     assert select_game_scorer([r,alternative])['player_id']=='other'
 

@@ -41,6 +41,15 @@ def test_report_never_uses_outcome_or_changes_probability_and_alternatives_obey_
     assert any('active status is unconfirmed' in s for s in report['checks'])
 
 
+def test_a_player_under_forty_percent_is_not_named():
+    assert select_game_scorer([candidate("longshot", p=.34, team_implied_points=28)]) is None
+    kept = select_game_scorer([
+        candidate("longshot", p=.34, team_implied_points=28),
+        candidate("real", p=.46, team_implied_points=28),
+    ])
+    assert kept["player_id"] == "real"
+
+
 def test_a_blowout_dog_is_not_the_scorer_when_the_favorite_has_a_player():
     dog = candidate('roberts', p=.55, team='MIZ', team_implied_points=16.0)
     favorite = candidate('frazier', p=.40, team='UGA', team_implied_points=32.5)

@@ -18,6 +18,10 @@ def assess(row):
     reasons, cautions, missing = [], [], []
     recent_games = f.get('recent_measured_opportunity_games') or 0
     recent_touches = f.get('recent_measured_touches')
+    research=projection.get('research') or {}
+    if 'recent_measured_opportunity_games' not in f and research.get('games',0)>=2:
+        recent_games=2
+        recent_touches=(research.get('role') or {}).get('recent_touches',0)/2
     current_role = recent_games >= 2 and number(recent_touches) and recent_touches > 0
     if current_role:
         reasons.append({'kind':'current_role', 'text':f"Recorded offensive work in the last two team games averages {recent_touches:.1f} carries plus passes thrown his way per game.",
@@ -33,7 +37,7 @@ def assess(row):
     deep = [p for p in paths if p['path']=='rec_deep' and p.get('player_sample',0)>=4
         and p.get('projected_opportunities',0)>=1 and p.get('opponent_position_sample',0)>=10
         and p.get('opponent_rate_ratio',0)>=1.1]
-    route = bool(projection.get('status')=='active' and (near or deep))
+    route = bool(projection.get('status') in ('active','research_only') and (near or deep))
     if near:
         best = max(near, key=lambda p:p.get('unscaled_expected_tds',p['projected_opportunities']))
         reasons.append({'kind':'scoring_area', 'text':f"{best['recent_share']:.0%} of the team's recent {best['label']}, with {best['player_sample']:.0f} measured opportunities in the longer window.",

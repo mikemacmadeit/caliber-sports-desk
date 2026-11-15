@@ -82,8 +82,8 @@ export type Forecast = {
   book_price: number | null;
   source_timestamp: string | null;
   price_freshness?: PriceFreshness;
-  availability_status: string;
-  reason_codes: string[];
+  availability_status?: string;
+  reason_codes?: string[];
   matchup?: { kind: "rush" | "pass"; factor: number } | null;
   tonight?: {
     depth_rank: number | null;
@@ -243,6 +243,7 @@ export type TdPriceCase = {
 };
 
 export type TdCustomerExplanation = {
+  evidence?: string[];
   version: string; label: string; chance: string; why: string; matchup: string;
   caution: string; price: string; research_note: string;
   comparison: { heading: string; text: string } | null;
@@ -273,6 +274,14 @@ export type TdScoutingReport = {
 };
 
 export type TdDecisionCandidate = {
+  research?: {
+    opponent_games: number;
+    quarterback?: { usable: boolean; name?: string; games: number; player_redzone_targets: number; receiving_tds: number };
+    opponent?: { targets: number; receiving_yards: number; receiving_tds: number; carries: number; rushing_yards: number; rushing_tds: number };
+  } | null;
+  research_selected?: boolean;
+  minimum_american?: number;
+  research_rank?: { score: number; supported: boolean; advantages: string[]; note: string };
   customer?: TdCustomerExplanation;
   football_case?: { supported: boolean; reasons: { kind: string; text: string; source: string; window: string }[];
     cautions: string[]; missing: string[] };
@@ -285,7 +294,7 @@ export type TdDecisionCandidate = {
 };
 
 export type PropRow = {
-  decision_results?: Partial<Record<"most_likely" | "value_candidate", { result: string; hypothetical_unit_profit: number | null }>>;
+  decision_results?: Partial<Record<"most_likely" | "value_candidate", { result: string; hypothetical_unit_profit: number | null; bet_qualified?: boolean }>>;
   decision?: { version: string; status: string; reason: string; policy: string; validation_note: string;
     eligible_candidates: number; price_supported_candidates: number;
     alternative_status?: string; alternative_note?: string;
