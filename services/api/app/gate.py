@@ -155,24 +155,16 @@ def _is_prop(row: dict[str, Any]) -> bool:
 
 def _lock_rows(rows: list[Any]) -> list[Any]:
     kept: list[Any] = []
-    stubs: dict[str, dict[str, Any]] = {}
     for row in rows:
         if not isinstance(row, dict):
             kept.append(row)
             continue
-        if started(row):
+        if started(row) or _is_prop(row):
             kept.append(row)
             continue
-        if _is_prop(row):
-            game_id = str(row.get("game_id") or "")
-            stubs.setdefault(game_id, _prop_stub(row))
-            continue
         kept.append(_lock_ats(row))
-    if not stubs:
-        kept.sort(key=lambda row: str(row.get("kickoff_utc") or "") if isinstance(row, dict) else "")
-        return kept
-    locked = sorted(stubs.values(), key=lambda row: str(row.get("kickoff_utc") or ""))
-    return kept + locked
+    kept.sort(key=lambda row: str(row.get("kickoff_utc") or "") if isinstance(row, dict) else "")
+    return kept
 
 
 def _model_opinion(key: str) -> bool:
@@ -187,31 +179,6 @@ def _lock_ats(row: dict[str, Any]) -> dict[str, Any]:
             row[key] = None
     row["locked"] = True
     return row
-
-
-def _prop_stub(row: dict[str, Any]) -> dict[str, Any]:
-    game_id = row.get("game_id")
-    return {
-        "locked": True,
-        "game_id": game_id,
-        "league_id": row.get("league_id"),
-        "kickoff_utc": row.get("kickoff_utc"),
-        "home_team": row.get("home_team"),
-        "away_team": row.get("away_team"),
-        "home_abbr": row.get("home_abbr"),
-        "away_abbr": row.get("away_abbr"),
-        "market_id": row.get("market_id"),
-        "outcome_id": f"locked-{game_id}",
-        "team": "",
-        "opponent": "",
-        "player_name": "",
-        "player_id": None,
-        "book_price": None,
-        "side": "",
-        "line": None,
-        "bookmaker": None,
-        "forecast": {"p_estimate": None, "availability_status": "unknown", "reason_codes": []},
-    }
 
 
 def _lock_pick(row: dict[str, Any]) -> dict[str, Any]:

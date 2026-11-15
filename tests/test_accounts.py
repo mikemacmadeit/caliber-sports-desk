@@ -147,7 +147,7 @@ def test_future_side_is_removed_and_a_final_stays():
     assert shown["rows"][0]["pick_label"] == "Home to win"
 
 
-def test_future_player_name_is_removed():
+def test_a_future_prop_line_stays_on_the_board():
     out = redact(
         "/v1/props",
         {
@@ -163,8 +163,8 @@ def test_future_player_name_is_removed():
         },
         subscribed=False,
     )
-    assert out["rows"][0]["locked"] is True
-    assert "Secret Player" not in json.dumps(out)
+    assert out["rows"][0]["player_name"] == "Secret Player"
+    assert out["rows"][0].get("locked") is not True
 
 
 def test_a_subscriber_still_sees_the_name():
