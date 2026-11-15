@@ -4,6 +4,7 @@ import { useState } from "react";
 import { club, type Club } from "@/lib/teams";
 
 const SIZE = {
+  xs: "h-6 w-6 text-[9px]",
   sm: "h-8 w-8 text-[11px]",
   md: "h-14 w-14 text-lg",
   lg: "h-20 w-20 text-2xl",
@@ -23,8 +24,8 @@ export function TeamMark({
 
   return (
     <span
-      className={`relative grid shrink-0 place-items-center overflow-hidden bg-ink-950 ${SIZE[size]}`}
-      style={{ boxShadow: `inset 0 0 0 1.5px ${team.primary}` }}
+      className={`relative grid shrink-0 place-items-center overflow-hidden ${SIZE[size]}`}
+      style={{ background: "#F4F1EA", boxShadow: `inset 0 0 0 1.5px ${team.primary}` }}
       title={`${team.city} ${team.nick}`}
     >
       {failed ? (

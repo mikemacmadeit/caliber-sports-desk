@@ -1,0 +1,1162 @@
+{
+  "task": "Expanded local anytime TD evidence and model validation",
+  "implemented": [
+    "Shared cutoff-aware team matchup features: run/pass EPA, success, yardage, explosiveness, neutral pass rate, pace, red-zone trips/conversion, prior-opponent schedule residuals.",
+    "Player yardage and coverage-gated scoring-area opportunities. Missing identities are not targets or zero workload.",
+    "Separate chronological component fitting, blending, calibration and validation; active promotion requires matching-sample Brier/log-loss checks against existing combined model.",
+    "Current weather, depth and availability context with source timestamps; known inactives already redistribute allocation.",
+    "Exact-ID college play-stat import, bounded request path, explicit rate-limit stop.",
+    "Local evidence refresh, model-dependent board cache, evidence explanations on replay cards.",
+    "NFL later-observed context excluded from earlier cutoffs. Forecast receipt time is distinct from issue time."
+  ],
+  "limitations": [
+    "College player-level play statistics could not be fetched: provider returned HTTP 429; no further requests made. College targets and individual goal-line/red-zone usage remain unknown.",
+    "Complete routes, individual coverage assignments, verified coach/film role notes and comprehensive college depth/availability remain unavailable.",
+    "Weather and depth context are displayed, not fitted probability adjustments. No validated quarterback-change or replacement-role forecast has been added.",
+    "Expanded NFL candidate remains shadow only if it fails the predeclared validation rule; NFL snap/NGS context is collected and existing shadow comparisons are available, not all active combined-model features.",
+    "College sportsbook totals still screen eligibility rather than enter its fitted probability.",
+    "Historical revised inputs with an assumed 48-hour postgame lag are replay evidence, not pregame saved predictions. Observed participants only; no historical inactive/DNP reconstruction or price-based ROI.",
+    "2026 evaluation was already examined previously; it is not an untouched holdout. Repeated fits in this task corrected feature implementation, not tuning to maximize 2026 results.",
+    "No deployment or data purchase. Browser visual verification unavailable because project requires IronBee and its tools are not connected; actual HTTP API/proxy and real React card rendering checked."
+  ],
+  "checks": {
+    "pytest_passed": 107,
+    "typescript": "passed",
+    "react_card_and_selector": "passed",
+    "diff_check": "passed"
+  },
+  "code_sha256": {
+    "packages/core/spe/models/player_td/desk_evidence.py": "6e8ae25507e26887703ea7dc7770db44dbe9648f4b958dd698b71be178772f77",
+    "packages/core/spe/ingest/desk_evidence.py": "23b9c5d0de2ac077810e14658b9708404e2cc19c79b7579b4d24f57549568796",
+    "packages/core/spe/ingest/cfbd_play_stats.py": "2a5cb2feec221f96d894847b1f6dc7bd47381cb00d41f118e6681d63e5e1d433",
+    "scripts/train_desk_combined.py": "5e8c7c867585124b50dc9404a11269bc62c3f54a2dcb997878c9a8f6f589f190"
+  },
+  "cfbd_probe": {
+    "endpoint": "/plays/stats/types",
+    "status": 429,
+    "requests": 1
+  },
+  "source_refresh": {
+    "weather_and_evidence": {
+      "weather": {
+        "forecasts_upserted": 35,
+        "alerts": 3,
+        "venues_located": 0,
+        "skipped_no_coordinates": 5,
+        "skipped_outside_coverage": 1,
+        "skipped_beyond_horizon": 15,
+        "skipped_fresh": 0
+      },
+      "local": {
+        "status": "refreshed",
+        "nfl": {
+          "team_games": 1954,
+          "player_games": 18732,
+          "latest_game": "2026-11-06 01:15:00.000000"
+        },
+        "fbs": {
+          "team_games": 6301,
+          "player_games": 0,
+          "latest_game": "2026-11-07 03:15:00.000000"
+        }
+      }
+    },
+    "nfl": {
+      "nfl": {
+        "status": "ok",
+        "season": 2026,
+        "datasets": {
+          "box_scores": {
+            "games_upserted": 1,
+            "games_skipped": 271,
+            "players_upserted": 0,
+            "players_skipped": 24869,
+            "weekly_stats_upserted": 9524,
+            "weekly_stats_skipped": 10,
+            "injuries_upserted": 345,
+            "plays_upserted": 0,
+            "seasons": [
+              2026
+            ],
+            "injuries_only": false
+          },
+          "desk_pbp": {
+            "rows": 2869
+          },
+          "snap_counts": {
+            "rows": 12672,
+            "unresolved": 21
+          },
+          "roster_weekly": {
+            "rows": 24554,
+            "skipped": 11
+          },
+          "depth_charts": {
+            "rows": 30281,
+            "skipped": 91
+          },
+          "ngs_passing": {
+            "rows": 313,
+            "skipped": 0
+          },
+          "ngs_rushing": {
+            "rows": 318,
+            "skipped": 0
+          },
+          "ngs_receiving": {
+            "rows": 760,
+            "skipped": 0
+          }
+        }
+      },
+      "local": {
+        "status": "refreshed",
+        "nfl": {
+          "team_games": 1954,
+          "player_games": 18732,
+          "latest_game": "2026-11-06 01:15:00.000000"
+        },
+        "fbs": {
+          "team_games": 6301,
+          "player_games": 0,
+          "latest_game": "2026-11-07 03:15:00.000000"
+        }
+      }
+    }
+  },
+  "models": {
+    "nfl": {
+      "candidate_enabled": false,
+      "active_version": "desk_combined_v2",
+      "active_sha256": "1907f4a732a3edc830dec6bf71c439908fa90c2531dfb45b51b66bf56aa7d06d",
+      "feature_count": 69,
+      "evidence_sha256": "8abaa0ca433aa769538f0052248306ff74205effe8ffd3740be0032bc2584922",
+      "validation": {
+        "sample_counts": {
+          "fit": 10752,
+          "blend": 1121,
+          "calibrate": 1425,
+          "validation": 1267,
+          "evaluation_2026": 1982
+        },
+        "allocation_weight": 0.38,
+        "limitations": [
+          "Revised historical stats and historical market archives retrieved after games; not archived pregame source snapshots.",
+          "Labels include observed participants with two prior same-team games; inactive/DNP outcomes not reconstructed.",
+          "Historical injury reports and executable prices unavailable; pick metrics are highest-probability scorers, not priced Desk ROI.",
+          "Current team pool uses recent appearances; rookies, transfers and new replacements need role history.",
+          "NFL and FBS fitted independently. Spreads enter both models; NFL totals also enter probability models. College historical totals are insufficient, so current college totals are used only for selection screening.",
+          "No complete routes or fitted weather adjustment. Schedule residuals use only preceding games. Archived odds timing is not independently verified.",
+          "Play-by-play is revised historical data with a 48-hour postgame availability assumption; not archived pregame evidence.",
+          "2026 is an examined retrospective replay, not an untouched prospective test."
+        ],
+        "promotion_rule": "Positive allocation weight and calibration slope; validation Brier and log loss no worse than independently calibrated player-only component. Research Desk only. Also requires validation Brier and log loss no worse than the previous combined model on identical candidates.",
+        "validation": {
+          "combined": {
+            "player_games": 1267,
+            "brier": 0.13450600898867818,
+            "log_loss": 0.4266021335898646,
+            "predicted_rate": 0.18269152282851023,
+            "actual_rate": 0.18153117600631413,
+            "picks": 63,
+            "hits": 28,
+            "hit_rate": 0.4444444444444444
+          },
+          "player_only": {
+            "player_games": 1267,
+            "brier": 0.1352199345786332,
+            "log_loss": 0.430377417762037,
+            "predicted_rate": 0.18445279094295716,
+            "actual_rate": 0.18153117600631413,
+            "picks": 63,
+            "hits": 28,
+            "hit_rate": 0.4444444444444444
+          },
+          "paired_brier_vs_player_only": {
+            "difference": -0.0007139255899550382,
+            "game_bootstrap_95_percent": [
+              -0.0017761159659073291,
+              0.00023995177767512514
+            ],
+            "games": 63
+          },
+          "allocation_uncalibrated": {
+            "player_games": 1267,
+            "brier": 0.13547601731397954,
+            "log_loss": 0.4314594724636612,
+            "predicted_rate": 0.16586116285135305,
+            "actual_rate": 0.18153117600631413,
+            "picks": 63,
+            "hits": 28,
+            "hit_rate": 0.4444444444444444
+          },
+          "previous_combined": {
+            "player_games": 1267,
+            "brier": 0.13421783888503488,
+            "log_loss": 0.42625685731719687,
+            "predicted_rate": 0.1789077333478219,
+            "actual_rate": 0.18153117600631413,
+            "picks": 63,
+            "hits": 26,
+            "hit_rate": 0.4126984126984127
+          },
+          "paired_brier_vs_previous_combined": {
+            "difference": 0.00028817010364330306,
+            "game_bootstrap_95_percent": [
+              -0.0005143144546865624,
+              0.0010867434119637021
+            ],
+            "games": 63
+          }
+        },
+        "evaluation_2026": {
+          "combined": {
+            "player_games": 1982,
+            "brier": 0.1434737309553972,
+            "log_loss": 0.45161263547495467,
+            "predicted_rate": 0.1759568949683873,
+            "actual_rate": 0.20232088799192735,
+            "picks": 105,
+            "hits": 54,
+            "hit_rate": 0.5142857142857142
+          },
+          "player_only": {
+            "player_games": 1982,
+            "brier": 0.14465346879438742,
+            "log_loss": 0.4534534042247717,
+            "predicted_rate": 0.17538405412806427,
+            "actual_rate": 0.20232088799192735,
+            "picks": 105,
+            "hits": 52,
+            "hit_rate": 0.49523809523809526
+          },
+          "paired_brier_vs_player_only": {
+            "difference": -0.001179737838990258,
+            "game_bootstrap_95_percent": [
+              -0.002045725988046375,
+              -0.00032021246449894533
+            ],
+            "games": 105
+          },
+          "allocation_uncalibrated": {
+            "player_games": 1982,
+            "brier": 0.14457665797965658,
+            "log_loss": 0.5123316179215073,
+            "predicted_rate": 0.16866232956836094,
+            "actual_rate": 0.20232088799192735,
+            "picks": 105,
+            "hits": 54,
+            "hit_rate": 0.5142857142857142
+          },
+          "previous_combined": {
+            "player_games": 1982,
+            "brier": 0.14306804175708776,
+            "log_loss": 0.4503671069861617,
+            "predicted_rate": 0.1797061698142491,
+            "actual_rate": 0.20232088799192735,
+            "picks": 105,
+            "hits": 55,
+            "hit_rate": 0.5238095238095238
+          },
+          "paired_brier_vs_previous_combined": {
+            "difference": 0.00040568919830941336,
+            "game_bootstrap_95_percent": [
+              -0.00029549391130835606,
+              0.001170428958734243
+            ],
+            "games": 105
+          },
+          "previous_v2": {
+            "player_games": 1982,
+            "brier": 0.1469619488959951,
+            "log_loss": 0.4598609521032693,
+            "predicted_rate": 0.19074067624991028,
+            "actual_rate": 0.20232088799192735,
+            "picks": 105,
+            "hits": 50,
+            "hit_rate": 0.47619047619047616
+          },
+          "paired_brier_vs_previous_v2": {
+            "difference": -0.0034882179405979143,
+            "game_bootstrap_95_percent": [
+              -0.005285637696011985,
+              -0.0017771612750004187
+            ],
+            "games": 105
+          }
+        },
+        "feature_coverage": {
+          "fit": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 0.9272693452380952,
+            "offense_rush_schedule_residual": 0.9272693452380952,
+            "defense_pass_epa": 1.0,
+            "defense_rush_epa": 1.0,
+            "defense_pass_success": 1.0,
+            "defense_rush_success": 1.0,
+            "defense_pass_yards": 1.0,
+            "defense_rush_yards": 1.0,
+            "defense_explosive_rate": 1.0,
+            "defense_neutral_pass_rate": 1.0,
+            "defense_plays": 1.0,
+            "defense_red_zone_drives": 1.0,
+            "defense_red_zone_td_rate": 1.0,
+            "defense_pace": 1.0,
+            "defense_pass_schedule_residual": 0.9272693452380952,
+            "defense_rush_schedule_residual": 0.9272693452380952,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 1.0,
+            "rush_matchup": 1.0,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.04827008928571429,
+            "measured_inside20_carries": 0.04827008928571429,
+            "measured_inside5_carries": 0.04827008928571429,
+            "measured_inside20_targets": 0.04827008928571429,
+            "measured_inside5_targets": 0.04827008928571429,
+            "player_pbp_known": 1.0
+          },
+          "blend": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 1.0,
+            "offense_rush_schedule_residual": 1.0,
+            "defense_pass_epa": 1.0,
+            "defense_rush_epa": 1.0,
+            "defense_pass_success": 1.0,
+            "defense_rush_success": 1.0,
+            "defense_pass_yards": 1.0,
+            "defense_rush_yards": 1.0,
+            "defense_explosive_rate": 1.0,
+            "defense_neutral_pass_rate": 1.0,
+            "defense_plays": 1.0,
+            "defense_red_zone_drives": 1.0,
+            "defense_red_zone_td_rate": 1.0,
+            "defense_pace": 1.0,
+            "defense_pass_schedule_residual": 1.0,
+            "defense_rush_schedule_residual": 1.0,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 1.0,
+            "rush_matchup": 1.0,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.07225691347011597,
+            "measured_inside20_carries": 0.07225691347011597,
+            "measured_inside5_carries": 0.07225691347011597,
+            "measured_inside20_targets": 0.07225691347011597,
+            "measured_inside5_targets": 0.07225691347011597,
+            "player_pbp_known": 1.0
+          },
+          "calibrate": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 1.0,
+            "offense_rush_schedule_residual": 1.0,
+            "defense_pass_epa": 1.0,
+            "defense_rush_epa": 1.0,
+            "defense_pass_success": 1.0,
+            "defense_rush_success": 1.0,
+            "defense_pass_yards": 1.0,
+            "defense_rush_yards": 1.0,
+            "defense_explosive_rate": 1.0,
+            "defense_neutral_pass_rate": 1.0,
+            "defense_plays": 1.0,
+            "defense_red_zone_drives": 1.0,
+            "defense_red_zone_td_rate": 1.0,
+            "defense_pace": 1.0,
+            "defense_pass_schedule_residual": 1.0,
+            "defense_rush_schedule_residual": 1.0,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 1.0,
+            "rush_matchup": 1.0,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.028771929824561403,
+            "measured_inside20_carries": 0.028771929824561403,
+            "measured_inside5_carries": 0.028771929824561403,
+            "measured_inside20_targets": 0.028771929824561403,
+            "measured_inside5_targets": 0.028771929824561403,
+            "player_pbp_known": 1.0
+          },
+          "validation": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 1.0,
+            "offense_rush_schedule_residual": 1.0,
+            "defense_pass_epa": 1.0,
+            "defense_rush_epa": 1.0,
+            "defense_pass_success": 1.0,
+            "defense_rush_success": 1.0,
+            "defense_pass_yards": 1.0,
+            "defense_rush_yards": 1.0,
+            "defense_explosive_rate": 1.0,
+            "defense_neutral_pass_rate": 1.0,
+            "defense_plays": 1.0,
+            "defense_red_zone_drives": 1.0,
+            "defense_red_zone_td_rate": 1.0,
+            "defense_pace": 1.0,
+            "defense_pass_schedule_residual": 1.0,
+            "defense_rush_schedule_residual": 1.0,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 1.0,
+            "rush_matchup": 1.0,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.009471191791633781,
+            "measured_inside20_carries": 0.009471191791633781,
+            "measured_inside5_carries": 0.009471191791633781,
+            "measured_inside20_targets": 0.009471191791633781,
+            "measured_inside5_targets": 0.009471191791633781,
+            "player_pbp_known": 1.0
+          },
+          "evaluation_2026": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 0.9959636730575177,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 0.8668012108980827,
+            "offense_rush_schedule_residual": 0.8668012108980827,
+            "defense_pass_epa": 1.0,
+            "defense_rush_epa": 1.0,
+            "defense_pass_success": 1.0,
+            "defense_rush_success": 1.0,
+            "defense_pass_yards": 1.0,
+            "defense_rush_yards": 1.0,
+            "defense_explosive_rate": 1.0,
+            "defense_neutral_pass_rate": 1.0,
+            "defense_plays": 1.0,
+            "defense_red_zone_drives": 1.0,
+            "defense_red_zone_td_rate": 1.0,
+            "defense_pace": 1.0,
+            "defense_pass_schedule_residual": 0.8668012108980827,
+            "defense_rush_schedule_residual": 0.8668012108980827,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 1.0,
+            "rush_matchup": 1.0,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.05852674066599395,
+            "measured_inside20_carries": 0.05852674066599395,
+            "measured_inside5_carries": 0.05852674066599395,
+            "measured_inside20_targets": 0.05852674066599395,
+            "measured_inside5_targets": 0.05852674066599395,
+            "player_pbp_known": 1.0
+          }
+        },
+        "live_enabled": false
+      }
+    },
+    "fbs": {
+      "candidate_enabled": true,
+      "active_version": "desk_combined_v3",
+      "active_sha256": "5d2e44134ba703909147a7d939989689ab3356d9ea3792fd729598e5fdfc9fe0",
+      "feature_count": 69,
+      "evidence_sha256": "40d1da99ed1e9d08301c8f13a41b59fccb85d100335e622dc8ca0a03db8602fa",
+      "validation": {
+        "sample_counts": {
+          "fit": 20496,
+          "blend": 3777,
+          "calibrate": 1934,
+          "validation": 4836,
+          "evaluation_2026": 7183
+        },
+        "allocation_weight": 0.15,
+        "limitations": [
+          "Revised historical stats and historical market archives retrieved after games; not archived pregame source snapshots.",
+          "Labels include observed participants with two prior same-team games; inactive/DNP outcomes not reconstructed.",
+          "Historical injury reports and executable prices unavailable; pick metrics are highest-probability scorers, not priced Desk ROI.",
+          "Current team pool uses recent appearances; rookies, transfers and new replacements need role history.",
+          "NFL and FBS fitted independently. Spreads enter both models; NFL totals also enter probability models. College historical totals are insufficient, so current college totals are used only for selection screening.",
+          "No complete routes or fitted weather adjustment. Schedule residuals use only preceding games. Archived odds timing is not independently verified.",
+          "Play-by-play is revised historical data with a 48-hour postgame availability assumption; not archived pregame evidence.",
+          "2026 is an examined retrospective replay, not an untouched prospective test."
+        ],
+        "promotion_rule": "Positive allocation weight and calibration slope; validation Brier and log loss no worse than independently calibrated player-only component. Research Desk only. Also requires validation Brier and log loss no worse than the previous combined model on identical candidates.",
+        "validation": {
+          "combined": {
+            "player_games": 4836,
+            "brier": 0.17616193413627995,
+            "log_loss": 0.5323852353366437,
+            "predicted_rate": 0.2823963873095127,
+            "actual_rate": 0.26716294458229944,
+            "picks": 286,
+            "hits": 174,
+            "hit_rate": 0.6083916083916084
+          },
+          "player_only": {
+            "player_games": 4836,
+            "brier": 0.17641581266233508,
+            "log_loss": 0.5330515562220424,
+            "predicted_rate": 0.2826760589088826,
+            "actual_rate": 0.26716294458229944,
+            "picks": 286,
+            "hits": 172,
+            "hit_rate": 0.6013986013986014
+          },
+          "paired_brier_vs_player_only": {
+            "difference": -0.00025387852605509675,
+            "game_bootstrap_95_percent": [
+              -0.0004892518049405513,
+              -2.9555721915454734e-05
+            ],
+            "games": 286
+          },
+          "allocation_uncalibrated": {
+            "player_games": 4836,
+            "brier": 0.17828079781447065,
+            "log_loss": 0.5394295053687943,
+            "predicted_rate": 0.23147013136914327,
+            "actual_rate": 0.26716294458229944,
+            "picks": 286,
+            "hits": 169,
+            "hit_rate": 0.5909090909090909
+          },
+          "previous_combined": {
+            "player_games": 4836,
+            "brier": 0.17662746874421878,
+            "log_loss": 0.5338102594148427,
+            "predicted_rate": 0.28237615819101636,
+            "actual_rate": 0.26716294458229944,
+            "picks": 286,
+            "hits": 164,
+            "hit_rate": 0.5734265734265734
+          },
+          "paired_brier_vs_previous_combined": {
+            "difference": -0.00046553460793881987,
+            "game_bootstrap_95_percent": [
+              -0.0009904402577775508,
+              8.379583890150385e-05
+            ],
+            "games": 286
+          }
+        },
+        "evaluation_2026": {
+          "combined": {
+            "player_games": 7183,
+            "brier": 0.1767824289072491,
+            "log_loss": 0.534082038685123,
+            "predicted_rate": 0.2656437217415414,
+            "actual_rate": 0.26158986495893083,
+            "picks": 429,
+            "hits": 240,
+            "hit_rate": 0.5594405594405595
+          },
+          "player_only": {
+            "player_games": 7183,
+            "brier": 0.17697450931545486,
+            "log_loss": 0.534547172078629,
+            "predicted_rate": 0.2657829420824276,
+            "actual_rate": 0.26158986495893083,
+            "picks": 429,
+            "hits": 243,
+            "hit_rate": 0.5664335664335665
+          },
+          "paired_brier_vs_player_only": {
+            "difference": -0.000192080408205752,
+            "game_bootstrap_95_percent": [
+              -0.0003994856726166916,
+              -2.459099775255699e-06
+            ],
+            "games": 429
+          },
+          "allocation_uncalibrated": {
+            "player_games": 7183,
+            "brier": 0.18091117939418158,
+            "log_loss": 0.549414158125745,
+            "predicted_rate": 0.2157167275492872,
+            "actual_rate": 0.26158986495893083,
+            "picks": 428,
+            "hits": 245,
+            "hit_rate": 0.572429906542056
+          },
+          "previous_combined": {
+            "player_games": 7183,
+            "brier": 0.17707826286672856,
+            "log_loss": 0.5350862208728262,
+            "predicted_rate": 0.26695681310721553,
+            "actual_rate": 0.26158986495893083,
+            "picks": 429,
+            "hits": 239,
+            "hit_rate": 0.5571095571095571
+          },
+          "paired_brier_vs_previous_combined": {
+            "difference": -0.0002958339594794662,
+            "game_bootstrap_95_percent": [
+              -0.0007986139833734803,
+              0.0001959730779267224
+            ],
+            "games": 429
+          },
+          "previous_v2": {
+            "player_games": 7183,
+            "brier": 0.17835829911691245,
+            "log_loss": 0.5381862209955777,
+            "predicted_rate": 0.2583569949397453,
+            "actual_rate": 0.26158986495893083,
+            "picks": 429,
+            "hits": 229,
+            "hit_rate": 0.5337995337995338
+          },
+          "paired_brier_vs_previous_v2": {
+            "difference": -0.0015758702096633527,
+            "game_bootstrap_95_percent": [
+              -0.0024520655707214786,
+              -0.0006665096140931753
+            ],
+            "games": 429
+          }
+        },
+        "feature_coverage": {
+          "fit": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 0.9214968774395004,
+            "offense_rush_schedule_residual": 0.9214968774395004,
+            "defense_pass_epa": 0.9988290398126464,
+            "defense_rush_epa": 0.9988290398126464,
+            "defense_pass_success": 0.9988290398126464,
+            "defense_rush_success": 0.9988290398126464,
+            "defense_pass_yards": 0.9988290398126464,
+            "defense_rush_yards": 0.9988290398126464,
+            "defense_explosive_rate": 0.9988290398126464,
+            "defense_neutral_pass_rate": 0.9988290398126464,
+            "defense_plays": 0.9988290398126464,
+            "defense_red_zone_drives": 0.9988290398126464,
+            "defense_red_zone_td_rate": 0.9988290398126464,
+            "defense_pace": 0.9988290398126464,
+            "defense_pass_schedule_residual": 0.9196428571428571,
+            "defense_rush_schedule_residual": 0.9196428571428571,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 0.9988290398126464,
+            "rush_matchup": 0.9988290398126464,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.0,
+            "measured_inside20_carries": 0.0,
+            "measured_inside5_carries": 0.0,
+            "measured_inside20_targets": 0.0,
+            "measured_inside5_targets": 0.0,
+            "player_pbp_known": 1.0
+          },
+          "blend": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 0.7701879798782102,
+            "offense_rush_schedule_residual": 0.7701879798782102,
+            "defense_pass_epa": 0.997881916865237,
+            "defense_rush_epa": 0.997881916865237,
+            "defense_pass_success": 0.997881916865237,
+            "defense_rush_success": 0.997881916865237,
+            "defense_pass_yards": 0.997881916865237,
+            "defense_rush_yards": 0.997881916865237,
+            "defense_explosive_rate": 0.997881916865237,
+            "defense_neutral_pass_rate": 0.997881916865237,
+            "defense_plays": 0.997881916865237,
+            "defense_red_zone_drives": 0.997881916865237,
+            "defense_red_zone_td_rate": 0.997881916865237,
+            "defense_pace": 0.997881916865237,
+            "defense_pass_schedule_residual": 0.7659518136086841,
+            "defense_rush_schedule_residual": 0.7659518136086841,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 0.997881916865237,
+            "rush_matchup": 0.997881916865237,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.0,
+            "measured_inside20_carries": 0.0,
+            "measured_inside5_carries": 0.0,
+            "measured_inside20_targets": 0.0,
+            "measured_inside5_targets": 0.0,
+            "player_pbp_known": 1.0
+          },
+          "calibrate": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 1.0,
+            "offense_rush_schedule_residual": 1.0,
+            "defense_pass_epa": 1.0,
+            "defense_rush_epa": 1.0,
+            "defense_pass_success": 1.0,
+            "defense_rush_success": 1.0,
+            "defense_pass_yards": 1.0,
+            "defense_rush_yards": 1.0,
+            "defense_explosive_rate": 1.0,
+            "defense_neutral_pass_rate": 1.0,
+            "defense_plays": 1.0,
+            "defense_red_zone_drives": 1.0,
+            "defense_red_zone_td_rate": 1.0,
+            "defense_pace": 1.0,
+            "defense_pass_schedule_residual": 1.0,
+            "defense_rush_schedule_residual": 1.0,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 1.0,
+            "rush_matchup": 1.0,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.0,
+            "measured_inside20_carries": 0.0,
+            "measured_inside5_carries": 0.0,
+            "measured_inside20_targets": 0.0,
+            "measured_inside5_targets": 0.0,
+            "player_pbp_known": 1.0
+          },
+          "validation": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 1.0,
+            "offense_rush_schedule_residual": 1.0,
+            "defense_pass_epa": 0.9981389578163772,
+            "defense_rush_epa": 0.9981389578163772,
+            "defense_pass_success": 0.9981389578163772,
+            "defense_rush_success": 0.9981389578163772,
+            "defense_pass_yards": 0.9981389578163772,
+            "defense_rush_yards": 0.9981389578163772,
+            "defense_explosive_rate": 0.9981389578163772,
+            "defense_neutral_pass_rate": 0.9981389578163772,
+            "defense_plays": 0.9981389578163772,
+            "defense_red_zone_drives": 0.9981389578163772,
+            "defense_red_zone_td_rate": 0.9981389578163772,
+            "defense_pace": 0.9981389578163772,
+            "defense_pass_schedule_residual": 0.9981389578163772,
+            "defense_rush_schedule_residual": 0.9981389578163772,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 0.9981389578163772,
+            "rush_matchup": 0.9981389578163772,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.0,
+            "measured_inside20_carries": 0.0,
+            "measured_inside5_carries": 0.0,
+            "measured_inside20_targets": 0.0,
+            "measured_inside5_targets": 0.0,
+            "player_pbp_known": 1.0
+          },
+          "evaluation_2026": {
+            "offense_pass_epa": 1.0,
+            "offense_rush_epa": 1.0,
+            "offense_pass_success": 1.0,
+            "offense_rush_success": 1.0,
+            "offense_pass_yards": 1.0,
+            "offense_rush_yards": 1.0,
+            "offense_explosive_rate": 1.0,
+            "offense_neutral_pass_rate": 1.0,
+            "offense_plays": 1.0,
+            "offense_red_zone_drives": 1.0,
+            "offense_red_zone_td_rate": 1.0,
+            "offense_pace": 1.0,
+            "offense_pass_schedule_residual": 0.8688570235277739,
+            "offense_rush_schedule_residual": 0.8688570235277739,
+            "defense_pass_epa": 1.0,
+            "defense_rush_epa": 1.0,
+            "defense_pass_success": 1.0,
+            "defense_rush_success": 1.0,
+            "defense_pass_yards": 1.0,
+            "defense_rush_yards": 1.0,
+            "defense_explosive_rate": 1.0,
+            "defense_neutral_pass_rate": 1.0,
+            "defense_plays": 1.0,
+            "defense_red_zone_drives": 1.0,
+            "defense_red_zone_td_rate": 0.9976333008492273,
+            "defense_pace": 1.0,
+            "defense_pass_schedule_residual": 0.8666295419741056,
+            "defense_rush_schedule_residual": 0.8666295419741056,
+            "offense_evidence_known": 1.0,
+            "defense_evidence_known": 1.0,
+            "pass_matchup": 1.0,
+            "rush_matchup": 1.0,
+            "recent_rush_yards": 1.0,
+            "recent_rec_yards": 1.0,
+            "yardage_known": 1.0,
+            "measured_targets": 0.0,
+            "measured_inside20_carries": 0.0,
+            "measured_inside5_carries": 0.0,
+            "measured_inside20_targets": 0.0,
+            "measured_inside5_targets": 0.0,
+            "player_pbp_known": 1.0
+          }
+        },
+        "live_enabled": true
+      }
+    }
+  },
+  "runtime": {
+    "2026-11-14": {
+      "http_status": 200,
+      "games": 55,
+      "picks": 30,
+      "passes": 25,
+      "visible_models": [
+        "desk_combined_v3-fbs-5d2e44134b"
+      ],
+      "examples": [
+        {
+          "player": "Cole Tabb",
+          "probability": 0.7072988890266789,
+          "analysis": {
+            "combination": {
+              "player_probability": 0.7533352441765719,
+              "allocation_probability": 0.6112511867688993,
+              "allocation_weight": 0.15,
+              "rush_lambda": 0.6825133677892926,
+              "rec_lambda": 0.26230850048579485,
+              "probability": 0.7072988890266789,
+              "team_expected_tds": {
+                "rush": 1.959050180595627,
+                "rec": 1.7704609526273969
+              },
+              "unassigned_expected_tds": {
+                "rush": 0.11338237079441224,
+                "rec": 0.14529895649296104
+              },
+              "pool_size": 9,
+              "excluded_players": [],
+              "combined_probability": 0.7072988890266789
+            },
+            "combination_status": "active",
+            "features": {
+              "carries": 12.453291699193338,
+              "receptions": 2.8511579495186052,
+              "targets": 0.0,
+              "gl_carries": 0.0,
+              "rz_targets": 0.0,
+              "rush_td": 1.3455633619568046,
+              "rec_td": 0.47913956110677425,
+              "carry_trend": 2.4355971896955513,
+              "receiving_trend": -0.2956023939630499,
+              "team_rush_td": 2.017694509497788,
+              "team_rec_td": 1.6764680371237748,
+              "opp_rush_td": 2.5277994622256914,
+              "opp_rec_td": 2.650533437418683,
+              "opp_position_td": 2.1668835111458065,
+              "games": 6,
+              "is_home": 0.0,
+              "charting_known": 0.0,
+              "pos_qb": 0.0,
+              "pos_rb": 1.0,
+              "pos_te": 0.0,
+              "carry_share": 0.3592871013593321,
+              "receiving_share": 0.15721432534292437,
+              "goal_line_share": 0.0,
+              "red_zone_share": 0.0,
+              "last_played_at": "2026-10-31T19:45:00+00:00",
+              "opponent_games": 6,
+              "last_game_carries": 14.0,
+              "last_game_receptions": 3.0,
+              "yardage_known": 1.0,
+              "recent_rush_yards": 116.82426923410529,
+              "recent_rec_yards": 23.638823835545146,
+              "offense_pass_epa": 0.30180366167200434,
+              "offense_rush_epa": 0.2299302467480734,
+              "offense_pass_success": 0.47253902029242406,
+              "offense_rush_success": 0.48984071703810583,
+              "offense_pass_yards": 7.746829213810077,
+              "offense_rush_yards": 6.712226071281497,
+              "offense_explosive_rate": 0.16121315936532188,
+              "offense_neutral_pass_rate": 0.47261001167474914,
+              "offense_plays": 62.7461184838234,
+              "offense_red_zone_drives": 2.860699106600746,
+              "offense_red_zone_td_rate": 0.8959146500130106,
+              "offense_pace": 27.749047768318327,
+              "offense_pass_schedule_residual": 0.13722783183390047,
+              "offense_rush_schedule_residual": 0.24169608265140916,
+              "defense_pass_epa": 0.3411582950435629,
+              "defense_rush_epa": 0.2615302898818249,
+              "defense_pass_success": 0.4996485460626926,
+              "defense_rush_success": 0.4971944478431385,
+              "defense_pass_yards": 8.345465916130816,
+              "defense_rush_yards": 5.783723418301769,
+              "defense_explosive_rate": 0.12210942960721363,
+              "defense_neutral_pass_rate": 0.4000897667304121,
+              "defense_plays": 65.69294821753837,
+              "defense_red_zone_drives": 3.8181975886893915,
+              "defense_red_zone_td_rate": 0.7653498334126607,
+              "defense_pace": 27.799932496612275,
+              "defense_pass_schedule_residual": -0.08175364032783985,
+              "defense_rush_schedule_residual": 0.06991430938485411,
+              "offense_evidence_known": 1.0,
+              "defense_evidence_known": 1.0,
+              "pass_matchup": 0.10296282265392528,
+              "rush_matchup": 0.06013372408462317,
+              "measured_targets": null,
+              "measured_inside20_carries": null,
+              "measured_inside5_carries": null,
+              "measured_inside20_targets": null,
+              "measured_inside5_targets": null,
+              "player_pbp_known": 0.0,
+              "market_team_spread": 2.5,
+              "market_game_total": 0.0,
+              "market_spread_known": 1.0,
+              "market_total_known": 0.0
+            },
+            "matchup_features_active": true,
+            "reasons": [
+              "Offense: +0.23 rushing and +0.30 passing EPA per play in recent measured games.",
+              "Opponent allows: +0.26 rushing and +0.34 passing EPA per play in recent measured games."
+            ],
+            "risks": [
+              "Player-level play-by-play identity coverage is incomplete; scoring-area opportunities remain unknown."
+            ],
+            "current_context": {
+              "weather": null,
+              "depth": null,
+              "availability": null,
+              "reported_players": {},
+              "missing": [
+                "charted_routes",
+                "individual_coverage_assignments",
+                "verified_coach_role_notes"
+              ],
+              "note": "Missing reports are unknown. Weather and depth are context until prospectively validated."
+            },
+            "sources": [
+              "Stored prior-game play-by-play",
+              "Prior-game player box scores"
+            ],
+            "evidence_timing": "Revised historical plays; availability assumed 48 hours after prior games."
+          }
+        },
+        {
+          "player": "Mark Fletcher Jr.",
+          "probability": 0.5694419781786793,
+          "analysis": {
+            "combination": {
+              "player_probability": 0.5944642561034548,
+              "allocation_probability": 0.5407889117328486,
+              "allocation_weight": 0.15,
+              "rush_lambda": 0.6928793245683922,
+              "rec_lambda": 0.08536596277668146,
+              "probability": 0.5694419781786793,
+              "team_expected_tds": {
+                "rush": 1.7731485913917688,
+                "rec": 1.9465703923576136
+              },
+              "unassigned_expected_tds": {
+                "rush": 0.10262309411678582,
+                "rec": 0.15975198229021836
+              },
+              "pool_size": 8,
+              "excluded_players": [],
+              "combined_probability": 0.5694419781786793
+            },
+            "combination_status": "active",
+            "features": {
+              "carries": 13.736924277907884,
+              "receptions": 1.036516610287102,
+              "targets": 0.0,
+              "gl_carries": 0.0,
+              "rz_targets": 0.0,
+              "rush_td": 1.4986555642293347,
+              "rec_td": 0.27105559892445136,
+              "carry_trend": -0.7369242779078853,
+              "receiving_trend": 0.5190389452684534,
+              "team_rush_td": 2.5513054037644203,
+              "team_rec_td": 2.9392835458409223,
+              "opp_rush_td": 0.784109636568653,
+              "opp_rec_td": 0.3386243386243386,
+              "opp_position_td": 0.8729291352242172,
+              "games": 6,
+              "is_home": 1.0,
+              "charting_known": 0.0,
+              "pos_qb": 0.0,
+              "pos_rb": 1.0,
+              "pos_te": 0.0,
+              "carry_share": 0.38000643049783567,
+              "receiving_share": 0.04173506094366639,
+              "goal_line_share": 0.0,
+              "red_zone_share": 0.0,
+              "last_played_at": "2026-10-31T23:30:00+00:00",
+              "opponent_games": 6,
+              "last_game_carries": 13.0,
+              "last_game_receptions": 2.0,
+              "yardage_known": 1.0,
+              "recent_rush_yards": 61.44461792002776,
+              "recent_rec_yards": 17.345389886373493,
+              "offense_pass_epa": 0.5414317070448654,
+              "offense_rush_epa": 0.19258759583232732,
+              "offense_pass_success": 0.584008898243467,
+              "offense_rush_success": 0.46520698288972634,
+              "offense_pass_yards": 8.622979986403063,
+              "offense_rush_yards": 5.15965992998949,
+              "offense_explosive_rate": 0.129431474860794,
+              "offense_neutral_pass_rate": 0.5470259969421938,
+              "offense_plays": 67.72642900511752,
+              "offense_red_zone_drives": 5.28935727296383,
+              "offense_red_zone_td_rate": 0.7799297010850486,
+              "offense_pace": 31.18210348110582,
+              "offense_pass_schedule_residual": 0.42852302588349017,
+              "offense_rush_schedule_residual": 0.142706867881811,
+              "defense_pass_epa": 0.04901918761879776,
+              "defense_rush_epa": -0.04946213472968476,
+              "defense_pass_success": 0.41224131509998624,
+              "defense_rush_success": 0.4194749334590955,
+              "defense_pass_yards": 5.181559124171475,
+              "defense_rush_yards": 4.438671038857064,
+              "defense_explosive_rate": 0.09831789756970866,
+              "defense_neutral_pass_rate": 0.587801362196366,
+              "defense_plays": 61.45910313123427,
+              "defense_red_zone_drives": 2.386069910660075,
+              "defense_red_zone_td_rate": 0.45297366062393385,
+              "defense_pace": 28.622514116594356,
+              "defense_pass_schedule_residual": -0.17751541626425488,
+              "defense_rush_schedule_residual": -0.14099488498746246,
+              "offense_evidence_known": 1.0,
+              "defense_evidence_known": 1.0,
+              "pass_matchup": 0.026540542430398203,
+              "rush_matchup": -0.009525793612324649,
+              "measured_targets": null,
+              "measured_inside20_carries": null,
+              "measured_inside5_carries": null,
+              "measured_inside20_targets": null,
+              "measured_inside5_targets": null,
+              "player_pbp_known": 0.0,
+              "market_team_spread": -14.0,
+              "market_game_total": 0.0,
+              "market_spread_known": 1.0,
+              "market_total_known": 0.0
+            },
+            "matchup_features_active": true,
+            "reasons": [
+              "Offense: +0.19 rushing and +0.54 passing EPA per play in recent measured games.",
+              "Opponent allows: -0.05 rushing and +0.05 passing EPA per play in recent measured games."
+            ],
+            "risks": [
+              "Player-level play-by-play identity coverage is incomplete; scoring-area opportunities remain unknown."
+            ],
+            "current_context": {
+              "weather": null,
+              "depth": null,
+              "availability": null,
+              "reported_players": {},
+              "missing": [
+                "charted_routes",
+                "individual_coverage_assignments",
+                "verified_coach_role_notes"
+              ],
+              "note": "Missing reports are unknown. Weather and depth are context until prospectively validated."
+            },
+            "sources": [
+              "Stored prior-game play-by-play",
+              "Prior-game player box scores"
+            ],
+            "evidence_timing": "Revised historical plays; availability assumed 48 hours after prior games."
+          }
+        }
+      ]
+    },
+    "2026-11-15": {
+      "http_status": 200,
+      "games": 13,
+      "picks": 1,
+      "passes": 12,
+      "visible_models": [],
+      "examples": []
+    }
+  }
+}

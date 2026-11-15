@@ -13,7 +13,7 @@ from spe.db.models import (
     JobRun,
 )
 from spe.publishing.policy import assess
-from spe.publishing.ledger import publish, current_picks, settle, history
+from spe.publishing.ledger import publish, current_picks, day_picks, settle, history
 from spe.publishing.pipeline import run_step, health
 from spe.publishing.store import read, write
 from spe.publishing.boxes import parse
@@ -137,6 +137,12 @@ def test_publication_freezes_and_grades_original_price(db):
     assert current_picks(db, [row(book_price=150)], NOW) == []
     assert current_picks(db, [row()], NOW)[0]["pick_id"] == first.pick_id
     assert current_picks(db, [row()], NOW + timedelta(minutes=13)) == []
+    stayed = day_picks(db, "nfl", "2026-11-15")
+    assert len(stayed) == 1
+    assert stayed[0]["player_name"] == "Player"
+    assert stayed[0]["book_price"] == 110
+    assert stayed[0]["result"] == "pending"
+    assert day_picks(db, "fbs", "2026-11-15") == []
     # Missing stats remain pending, even once the game has finished.
     game.status = "final"
     db.commit()
@@ -157,6 +163,9 @@ def test_publication_freezes_and_grades_original_price(db):
     assert settle(db)["settled"] == 1
     db.commit()
     assert settle(db)["settled"] == 0
+    graded = day_picks(db, "nfl", "2026-11-15")
+    assert graded[0]["result"] == "win"
+    assert graded[0]["actual"] == 80
     result = history(db)
     assert result["rows"][0]["book_price"] == 110
     assert result["summaries"][0]["units"] == pytest.approx(1.1)
@@ -295,7 +304,10 @@ def test_api_returns_saved_pick_and_history_then_expires_it(db, monkeypatch):
         assert client.get("/ready").status_code == 503
         quote["price_freshness"]["observed_at"] = (now - timedelta(minutes=20)).isoformat()
         write_entry("rushing_yards", "nfl", date, [quote])
-        assert client.get(f"/v1/props/picks?league=nfl&date={date}").json()["picks"] == []
+        expired = client.get(f"/v1/props/picks?league=nfl&date={date}").json()
+        assert expired["picks"] == []
+        assert len(expired["day"]) == 1
+        assert expired["day"][0]["locked"] is True
         assert client.get("/v1/published/history").json()["total"] == 1
     finally:
         app.dependency_overrides.clear()

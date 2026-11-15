@@ -22,6 +22,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://caliber:caliber@db:5432/caliber
       WEB_ORIGIN: http://localhost:3000
+      APP_ENV: dev
       PARQUET_DIR: /data/parquet
       PYTHONPATH: /app/packages/core:/app/services/api:/app/services/worker
     env_file:

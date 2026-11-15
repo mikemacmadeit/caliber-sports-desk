@@ -16,6 +16,8 @@ from spe.market.odds import american_to_implied
 from spe.shadow.atd_desk_takes import desk_pick_score
 
 MARKETS = ("anytime_td", "rushing_yards", "receiving_yards", "receptions")
+# The props desk grades counting lines. Touchdowns stay on the anytime page.
+DESK_MARKETS = ("receptions", "receiving_yards", "rushing_yards")
 MARKET_LABEL = {
     "anytime_td": "anytime touchdown",
     "rushing_yards": "rushing yards",
@@ -28,6 +30,48 @@ ANYTIME_MAX_P = 0.75
 COUNT_MIN_P = 0.42
 COUNT_MAX_P = 0.66
 TARGET_P = 0.58
+# A chance above this is a line sitting far from the player's average.
+# Those sides have not held, so the desk takes the strongest chance under it.
+DESK_MAX_P = 0.90
+# Props on a team favored by a touchdown or more held. Close games did not.
+DESK_FAVORITE_MARGIN = 7.0
+
+
+def attach_team_spreads(
+    rows: list[dict[str, Any]],
+    home_team_by_game: dict[str, str],
+    home_spread_by_game: dict[str, float],
+) -> None:
+    """Stamp each row with its team's point spread. Negative means favored."""
+    for row in rows:
+        game_id = str(row.get("game_id") or "")
+        home_line = home_spread_by_game.get(game_id)
+        home_team = home_team_by_game.get(game_id)
+        team_id = row.get("team_id")
+        if home_line is None or not home_team or not team_id:
+            continue
+        row["team_spread"] = float(home_line) if team_id == home_team else -float(home_line)
+
+
+def select_desk_props(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One counting prop per game, for a team favored by a touchdown or more.
+
+    The strongest chance under 90%. A touchdown row stays off.
+    A game with no spread stored keeps the old rule.
+    """
+    best: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not _desk_prop(row) or not _on_a_clear_favorite(row):
+            continue
+        game_id = str(row.get("game_id") or "")
+        if not game_id:
+            continue
+        prior = best.get(game_id)
+        if prior is None or _desk_rank(row) > _desk_rank(prior):
+            best[game_id] = row
+    chosen = list(best.values())
+    chosen.sort(key=lambda row: (str(row.get("kickoff_utc") or ""), str(row.get("player_name") or "")))
+    return chosen
 
 
 def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None = None, *, now: datetime | None = None) -> list[dict[str, Any]]:
@@ -60,6 +104,39 @@ def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None 
 
     picks.sort(key=lambda pick: (str(pick.get("kickoff_utc") or ""), str(pick.get("game_id")), MARKETS.index(pick["market_id"])))
     return picks
+
+
+def _on_a_clear_favorite(row: dict[str, Any]) -> bool:
+    spread = row.get("team_spread")
+    if spread is None:
+        return True
+    try:
+        return float(spread) <= -DESK_FAVORITE_MARGIN
+    except (TypeError, ValueError):
+        return True
+
+
+def _desk_rank(row: dict[str, Any]) -> tuple[int, float]:
+    chance = _p(row)
+    if chance <= DESK_MAX_P:
+        return (1, chance)
+    return (0, -chance)
+
+
+def _desk_prop(row: dict[str, Any]) -> bool:
+    market = str(row.get("market_id") or "")
+    if market not in DESK_MARKETS or not row.get("player_id") or row.get("model_lean") is not True:
+        return False
+    if row.get("book_price") is None or row.get("line") is None or _trivial_floor(row):
+        return False
+    forecast = row.get("forecast") or {}
+    if str(forecast.get("availability_status") or "").lower() in {"out", "doubtful"}:
+        return False
+    chance = _p(row)
+    if chance is None or chance <= 0.50:
+        return False
+    implied = american_to_implied(int(row["book_price"]))
+    return implied > 0 and chance <= implied * MAX_PRICE_GAP
 
 
 def _publishable(row: dict[str, Any]) -> bool:

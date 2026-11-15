@@ -84,6 +84,7 @@ def build_player_td_frame(
     *,
     year_max: int = 2026,
     universe: str = "corrected",
+    attach_fitted: bool = True,
 ) -> tuple[pd.DataFrame, ShareWeights]:
     """Skill-position player-games with prior features, shares, and team λ.
 
@@ -130,6 +131,11 @@ def build_player_td_frame(
         frame = add_player_priors(frame, league_id)
         frame = _add_component_td_priors(frame)
 
+    frame["y_atd"] = (frame["anytime_tds"].fillna(0) > 0).astype(float)
+    frame["league_id"] = league_id
+    if not attach_fitted:
+        # Historical evaluation fits every upstream model inside its own fold.
+        return frame.reset_index(drop=True), default_or_fit_empty(league_id)
     frame = attach_team_td_lambdas(session, frame, league_id)
     kick = pd.to_datetime(frame["kickoff_utc"], utc=True)
     share_train = frame.loc[kick < pd.Timestamp("2024-08-01", tz="UTC")]

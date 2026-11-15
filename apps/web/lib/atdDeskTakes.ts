@@ -2,7 +2,7 @@ import type { PropRow } from "@/lib/api";
 
 /** Keep in lockstep with spe.shadow.atd_desk_takes */
 export const VALUE_HAIRCUT = 0.04;
-/** Minimum modeled scoring probability for a research Desk candidate. */
+/** Same floor the desk already uses before it will name an unpriced player. */
 export const SCORE_CHANCE_FLOOR = 0.22;
 /** A desk pick has to be a real chance, not a longshot whose price looks generous. */
 const MIN_DESK_CHANCE = 0.18;
@@ -63,12 +63,17 @@ export function deskPickScore(row: PropRow): number {
 }
 
 function eligible(row: PropRow, _haircut = VALUE_HAIRCUT): boolean {
+  if (row.selection_safety && !row.selection_safety.eligible) return false;
+  if (row.desk_analysis?.eligible === false) return false;
+  if (row.desk_analysis?.combination_status === "active" &&
+      !(row.price_freshness || row.forecast.price_freshness)?.is_current_opportunity) return false;
   const status = (row.forecast.availability_status || "").toLowerCase();
-  if (["out", "doubtful", "inactive", "confirmed_inactive", "suspended", "questionable", "uncertain"].includes(status)) return false;
-  if (row.desk_analysis && !row.desk_analysis.eligible) return false;
+  if (status === "out" || status === "doubtful" || status === "confirmed_inactive" || status === "inactive" || status === "suspended" || status === "questionable" || status === "uncertain") return false;
   if (row.forecast.p_estimate == null) return false;
   const p = row.forecast.p_estimate ?? 0;
-  if (!Number.isFinite(p) || p < SCORE_CHANCE_FLOOR || p > 1) return false;
+  if (!Number.isFinite(p) || p <= 0 || p > 1) return false;
+  // Freshness/edge are score factors, not vetoes. Research-only rows need a floor.
+  if (row.book_price == null && p < 0.22) return false;
   return true;
 }
 
@@ -83,6 +88,7 @@ export function beatsThePrice(row: PropRow): boolean {
 function tonightChance(row: PropRow): number | null {
   const raw = row.forecast.p_estimate;
   if (raw == null) return null;
+  if (row.desk_analysis?.combination_status === "active") return raw;
   const spread = row.team_spread;
   if (spread == null || spread <= 3) return raw;
   const factor = Math.max(0.35, 1 - (spread - 3) / 40);
@@ -92,17 +98,21 @@ function tonightChance(row: PropRow): number | null {
 function priceGap(row: PropRow): number | null {
   const chance = tonightChance(row);
   const price = row.book_price;
-  if (chance == null || price == null || !Number.isFinite(price) || !Number.isInteger(price) || Math.abs(price) < 100) return null;
+  if (chance == null || price == null) return null;
   return chance - americanToImplied(price);
 }
 
 function usageNum(row: PropRow, key: "gl_carries" | "rz_targets" | "rush_td" | "rec_td" | "carries" | "targets"): number {
   const value = row.usage?.[key];
-  return value == null || !Number.isFinite(value) ? 0 : value;
+  return value == null || Number.isNaN(value) ? 0 : value;
 }
 
 /** A price gap is not a reason. He has to be the one getting the scoring work. */
 function hasScoringRole(row: PropRow): boolean {
+  if (row.desk_analysis?.combination_status === "active") {
+    const c = row.desk_analysis.combination;
+    return !!c && c.rush_lambda + c.rec_lambda > 0;
+  }
   const scores = usageNum(row, "rush_td") + usageNum(row, "rec_td");
   if (usageNum(row, "gl_carries") >= 0.4 || usageNum(row, "rz_targets") >= 0.5) return true;
   return scores >= 0.45 && (usageNum(row, "carries") >= 5 || usageNum(row, "targets") >= 3.5);
@@ -110,30 +120,43 @@ function hasScoringRole(row: PropRow): boolean {
 
 /** Goal-line and red-zone work first. Recent scores cover a league without those splits. */
 export function scoringRole(row: PropRow): number {
+  if (row.desk_analysis?.combination_status === "active") return row.forecast.p_estimate ?? 0;
   return usageNum(row, "gl_carries") * 4 + usageNum(row, "rz_targets") * 2 + (usageNum(row, "rush_td") + usageNum(row, "rec_td")) * 1.5;
 }
 
-/** New API selections are authoritative; the legacy fallback preserves the prior board. */
-export function selectDeskTakes(rows: PropRow[], haircut = VALUE_HAIRCUT): PropRow[] {
-  if (rows.some(row => row.desk_selected !== undefined)) {
-    return rows.filter(row => row.desk_selected && (row.locked || (eligible(row, haircut) &&
-      Boolean(row.desk_analysis?.valid_until) && Date.parse(row.desk_analysis!.valid_until!) > Date.now())))
-      .sort((a, b) => b.forecast.p_estimate - a.forecast.p_estimate);
-  }
+/** One scorer per game: scoring touches, and only when our chance beats the price. */
+export function selectDeskTakes(rows: PropRow[], haircut = 0): PropRow[] {
   const best = new Map<string, { role: number; gap: number; row: PropRow }>();
+  const combinedGames = new Set(rows.filter(r => r.desk_analysis?.combination_status === "active").map(r => r.game_id));
+  const combined = new Map<string, PropRow[]>();
   for (const row of rows) {
     if (!eligible(row, haircut)) continue;
+    if (combinedGames.has(row.game_id)) {
+      if (row.desk_analysis?.combination_status === "active" && row.book_price != null && Math.abs(row.book_price) >= 100 && (row.forecast.p_estimate ?? 0) >= .40 && row.market_context?.usable && (row.team_implied_points ?? 0) >= 21) {
+        combined.set(row.game_id, [...(combined.get(row.game_id) || []), row]);
+      }
+      continue;
+    }
     const chance = tonightChance(row) ?? 0;
     if (chance < MIN_DESK_CHANCE) continue;
     const gap = priceGap(row);
-    if (gap == null || gap < haircut) continue;
+    if (gap == null || gap <= haircut) continue;
     if (!hasScoringRole(row)) continue;
     const role = scoringRole(row);
     const prior = best.get(row.game_id);
     if (!prior || role > prior.role || (role === prior.role && (gap > prior.gap ||
-      (gap === prior.gap && String(row.player_id) > String(prior.row.player_id))))) {
+        (gap === prior.gap && (row.player_id || "") > (prior.row.player_id || ""))))) {
       best.set(row.game_id, { role, gap, row });
     }
+  }
+  for (const [game, candidates] of combined) {
+    const peak = Math.max(...candidates.map(r => r.forecast.p_estimate ?? 0));
+    const affordable = candidates.filter(r => r.book_price! >= -200 && peak - r.forecast.p_estimate! <= .10 + 1e-12);
+    const ranked = (candidates.some(r => r.selection_safety) ? candidates : affordable.length ? affordable : candidates).slice().sort((a, b) =>
+      b.forecast.p_estimate! - a.forecast.p_estimate! || (priceGap(b) ?? -1) - (priceGap(a) ?? -1) ||
+      ((a.player_id || "") < (b.player_id || "") ? 1 : (a.player_id || "") > (b.player_id || "") ? -1 : 0));
+    const row = ranked[0];
+    best.set(game, {role: row.forecast.p_estimate!, gap: priceGap(row) ?? 0, row});
   }
   return [...best.values()]
     .sort((a, b) => b.role - a.role || b.gap - a.gap || a.row.player_name.localeCompare(b.row.player_name))
@@ -147,13 +170,12 @@ export function deskScoringLine(row: PropRow): string | null {
   const scores = (row.usage?.rush_td ?? 0) + (row.usage?.rec_td ?? 0);
   if (gl != null && gl >= 0.2) bits.push(countPhrase(gl, "goal-line carry", "goal-line carries"));
   if (rz != null && rz >= 0.2) bits.push(countPhrase(rz, "red-zone target", "red-zone targets"));
-  if (scores >= 0.3) bits.push(`${trimNum(scores)} recent scores`);
+  if (scores >= 0.3) bits.push(countPhrase(scores, "recent score", "recent scores"));
   if (bits.length === 0) return null;
   return `${bits.join(", ")} a game`;
 }
 
 export function deskPickReason(row: PropRow): string {
-  if (row.desk_analysis) return row.desk_analysis.reasons.join(" ");
   const chance = row.forecast.p_estimate;
   const price = row.book_price;
   const parts: string[] = [];

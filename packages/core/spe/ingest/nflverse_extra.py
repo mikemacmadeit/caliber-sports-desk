@@ -97,6 +97,12 @@ def game_available_at(kickoff: datetime) -> datetime:
     return as_utc(kickoff) + timedelta(hours=4)
 
 
+def participation_available_at(kickoff: datetime, year: int) -> datetime:
+    # 2023+ participation is an offseason FTN release, not an in-season feed.
+    # March 1 is a conservative replay boundary, not a claimed release timestamp.
+    return max(game_available_at(kickoff), datetime(year + 1, 3, 1, tzinfo=UTC)) if year >= 2023 else game_available_at(kickoff)
+
+
 def nfl_week_ends(session: Session) -> dict[tuple[int, int], datetime]:
     ends: dict[tuple[int, int], datetime] = {}
     games = (
@@ -262,7 +268,7 @@ def ingest_participation_frame(
             offense_plays[game.game_id] += 1
         if defense_ids:
             defense_plays[game.game_id] += 1
-        available = game_available_at(game.kickoff_utc)
+        available = participation_available_at(game.kickoff_utc, year)
         play_rows.append(
             {
                 "id": str(uuid4()),
@@ -329,7 +335,7 @@ def ingest_participation_frame(
                 "provider": PROVIDER,
                 "provider_record_id": f"{game_id}:{pid}"[:160],
                 "observed_at": observed,
-                "effective_at": game_available_at(season_games[game_id].kickoff_utc),
+                "effective_at": participation_available_at(season_games[game_id].kickoff_utc, year),
                 "ingested_at": observed,
                 "revision": 1,
                 "quality_status": "derived_from_player_lists",
@@ -354,7 +360,7 @@ def ingest_participation_frame(
         status="available" if plays else "empty",
         notes=(
             f"plays={plays} player_games={player_games} unresolved_player_tokens={unresolved}. "
-            "Play-level route is not a player route. effective_at is kickoff plus 4 hours."
+            "Route is the primary receiver's route, not routes for every player. 2023+ participation is available only after the postseason."
         ),
     )
     upsert_coverage(
@@ -436,8 +442,10 @@ def ingest_ngs_frame(
                     "quality_status": quality,
                 }
             )
+    supplied_types = {row["stat_type"] for row in rows}
     for year in wanted:
-        session.query(NgsWeek).filter(NgsWeek.season_year == year, NgsWeek.provider == PROVIDER).delete(
+        session.query(NgsWeek).filter(NgsWeek.season_year == year, NgsWeek.provider == PROVIDER,
+                                     NgsWeek.stat_type.in_(supplied_types)).delete(
             synchronize_session=False
         )
     session.flush()
@@ -505,9 +513,10 @@ def _ingest_dated_depth(
     known = _known_players(session)
     known_teams = {row[0] for row in session.query(Team.team_id)}
     run = start_run(session, PROVIDER, "depth", "nfl", year)
-    session.query(DepthChartWeek).filter(DepthChartWeek.season_year == year, DepthChartWeek.provider == PROVIDER).delete(
-        synchronize_session=False
-    )
+    stamps = list({stamp for value in df["dt"] for stamp in [_parse_chart_time(value)] if stamp})
+    for start in range(0, len(stamps), 400):
+        session.query(DepthChartWeek).filter(DepthChartWeek.season_year == year,
+            DepthChartWeek.provider == PROVIDER, DepthChartWeek.effective_at.in_(stamps[start:start + 400])).delete(synchronize_session=False)
     session.flush()
     seen: set[tuple] = set()
     batch: list[dict[str, Any]] = []
@@ -749,8 +758,14 @@ def ingest_nfl_extras(
                 season_year=year, row_count=0, status="unavailable", notes=str(exc),
             )
         try:
-            part = load_asset("participation", year, refresh=refresh)
-            summary["participation"][year] = ingest_participation_frame(session, part, year=year)
+            if year >= 2023:
+                summary["participation"][year] = {"status": "offseason_excluded"}
+                upsert_coverage(session, provider=PROVIDER, dataset="participation", league_id="nfl",
+                    season_year=year, row_count=0, status="offseason_excluded",
+                    notes="2023+ FTN participation is postseason-only and excluded by the project's FTN license policy. Use the separate PFR snap-count feed in season.")
+            else:
+                part = load_asset("participation", year, refresh=refresh)
+                summary["participation"][year] = ingest_participation_frame(session, part, year=year)
         except Exception as exc:  # noqa: BLE001
             session.rollback()
             summary["participation"][year] = {"error": str(exc)}

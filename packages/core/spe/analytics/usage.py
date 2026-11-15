@@ -71,9 +71,9 @@ def compute_usage(session: Session) -> dict[str, Any]:
     snaps = _read(
         session,
         """
-        SELECT game_id, player_id, offense_snaps, defense_snaps, offense_plays
-        FROM participation_player_games
-        WHERE provider = 'nflverse'
+        SELECT p.game_id, p.player_id, p.offense_snaps, p.defense_snaps, p.offense_plays
+        FROM participation_player_games p JOIN games g ON g.game_id=p.game_id
+        WHERE p.provider = 'nflverse' AND g.season_id < 'nfl-2023'
         """,
     )
     if not snaps.empty:
@@ -142,6 +142,10 @@ def compute_usage(session: Session) -> dict[str, Any]:
             return left
         right = right.sort_values("effective_at")
         left = left.sort_values("kickoff_utc")
+        left["player_id"] = left["player_id"].astype("string")
+        right["player_id"] = right["player_id"].astype("string")
+        left["kickoff_utc"] = pd.to_datetime(left["kickoff_utc"], utc=True).astype("datetime64[ns, UTC]")
+        right["effective_at"] = pd.to_datetime(right["effective_at"], utc=True).astype("datetime64[ns, UTC]")
         keep = ["player_id", "effective_at", *cols]
         merged = pd.merge_asof(
             left,
@@ -154,6 +158,7 @@ def compute_usage(session: Session) -> dict[str, Any]:
         return merged.drop(columns=["effective_at"], errors="ignore")
 
     if not base.empty:
+        base["kickoff_utc"] = pd.to_datetime(base["kickoff_utc"], utc=True)
         if not depth.empty:
             depth["effective_at"] = pd.to_datetime(depth["effective_at"], utc=True)
             depth = depth.sort_values("depth_rank_prior_week", na_position="last").groupby(
@@ -419,9 +424,10 @@ def _team_rows(session: Session, games: pd.DataFrame) -> list[dict[str, Any]]:
     source = _read(
         session,
         """
-        SELECT game_id, possession_team, offense_formation AS formation, defense_man_zone_type AS man_zone
-        FROM participation_plays
-        WHERE provider = 'nflverse' AND possession_team IS NOT NULL AND possession_team != ''
+        SELECT p.game_id, p.possession_team, p.offense_formation AS formation, p.defense_man_zone_type AS man_zone
+        FROM participation_plays p JOIN games g ON g.game_id=p.game_id
+        WHERE p.provider = 'nflverse' AND g.season_id < 'nfl-2023'
+          AND p.possession_team IS NOT NULL AND p.possession_team != ''
         """,
     )
     plays = []

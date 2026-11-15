@@ -1,0 +1,73 @@
+{
+  "source_counts": {
+    "2025": {
+      "pbp_context_rows": 6049,
+      "snap_rows": 26559,
+      "unresolved_snap_rows": 54
+    },
+    "2026": {
+      "pbp_context_rows": 2889,
+      "snap_rows": 12764,
+      "unresolved_snap_rows": 21
+    }
+  },
+  "train_n": 1732,
+  "calibration_n": 1448,
+  "validation_n": 1979,
+  "evaluation_n": 1981,
+  "promotion_rule": "Shadow comparison only. A validation score cannot authorize live promotion; independent prospective results are required.",
+  "limitations": [
+    "Revised postgame data with an assumed 48-hour availability lag; not timestamped historical source snapshots.",
+    "Observed participants only; historical availability and executable sportsbook prices unavailable.",
+    "2026 results are an examined retrospective evaluation, not evidence of prospective profit.",
+    "NGS and depth-chart summaries are descriptive context, not fitted probability inputs."
+  ],
+  "validation": {
+    "candidate_with_fallback": {
+      "player_games": 1979,
+      "brier": 0.13507832933972383,
+      "log_loss": 0.4302823731824063,
+      "predicted_rate": 0.17853051105631743,
+      "actual_rate": 0.1819100555836281,
+      "picks": 93,
+      "hits": 43,
+      "hit_rate": 0.46236559139784944
+    },
+    "existing_v2": {
+      "player_games": 1979,
+      "brier": 0.13550967683106324,
+      "log_loss": 0.4318921841911869,
+      "predicted_rate": 0.18166133823089936,
+      "actual_rate": 0.1819100555836281,
+      "picks": 92,
+      "hits": 44,
+      "hit_rate": 0.4782608695652174
+    },
+    "enriched_rows": 1977
+  },
+  "evaluation_2026": {
+    "candidate_with_fallback": {
+      "player_games": 1981,
+      "brier": 0.14833270362675297,
+      "log_loss": 0.462443387079859,
+      "predicted_rate": 0.18733659874829067,
+      "actual_rate": 0.20343260979303382,
+      "picks": 104,
+      "hits": 49,
+      "hit_rate": 0.47115384615384615
+    },
+    "existing_v2": {
+      "player_games": 1981,
+      "brier": 0.14805106978891136,
+      "log_loss": 0.4627798679379357,
+      "predicted_rate": 0.19126422190607026,
+      "actual_rate": 0.20343260979303382,
+      "picks": 104,
+      "hits": 50,
+      "hit_rate": 0.4807692307692308
+    },
+    "enriched_rows": 1976
+  },
+  "validation_gate_passed": false,
+  "research_approved": true
+}

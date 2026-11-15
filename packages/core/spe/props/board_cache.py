@@ -83,17 +83,19 @@ def write_entry(
     date: str | None,
     rows: list[dict[str, Any]],
     path: Path | None = None,
+    *, session: Session | None = None, scoring_signature: str | None = None,
 ) -> dict[str, Any]:
     if path is None:
         from spe.publishing.store import read, write
         from spe.publishing.desk import changes_for, selection_key
-        old = read("props:" + entry_key(market, league, date)) or {}
+        old = read("props:" + entry_key(market, league, date), db=session) or {}
         previous = {selection_key(r): r for r in old.get("rows", [])}
         now = datetime.now(UTC)
         rows = [{**r, "changes": changes_for(r, previous.get(selection_key(r)), now)} for r in rows]
         return write("props:" + entry_key(market, league, date), {
             "market": market or "all", "league": league or "all", "date": date or "all", "rows": rows,
-        })
+            "scoring_signature": scoring_signature,
+        }, db=session)
     store = read_store(path)
     entries = dict(store.get("entries") or {})
     entry = {
@@ -188,16 +190,19 @@ def load_props(
     if date is None and path is None:
         from app.queries import slate_today
         date = slate_today()
+    if path is None and not block_on_miss and settings.app_env == "dev":
+        from spe.publishing.local_board import ensure_local_board
+        ensure_local_board(session, date, league or "all")
     cached = read_entry(market, league, date, path)
     if cached is not None:
         from spe.publishing.policy import annotate
         rows = [annotate(row) for row in cached.get("rows") or []]
         if not is_fresh(cached):
-            if settings.app_env != "prod":
+            if settings.app_env == "dev" and path is not None:
                 _refresh_in_background(market, league, date, path)
         return _filter_rows(rows, min_odds=min_odds, min_ev=min_ev)
     # No saved board yet: never block the website on a full rebuild.
-    if settings.app_env != "prod" and not block_on_miss:
+    if settings.app_env == "dev" and path is not None and not block_on_miss:
         _refresh_in_background(market, league, date, path)
     if block_on_miss:
         from spe.db.session import session_factory

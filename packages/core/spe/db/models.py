@@ -346,6 +346,24 @@ class ParticipationPlayerGame(Base, ProvenanceMixin):
     )
 
 
+class NflverseGameContext(Base, ProvenanceMixin):
+    """Measured player/team game inputs, with independent dataset availability.
+
+    Metrics never imply charted routes. Empty/missing source files do not create zeros.
+    """
+
+    __tablename__ = "nflverse_game_context"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.game_id"), nullable=False, index=True)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    team_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    dataset: Mapped[str] = mapped_column(String(32), nullable=False)
+    metrics: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    __table_args__ = (
+        UniqueConstraint("game_id", "entity_id", "dataset", name="uq_nflverse_game_context"),
+    )
+
+
 class NgsWeek(Base, ProvenanceMixin):
     __tablename__ = "ngs_weeks"
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
@@ -988,3 +1006,24 @@ class PublishedStat(Base):
     actual: Mapped[float] = mapped_column(Float, nullable=False)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     source: Mapped[str] = mapped_column(String(128), nullable=False)
+
+
+class AccountUser(Base):
+    __tablename__ = "account_users"
+    user_id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
+    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    subscription_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    subscription_status: Mapped[str] = mapped_column(String(32), nullable=False, default="none")
+    current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("account_users.user_id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -44,6 +44,7 @@ _COLUMNS = [
     ("participation_plays", "time_to_throw", "FLOAT"),
     ("participation_plays", "was_pressure", "BOOLEAN"),
     ("participation_plays", "ngs_air_yards", "FLOAT"),
+    ("account_users", "is_admin", "BOOLEAN DEFAULT 0 NOT NULL"),
 ]
 
 

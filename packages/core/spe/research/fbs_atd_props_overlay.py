@@ -80,13 +80,17 @@ def apply_fbs_atd_research_overlay(
     if not player_id:
         return forecast_payload
 
-    hit = _load_index().get((str(game_id), str(player_id)))
+    index = _load_index()
+    hit = index.get((str(game_id), str(player_id)))
     out = dict(forecast_payload)
     reasons = list(out.get("reason_codes") or [])
+    game_has_research = any(gid == str(game_id) for gid, _pid in index)
 
     if hit is None:
-        # No player-specific research score — never keep an M3 depth-chart clone.
-        if is_m3_team_clone_forecast(out):
+        # A game the research file actually covers should not keep a shared team prior
+        # next to real player scores. A game the file does not cover keeps its price,
+        # or the whole day disappears and the next slate (often NFL) takes its place.
+        if game_has_research and is_m3_team_clone_forecast(out):
             return None
         return out
 

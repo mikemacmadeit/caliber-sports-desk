@@ -129,13 +129,10 @@ def fit_role_calibration(
     if df.empty:
         return {"ok": False, "reason": "empty"}
 
-    ko = pd.to_datetime(df["kickoff_utc"], utc=True)
-    order = np.argsort(ko.to_numpy())
-    cut = int(len(order) * train_frac)
-    train_idx = order[: max(cut, 1)]
-    test_idx = order[max(cut, 1) :]
-    train = df.iloc[train_idx]
-    test = df.iloc[test_idx] if len(test_idx) else train
+    from spe.models.player_td.folds import split_calibration
+    train, test = split_calibration(df, fraction=1 - train_frac)
+    if test.empty:
+        return {"ok": False, "reason": "insufficient_independent_games"}
 
     tags_tr = role_tags(train)
     p_tr = np.clip(train[p_col].to_numpy(dtype=float), 1e-6, 1 - 1e-6)
@@ -166,22 +163,8 @@ def fit_role_calibration(
             "delta_brier": float(brier_score(y, p0) - brier_score(y, p1)),
         }
 
-    # Keep only shifts that help (or are ~neutral) on holdout; zero the rest.
+    # Holdout labels measure performance only; they must never select shifts.
     before_tags = role_tags(test)
-    provisional = dict(shifts)
-    for key, delta in list(provisional.items()):
-        if abs(float(delta)) < 1e-9 or key not in before_tags.columns:
-            continue
-        part = test.loc[before_tags[key]]
-        if part.empty or len(part) < 40:
-            continue
-        solo = {k: (float(v) if k == key else 0.0) for k, v in provisional.items()}
-        p0 = np.clip(part[p_col].to_numpy(dtype=float), 1e-6, 1 - 1e-6)
-        y = part[y_col].to_numpy(dtype=float)
-        p1 = apply_role_calibration(p0, frame=part, artifact={"ok": True, "logit_shifts": solo})
-        assert isinstance(p1, np.ndarray)
-        if float(brier_score(y, p1)) > float(brier_score(y, p0)) - 1e-5:
-            shifts[key] = 0.0
 
     cohort = {}
     for key in ("rushing_qb", "high_carry_rb", "rb", "qb"):
@@ -203,7 +186,7 @@ def fit_role_calibration(
         "holdout": _metrics(test),
         "holdout_cohorts": cohort,
         "note": (
-            "Logit shifts lift underconfident rushing QBs / high-carry RBs. "
+            "Shifts fitted on earlier games only; later-game results may improve or worsen. "
             "Research-only; Official Play stays off."
         ),
     }

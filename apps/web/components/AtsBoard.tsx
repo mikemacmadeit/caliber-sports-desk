@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { CallCard } from "@/components/CallCard";
-import { kickoffParts } from "@/lib/format";
 import { withQuery } from "@/lib/days";
+import type { TeamMarkInfo } from "@/lib/teams";
 
 export type AtsRow = {
+  locked?: boolean;
   game_id: string;
   league_id: string;
   kickoff_utc: string;
   home_team: string;
   away_team: string;
+  home_abbr?: string | null;
+  away_abbr?: string | null;
+  home_mark?: TeamMarkInfo | null;
+  away_mark?: TeamMarkInfo | null;
   home_record?: string | null;
   away_record?: string | null;
   sportsbook?: string | null;
@@ -49,6 +54,7 @@ export function AtsBoard({
   league,
   sort,
   side,
+  date,
   view,
   result,
   book,
@@ -58,6 +64,7 @@ export function AtsBoard({
   league: string;
   sort: string;
   side: string;
+  date?: string;
   view: View;
   result?: ResultFilter;
   book?: Book;
@@ -74,9 +81,8 @@ export function AtsBoard({
   const shownSettled = result
     ? settled.filter((row) => (book === "ml" ? row.pick_result : row.ats_pick_result) === result)
     : settled;
-  const showOpen = view !== "final";
-  const showFinal = view !== "open";
-  const query = { league, sort, side };
+  const listed = view === "open" ? openRows : view === "final" ? shownSettled : rows;
+  const query = { league, sort, side, date };
 
   return (
     <div className="space-y-8">
@@ -143,63 +149,26 @@ export function AtsBoard({
         ) : null}
       </div>
 
-      {rows.length === 0 ? (
+      {listed.length === 0 ? (
         <div className="plate px-6 py-8">
           <p className="font-display text-4xl uppercase leading-none">No games on the card</p>
           <p className="mt-3 max-w-xl text-sm text-mute">
-            Nothing on this slate matched the filter. Switch league or come back when the next games are posted.
+            Nothing on this day matched the filter. Finished games stay on the day they were played.
           </p>
         </div>
       ) : (
-        <div className="space-y-12">
-          {showOpen && openRows.length > 0 ? (
-            <section className="space-y-5">
-              <SectionHead kicker="Current" title="Still to come" meta={`${openRows.length} games`} />
-              {sort === "kickoff" ? (
-                groupByDay(openRows).map((group) => (
-                  <div key={group.label} className="space-y-3">
-                    <h3 className="font-mono text-[11px] uppercase tracking-[0.18em] text-mute">
-                      {group.label} · {group.rows.length}
-                    </h3>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {group.rows.map((row) => (
-                        <CallCard key={row.game_id} row={row} />
-                      ))}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {openRows.map((row) => (
-                    <CallCard key={row.game_id} row={row} />
-                  ))}
-                </div>
-              )}
-            </section>
-          ) : null}
-
-          {showFinal && shownSettled.length > 0 ? (
-            <section className="space-y-3">
-              <SectionHead
-                kicker="Settled"
-                title="What happened"
-                meta={`Moneyline ${wins}–${losses}${rateSuffix(wins, losses)} · Spread ${correct}–${misses}${rateSuffix(correct, misses)}`}
-              />
-              <div className="grid gap-3 md:grid-cols-2">
-                {shownSettled.map((row) => (
-                  <CallCard key={row.game_id} row={row} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {showOpen && openRows.length === 0 && showFinal && shownSettled.length === 0 ? (
-            <div className="plate px-6 py-8">
-              <p className="font-display text-4xl uppercase leading-none">Nothing in this slice</p>
-              <p className="mt-3 text-sm text-mute">Clear the filter to see the rest of the card.</p>
-            </div>
-          ) : null}
-        </div>
+        <section className="space-y-3">
+          <SectionHead
+            kicker="This day"
+            title="Every game"
+            meta={`${rows.length} games · ${finalRows.length} finished · Moneyline ${wins}–${losses} · Spread ${correct}–${misses}`}
+          />
+          <div className="grid gap-3 md:grid-cols-2">
+            {listed.map((row) => (
+              <CallCard key={row.game_id} row={row} />
+            ))}
+          </div>
+        </section>
       )}
 
       <p className="max-w-3xl text-xs leading-relaxed text-mute">
@@ -234,7 +203,7 @@ function rateSuffix(wins: number, losses: number): string {
 }
 
 function toggleHref(
-  query: { league: string; sort: string; side: string },
+  query: { league: string; sort: string; side: string; date?: string },
   view: View,
   result: ResultFilter | undefined,
   book: Book | undefined,
@@ -273,7 +242,7 @@ function Ledger({
   bookName: Book;
   activeBook?: Book;
   activeResult?: ResultFilter;
-  query: { league: string; sort: string; side: string };
+  query: { league: string; sort: string; side: string; date?: string };
   view: View;
 }) {
   const mark = (next: ResultFilter, word: string, count: number, tone: string) => {
@@ -345,13 +314,3 @@ function SectionHead({ kicker, title, meta }: { kicker: string; title: string; m
   );
 }
 
-function groupByDay(rows: AtsRow[]) {
-  const groups: { label: string; rows: AtsRow[] }[] = [];
-  for (const row of rows) {
-    const label = kickoffParts(row.kickoff_utc).day;
-    const last = groups[groups.length - 1];
-    if (last?.label === label) last.rows.push(row);
-    else groups.push({ label, rows: [row] });
-  }
-  return groups;
-}

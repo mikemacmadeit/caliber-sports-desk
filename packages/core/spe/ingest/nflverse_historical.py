@@ -13,6 +13,8 @@ from typing import Any
 import pandas as pd
 from sqlalchemy.orm import Session
 
+from spe.db.base import as_utc
+
 from spe.adapters.nflverse import NflverseAdapter
 from spe.config import settings
 from spe.db.models import Game, InjuryEvent, Player, PlayerGameStat, Play, Roster, Team, WeatherSnapshot
@@ -174,8 +176,8 @@ def ingest_nfl_history(
             league_id="nfl",
             season_year=0,
             row_count=0,
-            status="requires_contract",
-            notes="Route participation, end-zone targets, and inside-5 carries are not in weekly CC-BY box scores. Do not treat stored 0s as observed zeros.",
+            status="partial",
+            notes="Weekly box scores do not contain routes or scoring-area splits. Inside-5/10/20 opportunities can be derived from free PBP; air-yard end-zone estimates are not film charting. Full in-season routes/coverage remain unavailable.",
         )
     session.flush()
     return {
@@ -215,12 +217,22 @@ def ingest_schedules(
             skipped += 1
             continue
         game_id = nfl_game_id(gid_raw)
-        if game_id in existing_ids:
-            skipped += 1
-            continue
         kickoff = parse_kickoff(raw.get("gameday"), raw.get("gametime"))
         if kickoff is None:
             skipped += 1
+            continue
+        if game_id in existing_ids:
+            # Schedules change and previously scheduled games become final.
+            game = session.get(Game, game_id)
+            home_score, away_score = as_int(raw.get("home_score"), None), as_int(raw.get("away_score"), None)
+            changed = as_utc(game.kickoff_utc) != as_utc(kickoff)
+            game.kickoff_utc = kickoff
+            if home_score is not None and away_score is not None:
+                changed |= game.status != "final" or game.home_score != home_score or game.away_score != away_score
+                game.status, game.home_score, game.away_score = "final", home_score, away_score
+                game.data_tier = board_tier("final", kickoff, observed_at)
+            upserted += int(changed)
+            skipped += int(not changed)
             continue
         ensure_season(session, "nfl", year)
         home_team = ensure_nfl_team(session, home)
@@ -333,12 +345,9 @@ def ingest_players(session: Session, df: pd.DataFrame, *, observed_at: datetime)
 def ingest_weekly_stats(session: Session, df: pd.DataFrame, year: int, *, observed_at: datetime) -> tuple[int, int]:
     run = start_run(session, PROVIDER, "player_week_stats", "nfl", year)
     index = _game_index(session, year)
-    existing = {
-        (g, p)
-        for g, p in session.query(PlayerGameStat.game_id, PlayerGameStat.player_id).filter(
-            PlayerGameStat.provider == PROVIDER
-        )
-    }
+    existing = {(row.game_id, row.player_id): row for row in session.query(PlayerGameStat)
+                .join(Game).filter(PlayerGameStat.provider == PROVIDER, Game.season_id == nfl_season_id(year))
+                .order_by(PlayerGameStat.revision)}
     upserted = skipped = 0
     for _, raw in df.iterrows():
         season = as_int(raw.get("season"), year) or year
@@ -367,36 +376,34 @@ def ingest_weekly_stats(session: Session, df: pd.DataFrame, year: int, *, observ
             )
             map_provider(session, PROVIDER, "player", player_ext, pid)
             session.flush()
-        if (game_id, pid) in existing:
-            skipped += 1
-            continue
         team_id = nfl_team_id(team)
         _ensure_roster(session, team_id, pid, year)
         rec_id = f"{game_id}:{pid}:{year}:{week}"
-        session.add(
-            PlayerGameStat(
-                game_id=game_id,
-                player_id=pid,
-                attempts=as_int(raw.get("attempts"), 0) or 0,
-                routes=0,
-                targets=as_int(raw.get("targets"), 0) or 0,
-                carries=as_int(raw.get("carries"), 0) or as_int(raw.get("rushing_attempts"), 0) or 0,
-                receptions=as_int(raw.get("receptions"), 0) or 0,
-                rush_yards=as_float(raw.get("rushing_yards")) or 0.0,
-                rec_yards=as_float(raw.get("receiving_yards")) or 0.0,
-                rush_td=as_int(raw.get("rushing_tds"), 0) or 0,
-                rec_td=as_int(raw.get("receiving_tds"), 0) or 0,
-                pass_td=as_int(raw.get("passing_tds"), 0) or 0,
-                rz_targets=0,
-                rz_carries=0,
-                provider=PROVIDER,
-                provider_record_id=rec_id[:160],
-                observed_at=observed_at,
-                effective_at=observed_at,
-                quality_status="partial_no_charting",
-            )
-        )
-        existing.add((game_id, pid))
+        values = dict(team_id=team_id, attempts=as_int(raw.get("attempts"), 0) or as_int(raw.get("passing_attempts"), 0) or 0,
+                      targets=as_int(raw.get("targets"), 0) or 0,
+                      carries=as_int(raw.get("carries"), 0) or as_int(raw.get("rushing_attempts"), 0) or 0,
+                      receptions=as_int(raw.get("receptions"), 0) or 0,
+                      rush_yards=as_float(raw.get("rushing_yards")) or 0.0,
+                      rec_yards=as_float(raw.get("receiving_yards")) or 0.0,
+                      rush_td=as_int(raw.get("rushing_tds"), 0) or 0,
+                      rec_td=as_int(raw.get("receiving_tds"), 0) or 0,
+                      pass_td=as_int(raw.get("passing_tds"), 0) or 0)
+        item = existing.get((game_id, pid))
+        if item is None:
+            item = PlayerGameStat(game_id=game_id, player_id=pid, **values,
+                routes=0, rz_targets=0, rz_carries=0, gl_carries=0, provider=PROVIDER,
+                provider_record_id=rec_id[:160], observed_at=observed_at, effective_at=observed_at,
+                quality_status="partial_no_charting")
+            session.add(item)
+            existing[(game_id, pid)] = item
+        else:
+            if all(getattr(item, key) == value for key, value in values.items()):
+                skipped += 1
+                continue
+            for key, value in values.items():
+                setattr(item, key, value)
+            item.revision = (item.revision or 1) + 1
+            item.observed_at = item.ingested_at = observed_at
         upserted += 1
         if upserted % 500 == 0:
             session.flush()
@@ -622,13 +629,17 @@ def _game_index(session: Session, year: int) -> dict[tuple[int, int, str], str]:
     season_id = nfl_season_id(year)
     index: dict[tuple[int, int, str], str] = {}
     games = session.query(Game).filter(Game.season_id == season_id).all()
-    for game in games:
+    for game in sorted(games, key=lambda g: (g.game_id.startswith(f"nfl:{year}_"), g.game_id)):
         if game.week is None:
             continue
         home = game.home_team_id.replace("nfl:", "")
         away = game.away_team_id.replace("nfl:", "")
         index[(year, game.week, home)] = game.game_id
         index[(year, game.week, away)] = game.game_id
+        for team in (home, away):
+            alias = {"LA": "LAR", "LAR": "LA", "WAS": "WSH", "WSH": "WAS", "JAX": "JAC", "JAC": "JAX"}.get(team)
+            if alias:
+                index[(year, game.week, alias)] = game.game_id
     return index
 
 

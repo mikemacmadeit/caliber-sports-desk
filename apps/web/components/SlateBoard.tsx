@@ -26,12 +26,27 @@ export function SlateBoard({
       .sort((a, b) => +new Date(a.kickoff_utc) - +new Date(b.kickoff_utc));
   }, [games, query, conference]);
   const live = visible.filter((game) => game.status === "in_progress");
+  const finals = visible.filter((game) => game.status === "final");
   const upcoming = visible.filter((game) => game.status !== "in_progress" && game.status !== "final");
-  const featured = live[0] ?? upcoming[0];
+  const featured = live[0] ?? upcoming[0] ?? finals[0];
   const restLive = live.filter((game) => game.game_id !== featured?.game_id);
   const rest = upcoming.filter((game) => game.game_id !== featured?.game_id);
+  const restFinals = finals.filter((game) => game.game_id !== featured?.game_id);
   const college = rest.filter((game) => game.league_id === "fbs");
   const nfl = rest.filter((game) => game.league_id === "nfl");
+  const finishedCollege = restFinals.filter((game) => game.league_id === "fbs");
+  const finishedNfl = restFinals.filter((game) => game.league_id === "nfl");
+  const finished =
+    (featured?.league_id === "nfl"
+      ? [
+          { key: "nfl-final", title: "NFL", games: finishedNfl },
+          { key: "fbs-final", title: "College", games: finishedCollege },
+        ]
+      : [
+          { key: "fbs-final", title: "College", games: finishedCollege },
+          { key: "nfl-final", title: "NFL", games: finishedNfl },
+        ]
+    ).filter((section) => section.games.length > 0);
   const sections =
     featured?.league_id === "nfl"
       ? [
@@ -112,6 +127,23 @@ export function SlateBoard({
             </section>
           ),
       )}
+
+      {finished.map((section) => (
+        <section key={section.key} className="space-y-4">
+          <div className="flex items-end justify-between gap-4 border-b border-white/10 pb-3">
+            <div>
+              <p className="kicker">Final</p>
+              <h2 className="mt-2 font-display text-4xl uppercase leading-none tracking-wide">{section.title}</h2>
+            </div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-mute">{section.games.length} finished</p>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {section.games.map((game) => (
+              <GameCard key={game.game_id} game={game} />
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

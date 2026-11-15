@@ -44,10 +44,10 @@ export function MarginBar({
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-mute">
         <span className="min-w-0 truncate" style={{ color: awayColor }}>
-          {shortName(awayName)}
+          {endLabels(awayName, homeName)[0]}
         </span>
         <span className="min-w-0 truncate text-right" style={{ color: homeColor }}>
-          {shortName(homeName)}
+          {endLabels(awayName, homeName)[1]}
         </span>
       </div>
       <p className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-mute">
@@ -57,7 +57,19 @@ export function MarginBar({
   );
 }
 
-function shortName(name: string) {
+function endLabels(awayName: string, homeName: string): [string, string] {
+  const away = lastWord(awayName);
+  const home = lastWord(homeName);
+  if (away.toLowerCase() !== home.toLowerCase()) return [away, home];
+  return [firstWord(awayName), firstWord(homeName)];
+}
+
+function lastWord(name: string) {
   const parts = name.trim().split(/\s+/);
   return parts[parts.length - 1] || name;
+}
+
+function firstWord(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return parts[0] || name;
 }

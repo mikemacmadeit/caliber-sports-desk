@@ -14,6 +14,7 @@ JOBS = {
     "production_publish": 900,
     "production_inputs": 2400,
     "production_weather": 10800,
+    "production_nflverse": 8 * 3600,
     "production_settlement": 2400,
 }
 
@@ -101,29 +102,40 @@ def run_step(name, fn):
         raise
 
 
-def warm_and_publish(db):
-    from app.queries import games_for_slate, kickoff_day, list_props
+def publish_slate(db, date):
+    """Save probabilities and pregame decisions in one transaction, on one connection."""
+    from app.queries import list_props
     from spe.props.board_cache import write_entry, WARM_MARKETS
     from spe.publishing.ledger import publish
     from spe.shadow.desk_ledger import freeze_desk_rows
+    from spe.publishing.local_board import scoring_signature
+
+    all_rows = list_props(db, None, None, None, "all", date)
+    freeze_desk_rows(db, all_rows)
+    signature = scoring_signature()
+    for market in WARM_MARKETS:
+        rows = [r for r in all_rows if r["market_id"] == market]
+        for league in ("all", "nfl", "fbs"):
+            write_entry(
+                market,
+                league,
+                date,
+                [r for r in rows if league == "all" or r["league_id"] == league],
+                session=db,
+                scoring_signature=signature,
+            )
+    return {"rows": len(all_rows), "published": publish(db, all_rows)["published"]}
+
+
+def warm_and_publish(db):
+    from app.queries import games_for_slate, kickoff_day
 
     games = games_for_slate(db, None, "all")
     horizon = datetime.now(UTC) + timedelta(hours=48)
     dates = sorted({kickoff_day(g.kickoff_utc) for g in games if as_utc(g.kickoff_utc) <= horizon})
     published = 0
     for date in dates:
-        all_rows = list_props(db, None, None, None, "all", date)
-        freeze_desk_rows(db, all_rows)
-        for market in WARM_MARKETS:
-            rows = [r for r in all_rows if r["market_id"] == market]
-            for league in ("all", "nfl", "fbs"):
-                write_entry(
-                    market,
-                    league,
-                    date,
-                    [r for r in rows if league == "all" or r["league_id"] == league],
-                )
-        published += publish(db, all_rows)["published"]
+        published += publish_slate(db, date)["published"]
         db.commit()
     return {"status": "ok", "dates": dates, "published": published}
 
@@ -191,7 +203,9 @@ def production_cycle(lane):
             # Shared credit ceiling is retained. Each committed stage is independently retryable.
             results = []
             errors = []
+            from spe.ingest.public_availability import refresh_public_availability
             for name, fn in [
+                ("production_pregame_availability", refresh_public_availability),
                 ("production_odds", ingest_odds_live),
                 ("production_spreads", lambda db: ingest_odds_spreads(db, max_events=12)),
                 ("production_publish", warm_and_publish),
@@ -206,11 +220,15 @@ def production_cycle(lane):
             return {"status": "ok", "steps": results}
         if lane == "inputs":
             from spe.ingest.nws_live import ingest_nws_forecasts
+            from spe.ingest.nflverse_desk import refresh_nflverse_desk
+            from spe.ingest.free_desk_inputs import refresh_free_desk_inputs
 
             errors = []
             for name, fn in [
                 ("production_inputs", inputs),
                 ("production_weather", lambda db: ingest_nws_forecasts(db, horizon_hours=48)),
+                ("production_nflverse", refresh_nflverse_desk),
+                ("production_free_college", refresh_free_desk_inputs),
             ]:
                 try:
                     run_step(name, fn)

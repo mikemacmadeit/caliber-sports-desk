@@ -154,6 +154,49 @@ def predict_margin(artifact: AtsModelArtifact, frame: pd.DataFrame) -> np.ndarra
     return artifact.intercept + x @ np.asarray(artifact.coef, dtype=float)
 
 
+def availability_shift(artifact: AtsModelArtifact, frame: pd.DataFrame) -> np.ndarray:
+    """Add the quarterback and skill-player effect when this model was not fit with it.
+
+    The NFL margin model was. College was not, so a college score uses those
+    fitted weights when a pregame report says someone is out. A model that
+    already has the columns is left alone.
+    """
+    from spe.models.ats.injuries import INJURY_FEATURES
+
+    needed = [name for name in INJURY_FEATURES if name != "injury_report"]
+    if any(name in artifact.feature_cols for name in needed):
+        return np.zeros(len(frame))
+    if not any(name in frame.columns for name in needed):
+        return np.zeros(len(frame))
+    weights = _availability_weights()
+    shift = np.zeros(len(frame))
+    for name, weight in weights.items():
+        if name not in frame.columns:
+            continue
+        values = pd.to_numeric(frame[name], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+        shift = shift + weight * values
+    return shift
+
+
+def _availability_weights() -> dict[str, float]:
+    """Weights from the NFL margin artifact, the fit that included these columns."""
+    import json
+
+    from spe.config import settings
+
+    path = settings.parquet_dir / "models" / "ats" / "model_nfl.json"
+    if not path.exists():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    cols = list(raw.get("feature_cols") or [])
+    coef = list(raw.get("coef") or [])
+    weights: dict[str, float] = {}
+    for name in ("home_qb_out", "away_qb_out", "home_skill_out", "away_skill_out"):
+        if name in cols and len(coef) == len(cols):
+            weights[name] = float(coef[cols.index(name)])
+    return weights
+
+
 def predict_scores(predicted_margin: np.ndarray, frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     """Split margin into home/away scores using prior PPG totals."""
     home_ppg = pd.to_numeric(frame.get("home_ppg"), errors="coerce").fillna(22.0).to_numpy()
@@ -217,7 +260,7 @@ def score_predictions(
     apply_calibration: bool = True,
 ) -> pd.DataFrame:
     out = attach_spread_fields(frame)
-    out["predicted_margin"] = predict_margin(artifact, out)
+    out["predicted_margin"] = predict_margin(artifact, out) + availability_shift(artifact, out)
     home_s, away_s = predict_scores(out["predicted_margin"].to_numpy(), out)
     out["predicted_home_score"] = home_s
     out["predicted_away_score"] = away_s

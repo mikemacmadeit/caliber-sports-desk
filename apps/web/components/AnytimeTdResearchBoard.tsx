@@ -83,6 +83,7 @@ export type ResearchGame = {
 };
 
 export type ResearchFinderPayload = {
+  locked?: boolean;
   as_of?: string;
   disclaimer?: string;
   play_enabled?: boolean;

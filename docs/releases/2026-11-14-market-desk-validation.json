@@ -1,0 +1,299 @@
+{
+  "model_version": "desk_combined_v2",
+  "selection_version": "market_scorer_v3",
+  "checks": {
+    "python_tests": 92,
+    "typescript": "passed",
+    "component_rendering_and_frontend_gates": "passed",
+    "browser_visual_check": "unavailable: project requires IronBee, not connected"
+  },
+  "limits": [
+    "Research only, not demonstrated betting profit.",
+    "FBS probabilities fit spreads; historical FBS totals remain insufficient for fitting. FBS implied totals are an explicit selection gate, not a calibrated probability input.",
+    "21 implied points and 40% player probability are experimental selection requirements, not proven optimal thresholds.",
+    "Historical market archives fetched after kickoff are labeled retrospective and excluded from live point-in-time inputs.",
+    "CFBD returned 429; requests stopped. Public ESPN sources filled current matchup data. No data purchase or deployment."
+  ],
+  "models": {
+    "nfl": {
+      "sample_counts": {
+        "fit": 10752,
+        "blend": 1121,
+        "calibrate": 1425,
+        "validation": 1267,
+        "evaluation_2026": 1944
+      },
+      "allocation_weight": 0.32,
+      "limitations": [
+        "Revised historical stats and historical market archives retrieved after games; not archived pregame source snapshots.",
+        "Labels include observed participants with two prior same-team games; inactive/DNP outcomes not reconstructed.",
+        "Historical injury reports and executable prices unavailable; pick metrics are highest-probability scorers, not priced Desk ROI.",
+        "Current team pool uses recent appearances; rookies, transfers and new replacements need role history.",
+        "NFL and FBS fitted independently. Spreads enter both models; NFL totals also enter probability models. College historical totals are insufficient, so current college totals are used only for selection screening.",
+        "No complete routes, weather or schedule-strength adjustment. Archived odds timing is not independently verified.",
+        "2026 is an examined retrospective replay, not an untouched prospective test."
+      ],
+      "promotion_rule": "Positive allocation weight and calibration slope; validation Brier and log loss no worse than independently calibrated player-only component. Research Desk only.",
+      "validation": {
+        "combined": {
+          "player_games": 1267,
+          "brier": 0.13421783888503488,
+          "log_loss": 0.42625685731719687,
+          "predicted_rate": 0.17890773334782187,
+          "actual_rate": 0.18153117600631413,
+          "picks": 63,
+          "hits": 26,
+          "hit_rate": 0.4126984126984127
+        },
+        "player_only": {
+          "player_games": 1267,
+          "brier": 0.13474900161051412,
+          "log_loss": 0.4294911162339156,
+          "predicted_rate": 0.1786611512646651,
+          "actual_rate": 0.18153117600631413,
+          "picks": 62,
+          "hits": 27,
+          "hit_rate": 0.43548387096774194
+        },
+        "paired_brier_vs_player_only": {
+          "difference": -0.000531162725479232,
+          "game_bootstrap_95_percent": [
+            -0.001410208676901684,
+            0.0002769136479470049
+          ],
+          "games": 63
+        },
+        "allocation_uncalibrated": {
+          "player_games": 1267,
+          "brier": 0.13546069347004042,
+          "log_loss": 0.43111192976722745,
+          "predicted_rate": 0.1658644080580084,
+          "actual_rate": 0.18153117600631413,
+          "picks": 63,
+          "hits": 27,
+          "hit_rate": 0.42857142857142855
+        }
+      },
+      "evaluation_2026": {
+        "combined": {
+          "player_games": 1944,
+          "brier": 0.1444453387905441,
+          "log_loss": 0.454301994660027,
+          "predicted_rate": 0.18056931966824447,
+          "actual_rate": 0.20421810699588477,
+          "picks": 104,
+          "hits": 55,
+          "hit_rate": 0.5288461538461539
+        },
+        "player_only": {
+          "player_games": 1944,
+          "brier": 0.14542655199801952,
+          "log_loss": 0.4561254304140752,
+          "predicted_rate": 0.18217876352980475,
+          "actual_rate": 0.20421810699588477,
+          "picks": 104,
+          "hits": 53,
+          "hit_rate": 0.5096153846153846
+        },
+        "paired_brier_vs_player_only": {
+          "difference": -0.000981213207475426,
+          "game_bootstrap_95_percent": [
+            -0.0016854640952227709,
+            -0.0002627357498787443
+          ],
+          "games": 104
+        },
+        "allocation_uncalibrated": {
+          "player_games": 1944,
+          "brier": 0.14525506499987856,
+          "log_loss": 0.5162181622018969,
+          "predicted_rate": 0.17060200506107304,
+          "actual_rate": 0.20421810699588477,
+          "picks": 104,
+          "hits": 54,
+          "hit_rate": 0.5192307692307693
+        },
+        "previous_v2": {
+          "player_games": 1944,
+          "brier": 0.14832859742193688,
+          "log_loss": 0.4636033876880468,
+          "predicted_rate": 0.1918749623568934,
+          "actual_rate": 0.20421810699588477,
+          "picks": 104,
+          "hits": 50,
+          "hit_rate": 0.4807692307692308
+        },
+        "paired_brier_vs_previous_v2": {
+          "difference": -0.003883258631392779,
+          "game_bootstrap_95_percent": [
+            -0.005644573323297589,
+            -0.0022394127578052917
+          ],
+          "games": 104
+        }
+      },
+      "live_enabled": true
+    },
+    "fbs": {
+      "sample_counts": {
+        "fit": 20496,
+        "blend": 3777,
+        "calibrate": 1934,
+        "validation": 4836,
+        "evaluation_2026": 7183
+      },
+      "allocation_weight": 0.1,
+      "limitations": [
+        "Revised historical stats and historical market archives retrieved after games; not archived pregame source snapshots.",
+        "Labels include observed participants with two prior same-team games; inactive/DNP outcomes not reconstructed.",
+        "Historical injury reports and executable prices unavailable; pick metrics are highest-probability scorers, not priced Desk ROI.",
+        "Current team pool uses recent appearances; rookies, transfers and new replacements need role history.",
+        "NFL and FBS fitted independently. Spreads enter both models; NFL totals also enter probability models. College historical totals are insufficient, so current college totals are used only for selection screening.",
+        "No complete routes, weather or schedule-strength adjustment. Archived odds timing is not independently verified.",
+        "2026 is an examined retrospective replay, not an untouched prospective test."
+      ],
+      "promotion_rule": "Positive allocation weight and calibration slope; validation Brier and log loss no worse than independently calibrated player-only component. Research Desk only.",
+      "validation": {
+        "combined": {
+          "player_games": 4836,
+          "brier": 0.17662746874421878,
+          "log_loss": 0.5338102594148427,
+          "predicted_rate": 0.28237615819101636,
+          "actual_rate": 0.26716294458229944,
+          "picks": 286,
+          "hits": 164,
+          "hit_rate": 0.5734265734265734
+        },
+        "player_only": {
+          "player_games": 4836,
+          "brier": 0.17676379508297496,
+          "log_loss": 0.5341901714158196,
+          "predicted_rate": 0.28257729054902403,
+          "actual_rate": 0.26716294458229944,
+          "picks": 286,
+          "hits": 166,
+          "hit_rate": 0.5804195804195804
+        },
+        "paired_brier_vs_player_only": {
+          "difference": -0.0001363263387561676,
+          "game_bootstrap_95_percent": [
+            -0.0002946868800363048,
+            1.0946113933593308e-05
+          ],
+          "games": 286
+        },
+        "allocation_uncalibrated": {
+          "player_games": 4836,
+          "brier": 0.17879758580550667,
+          "log_loss": 0.5408662780603359,
+          "predicted_rate": 0.23142783874110295,
+          "actual_rate": 0.26716294458229944,
+          "picks": 286,
+          "hits": 166,
+          "hit_rate": 0.5804195804195804
+        }
+      },
+      "evaluation_2026": {
+        "combined": {
+          "player_games": 7183,
+          "brier": 0.17707826286672856,
+          "log_loss": 0.5350862208728262,
+          "predicted_rate": 0.2669568131072156,
+          "actual_rate": 0.26158986495893083,
+          "picks": 429,
+          "hits": 239,
+          "hit_rate": 0.5571095571095571
+        },
+        "player_only": {
+          "player_games": 7183,
+          "brier": 0.17713611963414116,
+          "log_loss": 0.5352441193014079,
+          "predicted_rate": 0.2668915056497188,
+          "actual_rate": 0.26158986495893083,
+          "picks": 429,
+          "hits": 239,
+          "hit_rate": 0.5571095571095571
+        },
+        "paired_brier_vs_player_only": {
+          "difference": -5.7856767412596214e-05,
+          "game_bootstrap_95_percent": [
+            -0.00019051396264765127,
+            6.59721822848254e-05
+          ],
+          "games": 429
+        },
+        "allocation_uncalibrated": {
+          "player_games": 7183,
+          "brier": 0.18121557042680256,
+          "log_loss": 0.5503620936913624,
+          "predicted_rate": 0.21807345735344605,
+          "actual_rate": 0.26158986495893083,
+          "picks": 428,
+          "hits": 241,
+          "hit_rate": 0.5630841121495327
+        },
+        "previous_v2": {
+          "player_games": 7183,
+          "brier": 0.17835829911691245,
+          "log_loss": 0.5381862209955777,
+          "predicted_rate": 0.2583569949397453,
+          "actual_rate": 0.26158986495893083,
+          "picks": 429,
+          "hits": 229,
+          "hit_rate": 0.5337995337995338
+        },
+        "paired_brier_vs_previous_v2": {
+          "difference": -0.0012800362501838858,
+          "game_bootstrap_95_percent": [
+            -0.0019607025844322044,
+            -0.0006202281585144755
+          ],
+          "games": 429
+        }
+      },
+      "live_enabled": true
+    }
+  },
+  "runtime": {
+    "2026-11-14": {
+      "status": 200,
+      "games": 55,
+      "picks": 30,
+      "passes": 25,
+      "selection": "market_scorer_v3",
+      "models": [
+        "desk_combined_v2-fbs-f727e57c0c",
+        "locked"
+      ],
+      "examples": [
+        {
+          "name": "Anthony Colandrea",
+          "p": 0.4128396145622167,
+          "price": -115,
+          "team_implied_points": 33.5
+        },
+        {
+          "name": "Ajani Sheppard",
+          "p": 0.4074164446381819,
+          "price": -130,
+          "team_implied_points": 25.5
+        },
+        {
+          "name": "Jonaz Walton",
+          "p": 0.5587416824237871,
+          "price": -135,
+          "team_implied_points": 40.5
+        }
+      ]
+    },
+    "2026-11-15": {
+      "status": 200,
+      "games": 13,
+      "picks": 0,
+      "passes": 13,
+      "selection": "market_scorer_v3",
+      "models": [],
+      "examples": []
+    }
+  }
+}

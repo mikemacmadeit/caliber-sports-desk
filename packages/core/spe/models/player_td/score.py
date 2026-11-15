@@ -27,7 +27,7 @@ from spe.models.team_td.dataset import (
     injury_skill_out,
     weather_by_game,
 )
-from spe.models.team_td.model import predict_team_row
+from spe.models.team_td.model import TeamTdModel, predict_team_row
 from spe.models.team_td.train import load_team_td_model
 from spe.ops.availability import availability_for_player
 
@@ -89,7 +89,8 @@ def score_upcoming_player_td(
 
     for game in targets:
         model = load_player_td_model(game.league_id)
-        team_model = load_team_td_model(game.league_id)
+        team_model = (TeamTdModel.from_dict(model.upstream_team_model)
+                      if model and model.upstream_team_model else load_team_td_model(game.league_id))
         if model is None or team_model is None:
             out["games"].append({"game_id": game.game_id, "status": "missing_artifact"})
             continue

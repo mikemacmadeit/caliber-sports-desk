@@ -5,6 +5,22 @@ import type { PriceFreshness, PropRow } from "@/lib/api";
 import { american, kickoff, marketLabel } from "@/lib/format";
 import { presentTeam } from "@/lib/teams";
 
+function gradeTone(result: string | undefined) {
+  if (result === "win" || result === "scored") return "win";
+  if (result === "loss" || result === "blank") return "loss";
+  return null;
+}
+
+function GradeMark({ tone }: { tone: "win" | "loss" | null }) {
+  if (!tone) return null;
+  const won = tone === "win";
+  return (
+    <span aria-label={won ? "Win" : "Loss"} className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xl font-bold ${won ? "bg-green-500 text-black" : "bg-red-500 text-white"}`}>
+      {won ? "✓" : "✕"}
+    </span>
+  );
+}
+
 function NeedsPrice() {
   return <span className="font-mono text-[10px] uppercase tracking-wider text-mute">Needs price</span>;
 }
@@ -58,8 +74,10 @@ export function PropTable({ rows, call }: { rows: PropRow[]; call?: "scorer" }) 
       {rows.map((r) => {
         const club = presentTeam({ abbreviation: r.team, mark: r.team_mark });
         const pick = r.pick || `${marketLabel(r.market_id)} ${r.side}${r.line != null ? ` ${r.line}` : ""}`;
+        const tone = gradeTone(r.result);
         return (
-          <Link key={r.outcome_id} href={`/games/${r.game_id}`} className="plate block px-4 py-4">
+          <Link key={r.outcome_id} href={`/games/${r.game_id}`} className={`relative block rounded-xl border px-4 py-4 ${tone === "win" ? "border-green-500 bg-green-950/50" : tone === "loss" ? "border-red-500 bg-red-950/50" : "plate"}`}>
+            <GradeMark tone={tone} />
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <TeamMark team={club} size="sm" />
@@ -77,9 +95,9 @@ export function PropTable({ rows, call }: { rows: PropRow[]; call?: "scorer" }) 
             </p>
             <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
               <Interval
-                p={r.forecast.p_estimate}
-                lo={r.forecast.confidence_interval[0]}
-                hi={r.forecast.confidence_interval[1]}
+                p={r.forecast.p_estimate ?? 0}
+                lo={r.forecast.confidence_interval?.[0] ?? r.forecast.p_estimate ?? 0}
+                hi={r.forecast.confidence_interval?.[1] ?? r.forecast.p_estimate ?? 0}
               />
               <div className="text-right">
                 {r.book_price == null ? (
@@ -111,11 +129,12 @@ export function PropTable({ rows, call }: { rows: PropRow[]; call?: "scorer" }) 
           {rows.map((r) => {
             const hot = (r.forecast.ev_after_haircut ?? -1) >= 0.04;
             const club = presentTeam({ abbreviation: r.team, mark: r.team_mark });
+            const tone = gradeTone(r.result);
             return (
               <tr
                 key={r.outcome_id}
                 className={`border-b border-white/5 last:border-0 ${
-                  hot ? "bg-gold/[0.05]" : "hover:bg-white/[0.03]"
+                  tone === "win" ? "bg-green-950/40" : tone === "loss" ? "bg-red-950/40" : hot ? "bg-gold/[0.05]" : "hover:bg-white/[0.03]"
                 }`}
               >
                 <td className="px-4 py-3">
@@ -140,12 +159,15 @@ export function PropTable({ rows, call }: { rows: PropRow[]; call?: "scorer" }) 
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-paper/90">
-                  <div
-                    className={`font-display text-2xl uppercase leading-none tracking-wide ${
-                      r.model_lean ? "text-gold" : "text-paper"
-                    }`}
-                  >
-                    {r.pick || `${marketLabel(r.market_id)} ${r.side}${r.line != null ? ` ${r.line}` : ""}`}
+                  <div className="flex items-start gap-2">
+                    <GradeMark tone={tone} />
+                    <div
+                      className={`font-display text-2xl uppercase leading-none tracking-wide ${
+                        r.model_lean ? "text-gold" : "text-paper"
+                      }`}
+                    >
+                      {r.pick || `${marketLabel(r.market_id)} ${r.side}${r.line != null ? ` ${r.line}` : ""}`}
+                    </div>
                   </div>
                   {r.projection != null ? (
                     <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-mute">
@@ -161,9 +183,9 @@ export function PropTable({ rows, call }: { rows: PropRow[]; call?: "scorer" }) 
                 </td>
                 <td className="px-4 py-3">
                   <Interval
-                    p={r.forecast.p_estimate}
-                    lo={r.forecast.confidence_interval[0]}
-                    hi={r.forecast.confidence_interval[1]}
+                    p={r.forecast.p_estimate ?? 0}
+                    lo={r.forecast.confidence_interval?.[0] ?? r.forecast.p_estimate ?? 0}
+                    hi={r.forecast.confidence_interval?.[1] ?? r.forecast.p_estimate ?? 0}
                   />
                 </td>
                 <td className="px-4 py-3 font-mono text-base text-paper">

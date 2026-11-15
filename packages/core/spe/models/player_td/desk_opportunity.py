@@ -18,6 +18,8 @@ from spe.config import settings
 from spe.db.base import as_utc
 
 VERSION = "desk_opportunity_v2"
+NFL_VERSION = "desk_opportunity_v3"
+BUNDLED_MODEL_DIR = Path(__file__).resolve().parents[5] / "deploy/runtime-data/parquet/models"
 COLUMNS = ["game_id", "player_id", "team_id", "kickoff_utc", "home_team_id", "away_team_id",
            "position", "provider", "carries", "targets", "receptions", "rush_td", "rec_td",
            "gl_carries", "rz_targets", "player_name"]
@@ -85,10 +87,22 @@ class OpportunityHistory:
             first = players[0]
             totals = {k: sum(float(p.get(k) or 0) for p in players) for k in
                       ("carries", "targets", "receptions", "rush_td", "rec_td", "gl_carries", "rz_targets")}
-            totals.update(kickoff_utc=first["kickoff_utc"], game_id=first["game_id"])
+            totals.update(kickoff_utc=first["kickoff_utc"], game_id=first["game_id"],
+                          complete_player_box=all(p['provider']=='espn.complete_box' for p in players),
+                          nflverse_context=first.get("nflverse_context", {}))
             for pos in ("QB", "RB", "WR", "TE"):
                 totals[pos] = sum(float(p["rush_td"] or 0) + float(p["rec_td"] or 0)
                                   for p in players if p["position"] == pos)
+            from spe.models.player_td.matchup_features import POSITION_STATS
+            for stat in POSITION_STATS:
+                measured = any(p.get(stat) is not None for p in players)
+                totals['measured_'+stat] = measured
+                for pos in ('QB','RB','WR','TE'):
+                    totals[pos+'_'+stat] = sum(float(p.get(stat) or 0) for p in players if p['position']==pos) if measured else None
+                if stat not in totals:
+                    totals[stat] = sum(float(p.get(stat) or 0) for p in players) if measured else None
+                elif not measured:
+                    totals[stat] = None
             self.teams[team].append(totals)
             self.defenses[first["opponent_id"]].append(totals)
         for collection in (self.players, self.teams, self.defenses):
@@ -122,18 +136,45 @@ class OpportunityHistory:
                              ("goal_line_share", "gl_carries"), ("red_zone_share", "rz_targets")):
             f[dest] = min(1.0, _mean(own, source) / max(_mean(offense, source), 1.0))
         f["last_played_at"] = own[-1]["kickoff_utc"].isoformat()
+        f["days_since_appearance"] = (cutoff-own[-1]["kickoff_utc"]).total_seconds()/86400
+        f["recent_role_observation_games"] = len(offense[-2:])
         f["opponent_games"] = len(defense)
         f["last_game_carries"] = float(own[-1].get("carries") or 0)
         f["last_game_receptions"] = float(own[-1].get("receptions") or 0)
+        from spe.models.player_td.role_features import recent_role
+        f.update(recent_role(self, player, team, cutoff))
+        f["yardage_known"] = float(all(r.get("rush_yards") is not None and r.get("rec_yards") is not None for r in own))
+        f["recent_rush_yards"] = _mean(own, "rush_yards") if f["yardage_known"] else None
+        f["recent_rec_yards"] = _mean(own, "rec_yards") if f["yardage_known"] else None
+        evidence = getattr(self, "evidence", None)
+        if evidence is not None:
+            rich = evidence.features(team, opponent, cutoff, player, own)
+            for key in ("recent_rush_yards", "recent_rec_yards", "yardage_known"):
+                rich.pop(key, None)
+            f.update(rich)
+        if any(r.get("provider") == "nflverse" for r in own):
+            from spe.models.player_td.nflverse_context import free_features
+            f.update(free_features(own, offense, defense, position, cutoff))
+        if evidence is not None:
+            from spe.models.player_td.current_opportunities import current_features
+            f.update(current_features(self, player, team, position, cutoff))
+        from spe.models.player_td.matchup_features import features as matchup_features
+        f.update(matchup_features(self, player, team, opponent, position, cutoff))
         return f
 
 
-def vector(features):
-    return np.array([float(features.get(k) or 0) for k in FEATURES])
+def vector(features, names=None):
+    if names and 'projected_targets' in names:
+        from spe.models.player_td.matchup_features import interactions
+        features = {**features, **interactions(features)}
+    if names and 'favorite_carry_share' in names:
+        from spe.models.player_td.role_features import interactions
+        features = {**features, **interactions(features)}
+    return np.array([float(features.get(k) or 0) for k in (names or FEATURES)])
 
 
 def predict(model, features):
-    x = (vector(features) - np.array(model["center"])) / np.array(model["scale"])
+    x = (vector(features, model.get("features")) - np.array(model["center"])) / np.array(model["scale"])
     logit = float(model["intercept"]) + float(x @ np.array(model["coefficients"]))
     logit = model.get("calibration_intercept", 0) + model.get("calibration_slope", 1) * logit
     return 1.0 / (1.0 + math.exp(-max(-25.0, min(25.0, logit))))
@@ -143,16 +184,29 @@ def artifact_path(league):
     return Path(settings.parquet_dir) / "models" / f"{league}_{VERSION}.json"
 
 
-def load_model(league):
-    try:
-        body = artifact_path(league).read_bytes()
-        model = json.loads(body)
-        if model.get("features") != FEATURES or not model.get("research_approved"):
-            return None
-        model["artifact_sha256"] = hashlib.sha256(body).hexdigest()
-        return model
-    except (OSError, ValueError):
-        return None
+def load_model(league, prefer_enriched=True, research_candidate=False):
+    from spe.models.player_td.nflverse_context import NFL_EXTRA_FEATURES
+    paths = [artifact_path(league)]
+    if league == "nfl" and prefer_enriched:
+        paths.insert(0, Path(settings.parquet_dir) / "models" / f"nfl_{NFL_VERSION}.json")
+    for path in paths:
+        # Local checkouts and existing Docker data volumes may not contain the
+        # newly shipped weights. A present custom artifact remains authoritative.
+        if not path.exists():
+            path = BUNDLED_MODEL_DIR / path.name
+        try:
+            body = path.read_bytes()
+            model = json.loads(body)
+            expected = FEATURES + NFL_EXTRA_FEATURES if model.get("version") == NFL_VERSION else FEATURES
+            if model.get("features") != expected or not model.get("research_approved"):
+                continue
+            if model.get("version") == NFL_VERSION and not research_candidate and not model.get("live_enabled", False):
+                continue
+            model["artifact_sha256"] = hashlib.sha256(body).hexdigest()
+            return model
+        except (OSError, ValueError):
+            continue
+    return None
 
 
 def explain(f, league):
@@ -163,7 +217,12 @@ def explain(f, league):
             reasons.append(f"{f['goal_line_share']:.0%} of the team's measured carries inside the five.")
     reasons.append(f"Team scoring: {f['team_rush_td'] + f['team_rec_td']:.1f} offensive TDs per game recently.")
     reasons.append(f"Opponent has allowed {f['opp_position_td']:.1f} TDs per game to this position over {int(f['opponent_games'])} games.")
-    risks = ["Route participation, end-zone targets, and coverage splits are unavailable."]
+    risks = ["Complete routes run, film-charted end-zone targets, and current coverage splits are unavailable."]
+    if league == "nfl":
+        from spe.models.player_td.nflverse_context import context_explanations
+        extra_reasons, extra_risks = context_explanations(f)
+        reasons.extend(extra_reasons)
+        risks.extend(extra_risks)
     if league == "fbs" or not f["charting_known"]:
         risks.append("Goal-line and red-zone player opportunities are unavailable.")
     if f["carry_trend"] < -3 or f["receiving_trend"] < -1:

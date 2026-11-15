@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LockedCall } from "@/components/LockedCall";
 import { ParlayBoard } from "@/components/ParlayBoard";
 import type { ParlayCard } from "@/lib/api";
 
@@ -54,6 +55,14 @@ export function TodayTickets({
   }
   if (!card) {
     return <p className="text-sm text-mute">Building the tickets for this day.</p>;
+  }
+  if (card.locked) {
+    return (
+      <LockedCall
+        title="The tickets are locked"
+        detail="They open when the games kick off. Subscribers see them now — $19.99 a month."
+      />
+    );
   }
   if (card.tickets.length === 0) {
     return (

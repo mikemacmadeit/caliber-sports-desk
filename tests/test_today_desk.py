@@ -80,6 +80,24 @@ def test_accuracy_scores_real_frozen_probabilities():
     assert calibration_summary([])["brier_score"] is None
 
 
+def test_cards_carry_club_colors_and_logos():
+    chiefs = {
+        "location": "Kansas City", "nick": "Chiefs", "primary": "#E31837",
+        "secondary": "#FFB81C", "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/kc.png",
+    }
+    bills = {"primary": "#00338D", "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/buf.png", "extra": "nope"}
+    original = row(team="KC", opponent="BUF", away_abbr="BUF", home_abbr="KC")
+    original.update(team_mark=chiefs, opponent_mark=bills, away_mark=bills, home_mark=chiefs)
+    card = build([original], now=NOW)["rows"][0]
+    assert card["team_mark"] == chiefs
+    assert card["opponent_mark"] == {"primary": "#00338D", "logo": bills["logo"]}
+    assert card["away_abbr"] == "BUF" and card["home_abbr"] == "KC"
+    assert card["home_mark"]["nick"] == "Chiefs"
+    blank = row()
+    blank["team_mark"] = {"primary": "  "}
+    assert build([blank], now=NOW)["rows"][0]["team_mark"] is None
+
+
 def test_desk_route_reads_only_snapshots_and_removes_canceled_games(db):
     from app.main import app
     from app.deps import db_session
@@ -103,6 +121,11 @@ def test_desk_route_reads_only_snapshots_and_removes_canceled_games(db):
             write_entry(market, "nfl", date, [original] if market == "rushing_yards" else [])
         result = client.get(f"/v1/desk?date={date}&league=nfl").json()
         assert result["total"] == 1 and result["status"] == "ready"
+        assert result["rows"][0]["team_mark"]["logo"].endswith("/a.png")
+        assert result["rows"][0]["opponent_mark"]["logo"].endswith("/b.png")
+        assert result["rows"][0]["home_abbr"] == "A" and result["rows"][0]["away_abbr"] == "B"
+        assert result["games"][0]["home_mark"]["logo"].endswith("/a.png")
+        assert result["games"][0]["away_mark"]["logo"].endswith("/b.png")
         assert client.get("/v1/desk?date=garbage").status_code == 422
         assert client.get("/v1/desk?league=invalid").status_code == 422
         game.status = "canceled"
@@ -170,3 +193,15 @@ def test_batch_latest_forecast_and_best_fresh_book(db):
         assert forecast.forecast_id == "f0"
         assert tick.tick_id == "t1"
         assert forecast_payload(db, forecast, tick)["book_price"] == 110
+
+
+def test_empty_market_is_distinguished_from_a_sportsbook_filter_miss():
+    td = row(market_id='anytime_td', side='yes', line=None)
+    filtered = build([td, td], now=NOW, market='anytime_td', book='Unavailable book')
+    assert filtered['total'] == 0
+    assert filtered['market_counts']['anytime_td'] == 1
+    missing = build([row()], now=NOW, market='anytime_td')
+    assert missing['total'] == 0
+    assert missing['market_counts']['anytime_td'] == 0
+    assert missing['market_counts']['rushing_yards'] == 1
+    assert build([td], now=NOW+timedelta(hours=2))['market_counts']['anytime_td'] == 0

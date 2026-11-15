@@ -22,6 +22,7 @@ ENV APP_ENV=prod
 # Model weights + research/ATS board caches so cloud serves like local.
 # Fresh DB rows still come from Postgres; these files are the trained artifacts.
 COPY deploy/runtime-data/parquet /data/parquet
+COPY deploy/runtime-data/parquet/models/*desk_opportunity*.json /app/deploy/runtime-data/parquet/models/
 COPY deploy/runtime-data/research /data/research
 COPY deploy/runtime-data/cache /data/cache
 RUN mkdir -p /data/parquet /data/research /data/cache

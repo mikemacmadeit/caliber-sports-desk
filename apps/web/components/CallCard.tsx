@@ -1,19 +1,48 @@
 import Link from "next/link";
 import { MarginBar } from "@/components/MarginBar";
+import { LockedCall } from "@/components/LockedCall";
 import { TeamMark } from "@/components/TeamMark";
 import type { AtsRow } from "@/components/AtsBoard";
 import { pickTickets, type CallFacts, type PickTicket, type PickTickets } from "@/lib/calls";
 import { kickoffParts } from "@/lib/format";
-import { clubFromName } from "@/lib/teams";
+import { presentTeam } from "@/lib/teams";
 
 export function CallCard({ row }: { row: AtsRow }) {
   const settled = row.game_status === "final";
   const live = row.game_status === "in_progress";
   const tickets = pickTickets(row);
-  const away = clubFromName(row.away_team);
-  const home = clubFromName(row.home_team);
+  const away = presentTeam({
+    abbreviation: row.away_abbr || row.away_team,
+    name: row.away_team,
+    mark: row.away_mark,
+  });
+  const home = presentTeam({
+    abbreviation: row.home_abbr || row.home_team,
+    name: row.home_team,
+    mark: row.home_mark,
+  });
   const when = kickoffParts(row.kickoff_utc);
   const book = bookName(row.sportsbook);
+
+  if (row.locked) {
+    return (
+      <Link href={`/games/${row.game_id}`} className="plate group block overflow-hidden px-4 py-4 sm:px-5">
+        <span aria-hidden className="absolute bottom-0 left-0 top-0 w-1.5" style={{ background: away.primary }} />
+        <span aria-hidden className="absolute bottom-0 right-0 top-0 w-1.5" style={{ background: home.primary }} />
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-mute">
+          <span className="text-gold">{row.league_id}</span>
+          {` · ${when.time}`}
+        </p>
+        <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+          <TeamMark team={away} size="sm" />
+          <TeamLine name={row.away_team} record={row.away_record} score={null} marks={[]} />
+          <TeamMark team={home} size="sm" />
+          <TeamLine name={row.home_team} record={row.home_record} score={null} marks={[]} />
+        </div>
+        <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.16em] text-gold">Call locked until kickoff</p>
+      </Link>
+    );
+  }
 
   return (
     <Link href={`/games/${row.game_id}`} className="plate group block overflow-hidden px-4 py-4 sm:px-5">
@@ -56,7 +85,8 @@ export function CallCard({ row }: { row: AtsRow }) {
   );
 }
 
-export function PickPair({ row }: { row: CallFacts }) {
+export function PickPair({ row }: { row: CallFacts & { locked?: boolean } }) {
+  if (row.locked) return <LockedCall />;
   return <PickPairView tickets={pickTickets(row)} />;
 }
 

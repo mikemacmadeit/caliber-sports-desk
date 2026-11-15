@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DayStrip, EmptyDay } from "@/components/DayStrip";
 import { LeagueToggle } from "@/components/LeagueToggle";
 import { PageHeader } from "@/components/PageHeader";
+import { DeskRecord, PropDesk, type PropDeskCall } from "@/components/PropDesk";
 import { PropExplorer } from "@/components/PropExplorer";
 import { TodayPropPicks } from "@/components/TodayPropPicks";
 import { apiGet, type PropRow } from "@/lib/api";
@@ -43,6 +44,19 @@ export default async function PropsPage({
 
   const next = days?.dates.find((d) => d > selected) ?? null;
   const rows = data?.rows ?? [];
+  let deskCalls: PropDeskCall[] = [];
+  let deskLocked = false;
+  let deskError: string | null = null;
+  try {
+    const desk = await apiGet<{ calls?: PropDeskCall[]; locked?: boolean }>(
+      `/v1/props/desk?league=${league}&date=${selected}`,
+      45000,
+    );
+    deskCalls = desk.calls ?? [];
+    deskLocked = Boolean(desk.locked);
+  } catch (e) {
+    deskError = e instanceof Error ? e.message : "desk picks unavailable";
+  }
 
   return (
     <div className="space-y-8">
@@ -54,7 +68,7 @@ export default async function PropsPage({
             : dayParts(selected).monthDay
         }
         title="Props"
-        lede="The calls for this day sit first, one per market per game. The board under them is every priced line."
+        lede="One prop per game, and only when that team is favored by a touchdown or more. The strongest chance under 90%. The board under it is every priced line."
         action={
           <LeagueToggle
             value={league}
@@ -82,7 +96,26 @@ export default async function PropsPage({
           <p className="mt-1">Refresh after the API is back — this page no longer hard-crashes on a timeout.</p>
         </div>
       )}
-      <TodayPropPicks league={league} date={selected} market={market} />
+      {deskCalls.length > 0 ? <DeskRecord calls={deskCalls} /> : null}
+      <section className="space-y-3">
+        <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Desk picks</h2>
+        {deskError ? (
+          <p className="text-sm text-mute">The desk’s prop picks did not load.</p>
+        ) : deskCalls.length > 0 ? (
+          <PropDesk calls={deskCalls} />
+        ) : (
+          <div className="plate px-6 py-8">
+            <p className="font-display text-4xl uppercase leading-none">No prop call for this day</p>
+            <p className="mt-3 max-w-xl text-sm text-mute">
+              {deskLocked
+                ? "The calls open when the games kick off."
+                : "A call is the strongest receptions, receiving, or rushing line on a team favored by a touchdown or more. Close games stay off the card."}
+            </p>
+          </div>
+        )}
+      </section>
+      <DayTally rows={rows} />
+      <TodayPropPicks league={league} date={selected} market={market} hideWhenEmpty />
       <div className="flex flex-wrap gap-2">
         {MARKETS.map((m) => (
           <a
@@ -109,7 +142,7 @@ export default async function PropsPage({
             <p className="mt-3 max-w-xl text-sm text-mute">
               {propsError
                 ? "The desk could not load this market right now. Try again in a moment."
-                : "The games are on the board. This market has no locked number for them yet — or every game has already kicked off."}
+                : "The games are on the board. This market has no locked number for them yet."}
             </p>
             <Link
               href={withQuery("/", { league, date: days && selected === days.today ? undefined : selected })}
@@ -139,4 +172,18 @@ export default async function PropsPage({
       )}
     </div>
   );
+}
+
+function DayTally({ rows }: { rows: PropRow[] }) {
+  if (!rows.length) return null;
+  const sides = rows.filter(
+    (row) => row.model_lean === true || (row.model_lean == null && row.side !== "under" && row.side !== "no"),
+  );
+  const wins = sides.filter((row) => row.result === "win").length;
+  const losses = sides.filter((row) => row.result === "loss").length;
+  const pushes = sides.filter((row) => row.result === "push").length;
+  const pending = sides.length - wins - losses - pushes - sides.filter((row) => row.result === "void").length;
+  const parts = [`${wins} wins`, `${losses} losses`, `${pending} pending`];
+  if (pushes) parts.push(`${pushes} pushes`);
+  return <p className="text-sm text-mute">Today · {parts.join(" · ")}</p>;
 }

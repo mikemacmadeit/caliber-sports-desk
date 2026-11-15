@@ -1,7 +1,7 @@
 """Player Anytime TD probabilities from team λ × opportunity shares.
 
 P(ATD) = avail_factor * (1 - exp(-λ_player)), then Platt-calibrated.
-Uncertainty from Poisson rate bands + availability mixture — not fixed ±ranges.
+Probability intervals remain unvalidated until measured on independent games.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ class PlayerTdModel:
     platt_by_pos: dict[str, list[float]]
     train_end: str
     notes: list[str] = field(default_factory=list)
+    upstream_team_model: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -100,7 +101,10 @@ def availability_factor(status: pd.Series | None, prob: pd.Series | None, n: int
     else:
         pr = np.full(n, np.nan)
     for i, s in enumerate(st):
-        if s in {"confirmed_inactive", "out", "doubtful"} and np.isfinite(pr[i]) and pr[i] <= 0.35:
+        if s in {"confirmed_inactive", "out", "inactive"}:
+            factor[i] = 0.0
+            p_active[i] = 0.0
+        elif s == "doubtful" and np.isfinite(pr[i]) and pr[i] <= 0.35:
             factor[i] = float(pr[i])
             p_active[i] = float(pr[i])
         elif s in {"expected_active", "probable"}:
@@ -125,25 +129,12 @@ def uncertainty_bands(
     p: np.ndarray,
     p_active: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Validated-style bands: Poisson ±√λ mapped through 1-exp, mixed with inactivity."""
-    lam = np.clip(np.asarray(lam, dtype=float), 1e-8, None)
-    sd = np.sqrt(lam)
-    p_hi_rate = poisson_atd_probability(lam + 1.64 * sd)
-    p_lo_rate = poisson_atd_probability(np.clip(lam - 1.64 * sd, 1e-8, None))
-    # Mixture with availability when known.
-    known = np.isfinite(p_active)
-    pa = np.where(known, p_active, 1.0)
-    p_lo = pa * p_lo_rate
-    p_hi = pa * p_hi_rate + (1.0 - pa) * 0.0
-    # Unknown availability: widen toward [0.5*p, min(1, 1.5*p)] research band.
-    p_lo = np.where(known, p_lo, np.clip(p * 0.5, 1e-4, 1.0))
-    p_hi = np.where(known, p_hi, np.clip(np.maximum(p * 1.5, p + 0.08), 1e-4, 0.999))
-    p_lo = np.minimum(p_lo, p)
-    p_hi = np.maximum(p_hi, p)
-    return p_lo, p_hi
+    """Unknown probability uncertainty; count variance is not a confidence interval."""
+    return np.zeros(len(p)), np.ones(len(p))
 
 
-def fit_player_td_model(train: pd.DataFrame, league_id: str, train_end: str, weights: ShareWeights) -> PlayerTdModel:
+def fit_player_td_model(train: pd.DataFrame, league_id: str, train_end: str, weights: ShareWeights,
+                        *, calibration: pd.DataFrame | None = None) -> PlayerTdModel:
     train = train.copy()
     if "lambda_player_td" not in train.columns:
         train["lambda_rush_td"] = train["team_lambda_rush_td"] * train["rush_td_share"]
@@ -186,17 +177,24 @@ def fit_player_td_model(train: pd.DataFrame, league_id: str, train_end: str, wei
         adjusted = apply_beta(base, z, beta)
         base = np.where(mask, adjusted, base)
 
-    p_raw = poisson_atd_probability(base)
-    a, b = platt_calibrate(p_raw, y)
+    # Never fit a calibrator on the same outcomes used for the rate model.
+    a, b = 0.0, 1.0
     platt_by_pos: dict[str, list[float]] = {}
-    for pos, part in train.groupby("position_group"):
-        idx = part.index
-        # map to positions in train order
-        mask = train["position_group"].eq(pos).to_numpy()
-        if int(mask.sum()) < 80:
-            continue
-        aa, bb = platt_calibrate(p_raw[mask], y[mask])
-        platt_by_pos[str(pos)] = [aa, bb]
+    if calibration is not None and not calibration.empty:
+        if pd.to_datetime(train["kickoff_utc"], utc=True).max() >= pd.to_datetime(calibration["kickoff_utc"], utc=True).min():
+            raise ValueError("Calibration games must be strictly after fitting games")
+        cal_base = calibration["lambda_player_td"].to_numpy(dtype=float)
+        cal_base = apply_matchup_adjustments(cal_base, calibration, feature_betas, feature_z, opp_beta)
+        factor, _ = availability_factor(calibration.get("availability_status"), calibration.get("availability_prob"), len(calibration))
+        p_raw = poisson_atd_probability(cal_base * factor)
+        y_cal = (calibration["anytime_tds"].fillna(0) > 0).to_numpy(dtype=float)
+        if len(calibration) >= 40 and len(np.unique(y_cal)) == 2:
+            a, b = platt_calibrate(p_raw, y_cal)
+            for pos in calibration["position_group"].unique():
+                mask = calibration["position_group"].eq(pos).to_numpy()
+                if int(mask.sum()) >= 80 and len(np.unique(y_cal[mask])) == 2:
+                    aa, bb = platt_calibrate(p_raw[mask], y_cal[mask])
+                    platt_by_pos[str(pos)] = [aa, bb]
 
     return PlayerTdModel(
         league_id=league_id,
@@ -215,6 +213,8 @@ def fit_player_td_model(train: pd.DataFrame, league_id: str, train_end: str, wei
             "rush_plus_rec_anytime",
             "research_only",
             "not_promoted",
+            "separate_calibration_games" if calibration is not None and not calibration.empty else "uncalibrated_no_independent_games",
+            "uncertainty_unvalidated",
             "fbs_no_invented_rz_gl" if league_id == "fbs" else "nfl_rz_gl_priors",
         ],
     )
@@ -252,17 +252,19 @@ def predict_frame(model: PlayerTdModel, frame: pd.DataFrame) -> pd.DataFrame:
     # Confirmed inactive → force near-zero after calibration.
     if status is not None:
         st = status.fillna("").astype(str).str.lower()
-        inactive = st.isin({"confirmed_inactive", "out"}) | (
-            st.eq("doubtful") & (pd.to_numeric(aprog, errors="coerce").fillna(1) <= 0.05)
+        active_prob = pd.to_numeric(aprog, errors="coerce").fillna(1) if aprog is not None else pd.Series(1.0, index=out.index)
+        inactive = st.isin({"confirmed_inactive", "out", "inactive"}) | (
+            st.eq("doubtful") & (active_prob <= 0.05)
         )
-        p = np.where(inactive.to_numpy(), np.minimum(p, 0.02), p)
-        lam = np.where(inactive.to_numpy(), np.minimum(lam, 0.02), lam)
+        p = np.where(inactive.to_numpy(), 0.0, p)
+        lam = np.where(inactive.to_numpy(), 0.0, lam)
 
     p_lo, p_hi = uncertainty_bands(lam, p, p_active)
     out["lambda_player_td_adj"] = lam
     out["p_atd"] = p
     out["p_atd_low"] = p_lo
     out["p_atd_high"] = p_hi
+    out["uncertainty_status"] = "unvalidated"
     out["p_active"] = p_active
     return out
 

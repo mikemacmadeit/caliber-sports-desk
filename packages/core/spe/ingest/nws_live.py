@@ -175,7 +175,7 @@ def ingest_nws_forecasts(
                 roof_status=roof,
                 provider=PROVIDER,
                 provider_record_id=f"nws:{game_id}:{issued.strftime('%Y%m%d%H%M')}"[:160],
-                observed_at=issued,
+                observed_at=observed,
                 effective_at=issued,
                 quality_status="nws_forecast",
             )

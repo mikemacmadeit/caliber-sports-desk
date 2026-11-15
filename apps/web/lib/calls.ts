@@ -15,6 +15,8 @@ export type CallFacts = {
   ats_team?: string | null;
   ats_line?: number | null;
   ats_cover_margin?: number | null;
+  ats_basis?: "score" | "number" | null;
+  home_handicap?: number | null;
   predicted_margin?: number | null;
   predicted_home_score?: number | null;
   predicted_away_score?: number | null;
@@ -111,17 +113,16 @@ export function pickTickets(row: CallFacts): PickTickets {
   const spreadTeam = (row.ats_team || "").trim();
   const spreadName = ticketName(spreadTeam);
   const spreadTitle = spreadName && line ? `${spreadName} ${line}` : row.ats_pick_label || "";
-  const gap = row.ats_cover_margin;
-  const quiet = gap == null || Number.isNaN(gap) || Math.abs(gap) < QUIET_COVER;
+  const numberPosted = row.home_handicap != null && !Number.isNaN(row.home_handicap);
   const spread: PickTicket = spreadTitle
     ? {
         kicker: "Spread",
         title: spreadTitle,
         detail: settled
           ? resultWord(row.ats_pick_result, "Covered", "Missed")
-          : quiet
-            ? "On the number"
-            : `Cover by ${pointsText(gap)}`,
+          : row.ats_basis === "score"
+            ? `Cover by ${pointsText(row.ats_cover_margin ?? 0)}`
+            : "With the number",
         side: row.ats_side === "home" || row.ats_side === "away" ? row.ats_side : null,
         mark: line,
         result: settled ? row.ats_pick_result : null,
@@ -129,8 +130,8 @@ export function pickTickets(row: CallFacts): PickTickets {
       }
     : {
         kicker: "Spread",
-        title: "No number",
-        detail: "Spread not posted",
+        title: numberPosted ? "No side" : "No number",
+        detail: numberPosted ? "No edge" : "Spread not posted",
         side: null,
         mark: null,
         result: null,
@@ -195,17 +196,16 @@ export function callCopy(row: CallFacts): {
     return { winSentence, coverSentence: null, loud: false, score };
   }
 
-  const gap = row.ats_cover_margin;
-  const quiet = gap == null || Number.isNaN(gap) || Math.abs(gap) < QUIET_COVER;
-  const coverSentence = quiet
-    ? `${row.ats_pick_label} is essentially the model's score.`
-    : `${row.ats_pick_label}, projected to cover by ${pointsText(gap)}.`;
+  const coverSentence =
+    row.ats_basis === "score"
+      ? `${row.ats_pick_label}, our score has them past the number.`
+      : `${row.ats_pick_label}, with the number.`;
   const winSide = row.predicted_margin == null ? null : row.predicted_margin >= 0 ? "home" : "away";
   const split = winSide != null && row.ats_side != null && winSide !== row.ats_side;
   return {
     winSentence,
     coverSentence: split ? `${coverSentence} The win and the number name different teams.` : coverSentence,
-    loud: !quiet,
+    loud: true,
     score,
   };
 }

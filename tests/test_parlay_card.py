@@ -360,6 +360,55 @@ def test_spread_tickets_use_the_model_side_and_skip_a_started_game():
     assert all("Cincinnati" not in leg["player_name"] for ticket in card["tickets"] for leg in ticket["legs"])
 
 
+def test_posted_card_keeps_started_games_and_the_last_price():
+    now = datetime(2026, 11, 14, 23, 0, tzinfo=UTC)
+    rows = [
+        _row(
+            outcome_id="started",
+            player_name="Already Going",
+            kickoff_utc="2026-11-14T18:00:00+00:00",
+            book_price=-140,
+            price_freshness={"status": "stale", "is_current_opportunity": False, "age_minutes": 700},
+            forecast={"p_estimate": 0.62, "ev_after_haircut": None, "availability_status": "unknown"},
+        ),
+        _row(
+            outcome_id="other",
+            game_id="g2",
+            player_id="p2",
+            player_name="Also Going",
+            kickoff_utc="2026-11-14T21:00:00+00:00",
+            book_price=160,
+            price_freshness={"status": "stale", "is_current_opportunity": False, "age_minutes": 700},
+            forecast={"p_estimate": 0.40, "availability_status": "unknown"},
+        ),
+        _row(
+            outcome_id="out",
+            game_id="g3",
+            player_id="p3",
+            player_name="A.J. Brown",
+            kickoff_utc="2026-11-14T18:00:00+00:00",
+            book_price=-120,
+            price_freshness={"status": "stale", "is_current_opportunity": False, "age_minutes": 700},
+            forecast={"p_estimate": 0.55, "availability_status": "out"},
+        ),
+    ]
+    spreads = [
+        _spread("nfl:2026_09_CIN_ATL", "2026-11-14T17:00:00+00:00", "Cincinnati Bengals", "Atlanta Falcons"),
+        _spread("nfl:2026_09_DEN_CAR", "2026-11-14T18:00:00+00:00", "Denver Broncos", "Carolina Panthers"),
+    ]
+    spreads[0]["game_status"] = "final"
+    spreads[1]["game_status"] = "in_progress"
+    live = build_parlay_card(rows, spreads=spreads, now=now)
+    posted = build_parlay_card(rows, spreads=spreads, now=now, posted=True)
+    assert live["tickets"] == []
+    names = [leg["player_name"] for ticket in posted["tickets"] for leg in ticket["legs"]]
+    assert "Already Going" in names
+    assert "Also Going" in names
+    assert "A.J. Brown" not in names
+    assert "Cincinnati Bengals" in names
+    assert "Denver Broncos" in names
+
+
 def _spread(game_id, kickoff, away, home, *, chance=0.54, withheld=False):
     return {
         "game_id": game_id,

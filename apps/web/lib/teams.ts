@@ -66,23 +66,29 @@ export type TeamMarkInfo = {
   logo?: string | null;
 };
 
-/** Known clubs keep their palette. Everyone else uses the schedule mark. */
+/** A schedule mark carries the school's real colors and logo. The short list is only a fallback. */
 export function presentTeam(team: {
   abbreviation: string;
   name?: string;
   mark?: TeamMarkInfo | null;
 }): Club {
-  const known = CLUBS[(team.abbreviation || "").toUpperCase()];
-  if (known) return known;
   const base = club(team.abbreviation);
+  const known = CLUBS[(team.abbreviation || "").toUpperCase()];
   const mark = team.mark;
+  if (mark?.logo || mark?.primary) {
+    return {
+      abbr: base.abbr,
+      city: mark.location || team.name || known?.city || base.city,
+      nick: mark.nick || known?.nick || base.nick,
+      primary: mark.primary || known?.primary || base.primary,
+      secondary: mark.secondary || known?.secondary || base.secondary,
+      logo: mark.logo || known?.logo || base.logo,
+    };
+  }
+  if (known) return known;
   return {
-    abbr: base.abbr,
-    city: mark?.location || team.name || base.city,
-    nick: mark?.nick || base.nick,
-    primary: mark?.primary || base.primary,
-    secondary: mark?.secondary || base.secondary,
-    logo: mark?.logo || base.logo,
+    ...base,
+    city: team.name || base.city,
   };
 }
 

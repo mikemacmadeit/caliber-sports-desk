@@ -23,6 +23,7 @@ RELEASES = {
     "ngs_receiving": ("nextgen_stats", "ngs_receiving.parquet"),
     "roster_weekly": ("weekly_rosters", "roster_weekly_{season}.parquet"),
     "depth_charts": ("depth_charts", "depth_charts_{season}.parquet"),
+    "snap_counts": ("snap_counts", "snap_counts_{season}.parquet"),
 }
 
 

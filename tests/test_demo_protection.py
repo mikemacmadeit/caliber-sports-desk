@@ -158,6 +158,44 @@ def test_slate_hides_historical_games(db):
     assert {g.game_id for g in all_games} == {"nfl:2023_01_AAA_BBB"}
 
 
+def test_dated_slate_keeps_that_days_finals(db):
+    _seed_demo_and_historical(db)
+    kick = datetime(2026, 11, 14, 17, tzinfo=UTC)
+    db.add(
+        Game(
+            game_id="espn:nfl:finished-today",
+            season_id="nfl-2023",
+            league_id="nfl",
+            home_team_id="nfl:AAA",
+            away_team_id="nfl:BBB",
+            kickoff_utc=kick,
+            venue_id="v1",
+            data_tier="historical",
+            status="final",
+            home_score=24,
+            away_score=17,
+        )
+    )
+    db.add(
+        Game(
+            game_id="espn:nfl:called-off",
+            season_id="nfl-2023",
+            league_id="nfl",
+            home_team_id="nfl:AAA",
+            away_team_id="nfl:BBB",
+            kickoff_utc=kick,
+            venue_id="v1",
+            data_tier="historical",
+            status="canceled",
+        )
+    )
+    db.commit()
+    assert games_for_slate(db, None, "nfl") == []
+    kept = games_for_slate(db, "2026-11-14", "nfl", keep_finished=True)
+    assert [g.game_id for g in kept] == ["espn:nfl:finished-today"]
+    assert games_for_slate(db, "2023-09-10", "nfl") == []
+
+
 def test_slate_hides_espn_copy_of_the_same_game(db):
     _seed_demo_and_historical(db)
     kick = datetime(2026, 11, 8, 18, tzinfo=UTC)

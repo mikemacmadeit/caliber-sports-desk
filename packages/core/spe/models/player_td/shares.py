@@ -135,14 +135,12 @@ def normalize_shares(
         mask = keys == key
         vals = raw[mask]
         if not np.any(vals > 0):
-            # Uniform among skill players when no usage history.
-            n = int(mask.sum())
-            out[mask] = (1.0 - other) / max(n, 1)
+            # Unknown role is unallocated, not equal invented workload.
             continue
         # Numerical stable softmax
         z = sharp * np.log1p(vals)
         z = z - np.max(z)
-        ex = np.exp(z)
+        ex = np.where(vals > 0, np.exp(z), 0.0)
         shares = ex / ex.sum()
         out[mask] = shares * (1.0 - other)
     return out
@@ -152,19 +150,19 @@ def attach_shares(frame: pd.DataFrame, weights: ShareWeights) -> pd.DataFrame:
     out = frame.copy()
     rush_raw = raw_rush_scores(out, weights)
     rec_raw = raw_rec_scores(out, weights)
+    inactive = out.get("availability_status", pd.Series("unknown", index=out.index)).fillna("").astype(str).str.lower().isin({"out", "confirmed_inactive", "inactive"}).to_numpy()
+    rush_raw[inactive] = 0.0
+    rec_raw[inactive] = 0.0
+    qb = out["position_group"].astype(str).eq("QB").to_numpy()
+    rec_raw[qb & (_col(out, "prior_receptions") <= 0.05)] = 0.0
     out["rush_td_share"] = normalize_shares(
         out, rush_raw, other_share=weights.other_share, sharpness=weights.sharpness
     )
     out["rec_td_share"] = normalize_shares(
         out, rec_raw, other_share=weights.other_share, sharpness=weights.sharpness
     )
-    # QB cannot claim receiving TDs from thrown passes — already tiny; clamp pass share for pure pocket QBs with no rec history.
-    qb = out["position_group"].astype(str).eq("QB")
-    rec_hist = _col(out, "prior_receptions")
-    out.loc[qb & (rec_hist <= 0.05), "rec_td_share"] = 0.0
-    # Re-normalize rec shares after QB clamp.
-    if qb.any():
-        out["rec_td_share"] = _renorm_column(out, "rec_td_share", weights.other_share)
+    # Inactive teammates are removed before normalization, reallocating only
+    # among remaining players with measured or explicitly modeled workload.
     out["other_td_share_residual"] = weights.other_share
     return out
 

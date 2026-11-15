@@ -106,19 +106,55 @@ def test_overlay_blends_v1_and_c_recent(tmp_path: Path, monkeypatch) -> None:
         market_id="anytime_td",
     )
     assert out is not None
-    assert abs(float(out["p_estimate"]) - (0.55 * 0.50 + 0.45 * 0.40)) < 1e-9
+    assert abs(float(out["p_estimate"]) - (0.60 * 0.50 + 0.40 * 0.40)) < 1e-9
     assert out["model_version"] == "fbs_research_blend_v1_c_recent"
 
 
-def test_overlay_hides_m3_clone_without_research() -> None:
+def test_overlay_hides_m3_clone_when_the_game_has_research(tmp_path: Path, monkeypatch) -> None:
+    finder = {
+        "games": [
+            {
+                "league_id": "fbs",
+                "game_id": "espn:fbs:g1",
+                "players": [
+                    {
+                        "player_id": "fbs:a",
+                        "probabilities": {"primary_research": 0.41, "c_recent": 0.41},
+                        "model_source": {"locked_version": "fbs_m5_c_recent_locked_v1"},
+                    }
+                ],
+            }
+        ]
+    }
+    path = tmp_path / "anytime_td_finder.json"
+    path.write_text(json.dumps(finder), encoding="utf-8")
+    monkeypatch.setattr("spe.research.fbs_atd_props_overlay.finder_payload_path", lambda: path)
+    import spe.research.fbs_atd_props_overlay as mod
+
+    mod._CACHE.update({"mtime": None, "loaded_at": 0.0, "index": {}})
     m3 = {"model_version": "m3-fbs-anytime_td", "p_estimate": 0.419, "reason_codes": []}
     assert is_m3_team_clone_forecast(m3)
     assert (
         apply_fbs_atd_research_overlay(
-            m3, game_id="espn:fbs:missing", player_id="fbs:x", league_id="fbs", market_id="anytime_td"
+            dict(m3), game_id="espn:fbs:g1", player_id="fbs:x", league_id="fbs", market_id="anytime_td"
         )
         is None
     )
+
+
+def test_overlay_keeps_a_priced_row_when_the_game_has_no_research(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "anytime_td_finder.json"
+    path.write_text(json.dumps({"games": []}), encoding="utf-8")
+    monkeypatch.setattr("spe.research.fbs_atd_props_overlay.finder_payload_path", lambda: path)
+    import spe.research.fbs_atd_props_overlay as mod
+
+    mod._CACHE.update({"mtime": None, "loaded_at": 0.0, "index": {}})
+    m3 = {"model_version": "m3-fbs-anytime_td", "p_estimate": 0.419, "reason_codes": []}
+    out = apply_fbs_atd_research_overlay(
+        m3, game_id="espn:fbs:missing", player_id="fbs:x", league_id="fbs", market_id="anytime_td"
+    )
+    assert out is not None
+    assert out["p_estimate"] == 0.419
 
 
 def test_predict_row_blocks_anytime_td_team_clone() -> None:

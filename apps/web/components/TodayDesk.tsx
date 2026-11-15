@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type DeskCard, type DeskData, type SavedSelection, odds, pct, isCurrent, isOpen, priceCheck } from "@/lib/desk";
+import { TeamMark } from "@/components/TeamMark";
+import { type DeskCard, type DeskData, type DeskGame, type SavedSelection, odds, pct, isCurrent, isOpen, priceCheck } from "@/lib/desk";
+import { presentTeam, type Club } from "@/lib/teams";
 
 const STORAGE = "caliber.desk.v1";
 const MARKETS = [["", "All props"], ["anytime_td", "Anytime TD"], ["receptions", "Receptions"], ["receiving_yards", "Receiving yards"], ["rushing_yards", "Rushing yards"]];
@@ -76,6 +78,11 @@ export function TodayDesk({ initial, league, date }: { initial: DeskData | null;
     document.addEventListener("visibilitychange", visible);
     return () => { clearInterval(poll); document.removeEventListener("visibilitychange", visible); };
   }, [refresh]);
+  useEffect(() => {
+    if (data?.refresh_status !== "running" || loading) return;
+    const timer = setTimeout(refresh, 1500);
+    return () => clearTimeout(timer);
+  }, [data, loading, refresh]);
   useEffect(() => { setPage(0); setCheck(null); }, [league, date]);
 
   function toggleSave(row: DeskCard) {
@@ -84,6 +91,7 @@ export function TodayDesk({ initial, league, date }: { initial: DeskData | null;
     setSaved(current => exists ? current.filter(s => s.id !== row.id) : [...current, {
       id: row.id, player: row.player, pick: row.pick, kickoff: row.kickoff, book: row.book,
       price: row.price, game_id: row.game_id, saved_at: new Date().toISOString(),
+      team: row.team, team_mark: row.team_mark ?? null,
     }]);
     setAnnouncement(exists ? `${row.player} removed from saved research.` : `${row.player} saved on this device.`);
   }
@@ -92,6 +100,8 @@ export function TodayDesk({ initial, league, date }: { initial: DeskData | null;
   const currentCheck = check && data?.rows.find(r => r.id === check.id && r.book === check.book);
   const checked = currentCheck && now ? priceCheck(currentCheck, enteredPrice, now) : null;
   const shownBooks = data?.books || initial?.books || [];
+  const missingMarket = !!market && data?.market_counts?.[market] === 0;
+  const marketName = MARKETS.find(([id]) => id === market)?.[1] || "This market";
   const sameGame = Object.values(saved.reduce<Record<string, number>>((acc, r) => { acc[r.game_id] = (acc[r.game_id] || 0) + 1; return acc; }, {})).some(n => n > 1);
 
   return <div className="space-y-6">
@@ -120,19 +130,37 @@ export function TodayDesk({ initial, league, date }: { initial: DeskData | null;
     {storageError && <p role="alert" className="text-sm text-amber-300">This browser could not store your preferences. Saved research may be lost when you leave.</p>}
     {tab === "saved" && <div className="space-y-3"><p className="text-xs text-mute">Saved on this device. Live matches use the selected date and filters. Updates appear here while the page is open.</p>
       {sameGame && <p className="border-l-2 border-amber-300 pl-3 text-sm text-amber-200">You saved multiple selections from the same game. Their outcomes can be related; individual probabilities do not establish a parlay’s chance of winning.</p>}
-      {saved.length > 0 && <details className="text-sm"><summary className="cursor-pointer text-mute">All saved research · including other dates</summary><ul className="mt-3 divide-y divide-white/10">{saved.map(s => <li key={s.id} className="flex items-center justify-between gap-3 py-3"><div><p>{s.player} · {s.pick}</p><p className="mt-1 text-xs text-mute">{time(s.kickoff)} · Saved at {s.book} {odds(s.price)} · Historical bookmark</p></div><button aria-label={`Remove saved ${s.player}`} className="min-h-11 px-3 text-mute" onClick={() => setSaved(v => v.filter(r => r.id !== s.id))}>Remove</button></li>)}</ul></details>}
+      {saved.length > 0 && <details className="text-sm"><summary className="cursor-pointer text-mute">All saved research · including other dates</summary><ul className="mt-3 divide-y divide-white/10">{saved.map(s => {
+        const club = s.team ? presentTeam({ abbreviation: s.team, mark: s.team_mark }) : null;
+        return <li key={s.id} className="flex items-center justify-between gap-3 py-3"><div className="flex min-w-0 items-center gap-3">{club ? <TeamMark team={club} size="sm" /> : null}<div className="min-w-0"><p className="truncate">{s.player} · {s.pick}</p>{club ? <p className="mt-1"><ClubChip club={club} /></p> : null}<p className="mt-1 text-xs text-mute">{time(s.kickoff)} · Saved at {s.book} {odds(s.price)} · Historical bookmark</p></div></div><button aria-label={`Remove saved ${s.player}`} className="min-h-11 px-3 text-mute" onClick={() => setSaved(v => v.filter(r => r.id !== s.id))}>Remove</button></li>;
+      })}</ul></details>}
     </div>}
     {error && !loading && <div role="alert" className="plate p-6"><p>We couldn’t verify this board. Current opportunities are paused.</p><button className="mt-3 text-gold" onClick={refresh}>Try again →</button></div>}
     {loading && !data && <div aria-label="Loading research" className="grid gap-4 md:grid-cols-2">{[0, 1].map(n => <div key={n} className="plate h-64 animate-pulse p-6"><div className="h-5 w-2/3 bg-white/5" /><div className="mt-5 h-20 bg-white/5" /></div>)}</div>}
-    {!loading && !error && data && rows.length === 0 && <div className="plate space-y-3 p-7"><h3 className="font-display text-3xl uppercase">{tab === "saved" ? "No saved matches on this board" : data.games.length ? "Research is being prepared" : "No upcoming games on this date"}</h3><p className="max-w-xl text-sm text-mute">{tab === "saved" ? "Save a selection from the research board, or change the date and filters to find your bookmarks." : book || market || query ? "No selections match these filters. Try another sportsbook, market, or player." : data.games.length ? "The schedule is available below. Detailed selections appear after their data has been checked." : "Choose another date above to explore the next slate."}</p>{(book || market || query) && <button className="text-sm text-gold" onClick={() => { setBook(""); setMarket(""); setSearch(""); setQuery(""); setPage(0); }}>Clear filters →</button>}</div>}
+    {!loading && !error && data && rows.length === 0 && <div className="plate space-y-3 p-7">
+      <h3 className="font-display text-3xl uppercase">{tab === "saved" ? "No saved matches on this board" : !data.games.length ? "No upcoming games on this date" : missingMarket ? `${marketName} research is unavailable` : "No matching research available"}</h3>
+      <p className="max-w-xl text-sm text-mute">{tab === "saved" ? "Save a selection from the research board, or change the date and filters to find your bookmarks." : !data.games.length ? "Choose another date above to explore the next slate." : data.refresh_status === "running" ? "Updating player research from the available data. This board will update automatically." : data.refresh_status === "failed" ? "Research could not update. Try refreshing again; your filters are not the cause." : missingMarket ? `The feed returned no ${marketName} player research for this date. Sportsbook and player filters are not hiding it. Try another date or check back after an update.` : book || market || query ? "No published research matches this date and filter combination." : "The schedule is available below, but no player research is currently published for this date."}</p>
+      {(book || market || query) && !missingMarket && <button className="text-sm text-gold" onClick={() => { setBook(""); setMarket(""); setSearch(""); setQuery(""); setPage(0); }}>Clear filters →</button>}
+    </div>}
     {!loading && !error && data && data.qualified === 0 && rows.length > 0 && <details className="border-l-2 border-amber-300 bg-amber-300/5 px-4 py-3"><summary className="cursor-pointer text-sm text-amber-200">Research is available. No selection currently clears every check.</summary><ul className="mt-3 space-y-2 text-sm text-mute">{data.blockers.map(b => <li key={b.reason}>{b.reason} <span className="text-paper">({b.count})</span></li>)}</ul></details>}
     {!error && <div className="grid items-start gap-4 xl:grid-cols-2">{rows.map(row => {
       const fresh = now > 0 && isCurrent(row, now);
       const eligible = fresh && row.qualification.eligible;
       const savedHere = saved.some(s => s.id === row.id);
+      const clubs = clubsFor(row);
       return <article key={row.id} className={`desk-card plate overflow-hidden ${eligible ? "border-gold/30" : ""}`}>
-        <div className="flex items-center justify-between gap-2 border-b border-white/10 px-5 py-3"><p className="font-mono text-[10px] uppercase tracking-wider text-mute">{row.league.toUpperCase()} · {row.matchup}</p><span className={`text-[11px] ${eligible ? "text-gold" : "text-mute"}`}>{eligible ? "Meets research checks" : fresh ? "Research only" : "Price check needed"}</span></div>
-        <div className="p-5"><p className="text-xs text-mute">{time(row.kickoff)}</p><div className="mt-3 flex items-start justify-between gap-4"><div><Link href={`/games/${encodeURIComponent(row.game_id)}`} className="font-display text-3xl uppercase leading-none hover:text-gold">{row.player}</Link><p className="mt-2 text-sm text-paper/90">{row.pick}</p><p className="mt-1 text-xs text-mute">{row.team} vs {row.opponent}</p></div><div className="text-right"><p className={`font-mono text-2xl ${fresh ? "text-gold" : "text-mute"}`}>{odds(row.price)}</p><p className="mt-1 max-w-28 text-xs text-mute">{row.book || "No book"}</p></div></div>
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ background: clubs.player.primary }} />
+        <span aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(100deg, ${wash(clubs.player.primary)} 0%, transparent 48%)` }} />
+        <div className="relative flex items-center justify-between gap-2 border-b border-white/10 px-5 py-3">
+          <p className="flex min-w-0 flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-mute">
+            <ClubChip club={clubs.away} />
+            <span>at</span>
+            <ClubChip club={clubs.home} />
+            <span className="truncate">{row.league.toUpperCase()}</span>
+          </p>
+          <span className={`shrink-0 text-[11px] ${eligible ? "text-gold" : "text-mute"}`}>{eligible ? "Meets research checks" : fresh ? "Research only" : "Price check needed"}</span>
+        </div>
+        <div className="relative p-5"><p className="text-xs text-mute">{time(row.kickoff)}</p><div className="mt-3 flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-3"><TeamMark team={clubs.player} size="md" /><div className="min-w-0"><Link href={`/games/${encodeURIComponent(row.game_id)}`} className="font-display text-3xl uppercase leading-none hover:text-gold">{row.player}</Link><p className="mt-2 text-sm text-paper/90">{row.pick}</p></div></div><div className="text-right"><p className={`font-mono text-2xl ${fresh ? "text-gold" : "text-mute"}`}>{odds(row.price)}</p><p className="mt-1 max-w-28 text-xs text-mute">{row.book || "No book"}</p></div></div>
         <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 border-y border-white/10 py-4"><SmallStat label="Model estimate" value={pct(row.probability)} /><SmallStat label="Price break-even" value={pct(row.break_even)} /><SmallStat label="Minimum price" value={eligible ? odds(row.qualification.minimum_american_odds) : "—"} /></div>
         <p className="mt-2 text-[11px] text-mute">Experimental estimates · minimum price applies only while all checks pass.</p>
         {row.changes.length > 0 && <div className="mt-4 border-l-2 border-signal bg-signal/5 px-3 py-2"><p className="text-xs font-medium text-signal">What changed</p>{row.changes.map(c => <p key={`${c.kind}-${c.at}`} className="mt-1 text-xs text-paper/80">{c.kind === "probability" ? `Model estimate ${pct(Number(c.before))} → ${pct(Number(c.after))}` : c.kind === "price" ? `${c.bookmaker} ${odds(Number(c.before))} → ${odds(Number(c.after))}` : `Availability ${c.before} → ${c.after}`} <span className="text-mute">· {time(c.at)}</span></p>)}</div>}
@@ -143,9 +171,51 @@ export function TodayDesk({ initial, league, date }: { initial: DeskData | null;
         </div></article>;
     })}</div>}
     {!loading && data && data.total > 30 && <nav aria-label="Research pages" className="flex items-center justify-between"><button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="min-h-11 px-3 text-gold disabled:opacity-30">← Previous</button><p className="text-xs text-mute">{page * 30 + 1}–{Math.min((page + 1) * 30, data.total)} of {data.total}</p><button disabled={(page + 1) * 30 >= data.total} onClick={() => setPage(p => p + 1)} className="min-h-11 px-3 text-gold disabled:opacity-30">Next →</button></nav>}
-    {data && data.games.length > 0 && <section className="border-t border-white/10 pt-6"><h2 className="font-display text-3xl uppercase">Upcoming on this slate</h2><div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{data.games.map(g => <Link key={g.id} href={`/games/${encodeURIComponent(g.id)}`} className="flex items-center justify-between gap-3 border border-white/10 p-4 text-sm hover:border-gold/40"><span>{g.matchup}<span className="mt-1 block text-xs text-mute">{g.league.toUpperCase()} · {time(g.kickoff)}</span></span><span className="text-gold">↗</span></Link>)}</div></section>}
+    {data && data.games.length > 0 && <section className="border-t border-white/10 pt-6"><h2 className="font-display text-3xl uppercase">Upcoming on this slate</h2><div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{data.games.map(g => {
+      const { away, home } = gameClubs(g);
+      return <Link key={g.id} href={`/games/${encodeURIComponent(g.id)}`} className="relative flex items-center gap-3 overflow-hidden border border-white/10 p-3 text-sm hover:border-gold/40">
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ background: away.primary }} />
+        <span aria-hidden className="absolute inset-y-0 right-0 w-1" style={{ background: home.primary }} />
+        <TeamMark team={away} size="sm" />
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2"><ClubChip club={away} logo={false} /><span className="font-mono text-[10px] uppercase tracking-wider text-gold">at</span><ClubChip club={home} logo={false} /></span>
+          <span className="mt-1 block text-xs text-mute">{g.league.toUpperCase()} · {time(g.kickoff)}</span>
+        </span>
+        <TeamMark team={home} size="sm" />
+      </Link>;
+    })}</div></section>}
     <p className="max-w-3xl text-xs leading-relaxed text-mute">Research estimates can be wrong. A completed data check is not proof of predictive accuracy. Prices are observed quotes and may change at the sportsbook. Saving research does not place or record a wager.</p>
   </div>;
 }
 function Metric({ label, value }: { label: string; value?: number }) { return <div><p className="font-display text-3xl text-paper md:text-4xl">{value ?? "—"}</p><p className="mt-1 max-w-20 text-[10px] uppercase tracking-wider text-mute">{label}</p></div>; }
 function SmallStat({ label, value }: { label: string; value: string }) { return <div className="px-2 first:pl-0"><p className="text-[10px] text-mute">{label}</p><p className="mt-1 font-mono text-lg">{value}</p></div>; }
+function onColor(color: string) {
+  const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return "#F4F6FB";
+  const n = Number.parseInt(match[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.64 ? "#0C1018" : "#F4F6FB";
+}
+function wash(color: string) {
+  return /^#[0-9a-f]{6}$/i.test(color.trim()) ? `${color.trim()}29` : "transparent";
+}
+function clubsFor(row: DeskCard) {
+  const [awayText, homeText] = (row.matchup || "").split(/\s+at\s+/i);
+  return {
+    player: presentTeam({ abbreviation: row.team, mark: row.team_mark }),
+    away: presentTeam({ abbreviation: row.away_abbr || awayText, mark: row.away_mark }),
+    home: presentTeam({ abbreviation: row.home_abbr || homeText, mark: row.home_mark }),
+  };
+}
+function gameClubs(game: DeskGame) {
+  const [awayText, homeText] = (game.matchup || "").split(/\s+at\s+/i);
+  return {
+    away: presentTeam({ abbreviation: game.away_abbr || awayText, mark: game.away_mark }),
+    home: presentTeam({ abbreviation: game.home_abbr || homeText, mark: game.home_mark }),
+  };
+}
+function ClubChip({ club, logo = true }: { club: Club; logo?: boolean }) {
+  return <span className={`inline-flex items-center gap-1 ${logo ? "py-0.5 pl-0.5 pr-1.5" : "px-1.5 py-1"}`} style={{ background: club.primary }}>{logo ? <TeamMark team={club} size="xs" /> : null}<span className="font-mono text-[10px] uppercase leading-none tracking-wider" style={{ color: onColor(club.primary) }}>{club.abbr}</span></span>;
+}

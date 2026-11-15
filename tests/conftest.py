@@ -16,6 +16,8 @@ def db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Session]:
     url = f"sqlite:///{tmp_path.as_posix()}/ingest.db"
     monkeypatch.setattr(settings, "database_url", url)
     monkeypatch.setattr(settings, "parquet_dir", tmp_path / "parquet")
+    monkeypatch.setattr(settings, "app_env", "test")
+    monkeypatch.setattr("spe.models.player_td.desk_opportunity.BUNDLED_MODEL_DIR", tmp_path / "bundled")
     monkeypatch.setattr(settings, "cfbd_api_key", "")
     monkeypatch.setattr(settings, "odds_api_key", "")
     sess._engine = None

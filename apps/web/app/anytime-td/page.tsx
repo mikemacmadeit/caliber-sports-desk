@@ -7,7 +7,7 @@ import { LeagueToggle } from "@/components/LeagueToggle";
 import { AnytimeTdBoard } from "@/components/AnytimeTdBoard";
 import { PageHeader } from "@/components/PageHeader";
 import { apiGet } from "@/lib/api";
-import { dayParts, type SlateDays, withQuery } from "@/lib/days";
+import { dayParts, slateToday, type SlateDays, withQuery } from "@/lib/days";
 
 export default async function AnytimeTdPage({
   searchParams,
@@ -26,8 +26,10 @@ export default async function AnytimeTdPage({
     days = null;
   }
 
-  const today = days?.today || new Date().toISOString().slice(0, 10);
-  const selected = dateParam || today;
+  const today = days?.today || slateToday();
+  const nextGameDay = days?.dates.filter((d) => d >= today).sort()[0];
+  const selected = dateParam || nextGameDay || today;
+  const showingNextDay = !dateParam && selected > today;
   const next = days?.dates.find((d) => d > selected) ?? null;
   const when = days && selected === days.today ? "today" : dayParts(selected).monthDay;
   const researchHref = withQuery("/anytime-td", {
@@ -67,14 +69,13 @@ export default async function AnytimeTdPage({
       <PageHeader
         kicker={days && selected === days.today ? `Today · ${dayParts(selected).monthDay}` : dayParts(selected).monthDay}
         title="Anytime TD"
-        lede="Desk picks are the names we grade. The board underneath is every priced chance for the day."
+        lede="Combined-model picks and results for the selected day. Replays are separate from the original pregame record."
         accent="flare"
         action={
           <LeagueToggle
             value={league}
             basePath="/anytime-td"
-            date={selected}
-            today={days?.today ?? selected}
+            date={dateParam}
             extra={{ view: researchView ? "research" : undefined }}
           />
         }
@@ -101,8 +102,13 @@ export default async function AnytimeTdPage({
         </div>
       ) : (
         <>
+          {showingNextDay ? (
+            <p role="status" className="text-sm text-mute">
+              No {league === "nfl" ? "NFL" : league === "fbs" ? "college football" : "football"} games today. Showing {dayParts(selected).weekday}, {dayParts(selected).monthDay} picks.
+            </p>
+          ) : null}
           {days ? (
-            <DayStrip today={days.today} dates={days.dates} selected={selected} basePath="/anytime-td" league={league} />
+            <DayStrip today={days.today} dates={days.dates} selected={selected} basePath="/anytime-td" league={league} explicitDates />
           ) : null}
           {days && !days.dates.includes(selected) ? (
             <EmptyDay
@@ -113,6 +119,7 @@ export default async function AnytimeTdPage({
             />
           ) : (
             <AnytimeTdBoard
+              key={`${league}:${selected}`}
               league={league}
               date={selected}
               today={today}

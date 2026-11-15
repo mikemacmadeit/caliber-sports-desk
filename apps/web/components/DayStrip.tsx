@@ -8,6 +8,7 @@ export function DayStrip({
   basePath,
   league = "all",
   extra = {},
+  explicitDates = false,
 }: {
   today: string;
   dates: string[];
@@ -15,6 +16,7 @@ export function DayStrip({
   basePath: string;
   league?: string;
   extra?: Record<string, string | undefined>;
+  explicitDates?: boolean;
 }) {
   const days = dayWindow(today, dates, selected);
   const has = new Set(dates);
@@ -26,7 +28,7 @@ export function DayStrip({
         const active = iso === selected;
         const href = withQuery(basePath, {
           league,
-          date: iso === today ? undefined : iso,
+          date: iso === today && !explicitDates ? undefined : iso,
           ...extra,
         });
         return (

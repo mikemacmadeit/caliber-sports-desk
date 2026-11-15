@@ -1,7 +1,9 @@
 """Anytime TD desk takes — one scorer per game.
 
-The Desk requires a supported scoring role and a current price at least four
-probability points below the estimate, then ranks by modeled scoring chance.
+The pick is the player who gets the scoring touches, when our chance is
+ahead of the price. A short favorite the book has already priced is not a pick.
+Goal-line carries and red-zone targets count first. Recent touchdowns count
+where those splits are not on the player yet.
 
 Validated Play stays off. These are research takes for scoring only.
 """
@@ -16,13 +18,16 @@ from typing import Any
 
 from sqlalchemy.orm import Session, attributes
 
-from spe.db.base import as_utc, new_id
+from spe.db.base import as_utc, new_id, utcnow
 from spe.db.models import Game, ShadowPrediction, ShadowSettlement
 from spe.market.odds import american_to_implied, ev_per_dollar
 
 DESK_TAKE_KIND = "game_scorer"
-VALUE_HAIRCUT = 0.04  # probability-point margin, not an EV haircut
+VALUE_HAIRCUT = 0.04  # aligned with settings.min_ev_after_haircut / web shortlist floor
+# Same floor the desk already uses before it will name an unpriced player.
 SCORE_CHANCE_FLOOR = 0.22
+# A desk pick has to be a real chance, not a longshot whose price looks generous.
+MIN_DESK_CHANCE = 0.18
 
 # Weights for the composite desk score (must sum ~1).
 W_CHANCE = 0.35
@@ -114,45 +119,42 @@ def desk_pick_score(row: dict[str, Any]) -> dict[str, float]:
         "avail": avail,
         "total": float(total),
         "p": p,
-        "ev_after_haircut": float(ev_hc) if ev_hc is not None else None,
+        "ev_after_haircut": float(ev_hc) if ev_hc is not None else float("nan"),
     }
 
 
-def desk_candidate_blockers(row: dict[str, Any], *, haircut: float = VALUE_HAIRCUT,
-                            now: datetime | None = None) -> tuple[list[str], str | None]:
-    """Selection policy. Price freshness is independent of published-Play eligibility."""
-    from spe.publishing.policy import assess, finite
+def _eligible(row: dict[str, Any], *, haircut: float) -> bool:
+    """Hard gates before scoring — desk will not pick these.
 
+    Freshness and edge are score factors, not vetoes: the desk still names one
+    player per game when books are stale. Official Play stays off separately.
+    """
+    del haircut  # reserved for callers / future floor knobs
+    if row.get('selection_safety') is not None and not row['selection_safety'].get('eligible'):
+        return False
     forecast = row.get("forecast") or {}
-    checked = assess(row, now)
-    reasons = [r for r in checked["reasons"] if r in {
-        "game_not_pregame", "price_not_verified_recently", "invalid_price", "missing_book_or_selection"}]
+    analysis = row.get("desk_analysis") or {}
+    if analysis.get("eligible") is False:
+        return False
+    if analysis.get("combination_status") == "active":
+        freshness = row.get("price_freshness") or forecast.get("price_freshness") or {}
+        if not freshness.get("is_current_opportunity"):
+            return False
     status = str(forecast.get("availability_status") or "").lower()
     if status in {"out", "doubtful", "confirmed_inactive", "inactive", "suspended", "questionable", "uncertain"}:
-        reasons.append("availability_requires_review")
-    p = finite(forecast.get("p_estimate"))
-    price = finite(row.get("book_price"))
-    if p is None or not SCORE_CHANCE_FLOOR <= p <= 1:
-        reasons.append("insufficient_scoring_chance")
-    elif price is not None and abs(price) >= 100:
-        if p - american_to_implied(int(price)) + 1e-12 < haircut:
-            reasons.append("insufficient_price_advantage")
-    usage = row.get("usage") or {}
-    work = lambda key: finite(usage.get(key)) or 0.0
-    # College has no trustworthy goal-line charting: meaningful carries or catches
-    # can support a role without requiring a recent touchdown streak.
-    role = (work("gl_carries") >= .4 or work("rz_targets") >= .5
-            or work("carries") >= 5 or work("receptions") >= 3.5)
-    if not role:
-        reasons.append("insufficient_scoring_role")
-    return reasons, checked["valid_until"]
-
-
-def _eligible(row: dict[str, Any], *, haircut: float, now: datetime | None = None) -> bool:
-    analysis = row.get("desk_analysis")
-    if analysis is not None and not analysis.get("eligible"):
         return False
-    return not desk_candidate_blockers(row, haircut=haircut, now=now)[0]
+    if forecast.get("p_estimate") is None:
+        return False
+    try:
+        p = float(forecast.get("p_estimate") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    if not math.isfinite(p) or p <= 0.0 or p > 1.0:
+        return False
+    # Prefer a posted number; allow research-only rows with a real chance.
+    if row.get("book_price") is None and p < 0.22:
+        return False
+    return True
 
 
 def beats_the_price(row: dict[str, Any]) -> bool:
@@ -170,35 +172,125 @@ def beats_the_price(row: dict[str, Any]) -> bool:
     return p >= SCORE_CHANCE_FLOOR and p > implied
 
 
+def tonight_chance(row: dict[str, Any]) -> float | None:
+    """Season chance, cut when this team is a big dog.
+
+    A plus spread is points this team is getting. A four-touchdown dog does not
+    keep the scoring rate he posted against even opponents. Favorites are unchanged.
+    """
+    forecast = row.get("forecast") or {}
+    raw = forecast.get("p_estimate")
+    if raw is None:
+        return None
+    chance = float(raw)
+    if (row.get("desk_analysis") or {}).get("combination_status") == "active":
+        return chance
+    spread = row.get("team_spread")
+    if spread is None:
+        return chance
+    try:
+        points = float(spread)
+    except (TypeError, ValueError):
+        return chance
+    if points <= 3:
+        return chance
+    factor = max(0.35, 1.0 - (points - 3.0) / 40.0)
+    return chance * factor
+
+
+def _price_gap(row: dict[str, Any]) -> float | None:
+    """Tonight's chance minus the chance already inside the American price."""
+    chance = tonight_chance(row)
+    price = row.get("book_price")
+    if chance is None or price is None:
+        return None
+    try:
+        return float(chance) - float(american_to_implied(int(price)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _usage_num(row: dict[str, Any], key: str) -> float:
+    usage = row.get("usage") or {}
+    try:
+        return float(usage.get(key) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def scoring_role(row: dict[str, Any]) -> float:
+    """Goal-line and red-zone work first. Recent scores cover a league without those splits."""
+    if (row.get("desk_analysis") or {}).get("combination_status") == "active":
+        return float(row["forecast"]["p_estimate"])
+    return (
+        _usage_num(row, "gl_carries") * 4.0
+        + _usage_num(row, "rz_targets") * 2.0
+        + (_usage_num(row, "rush_td") + _usage_num(row, "rec_td")) * 1.5
+    )
+
+
+def has_scoring_role(row: dict[str, Any]) -> bool:
+    """A price gap is not a reason. He has to be the one getting the scoring work."""
+    if (row.get("desk_analysis") or {}).get("combination_status") == "active":
+        c = row["desk_analysis"]["combination"]
+        return c["rush_lambda"] + c["rec_lambda"] > 0
+    scores = _usage_num(row, "rush_td") + _usage_num(row, "rec_td")
+    if _usage_num(row, "gl_carries") >= 0.4 or _usage_num(row, "rz_targets") >= 0.5:
+        return True
+    return scores >= 0.45 and (_usage_num(row, "carries") >= 5 or _usage_num(row, "targets") >= 3.5)
+
+
 def select_desk_takes(
     rows: list[dict[str, Any]],
     *,
-    haircut: float = VALUE_HAIRCUT,
-    now: datetime | None = None,
+    haircut: float = 0.0,
 ) -> list[dict[str, Any]]:
-    """Highest scoring chance among supported, currently priced research candidates."""
-    best: dict[str, tuple[float, dict[str, Any], dict[str, float]]] = {}
+    """One scorer per game: scoring touches, and only when our chance beats the price."""
+    best: dict[str, tuple[float, float, dict[str, Any], dict[str, float]]] = {}
+    combined_games = {r.get("game_id") for r in rows
+                      if (r.get("desk_analysis") or {}).get("combination_status") == "active"}
+    combined_rows = {gid: [] for gid in combined_games}
     for row in rows:
-        if not _eligible(row, haircut=haircut, now=now):
+        if not _eligible(row, haircut=haircut):
             continue
         gid = str(row.get("game_id") or "")
         if not gid:
             continue
-        chance = float((row.get("forecast") or {}).get("p_estimate") or 0.0)
-        if chance < 0.05:
+        if gid in combined_games:
+            if (row.get("desk_analysis") or {}).get("combination_status") == "active" and row.get("book_price") is not None and abs(row["book_price"]) >= 100:
+                combined_rows[gid].append(row)
             continue
+        chance = tonight_chance(row) or 0.0
+        if chance < MIN_DESK_CHANCE:
+            continue
+        gap = _price_gap(row)
+        if gap is None or gap <= haircut:
+            continue
+        if not has_scoring_role(row):
+            continue
+        role = scoring_role(row)
         parts = desk_pick_score(row)
+        player_id = str(row.get("player_id") or "")
         prior = best.get(gid)
-        if prior is None or (chance, str(row.get("player_id"))) > (prior[0], str(prior[1].get("player_id"))):
-            best[gid] = (chance, row, parts)
+        if prior is None or (role, gap, player_id) > (prior[0], prior[1], prior[2]):
+            best[gid] = (role, gap, player_id, row, parts)
 
+    from spe.models.player_td.desk_replay import select_replay_candidate
     out: list[dict[str, Any]] = []
-    for _score, row, parts in best.values():
+    for candidates in combined_rows.values():
+        chosen = select_replay_candidate(candidates)
+        if chosen:
+            chosen["desk_pick_score"] = chosen["forecast"]["p_estimate"]
+            chosen["desk_price_gap"] = _price_gap(chosen)
+            chosen["desk_pick_parts"] = desk_pick_score(chosen)
+            out.append(chosen)
+    for role, gap, _player_id, row, parts in best.values():
         enriched = dict(row)
-        enriched["desk_pick_score"] = parts["total"]
+        enriched["desk_pick_score"] = role
+        enriched["desk_price_gap"] = gap
         enriched["desk_pick_parts"] = parts
         out.append(enriched)
-    out.sort(key=lambda r: float((r.get("forecast") or {}).get("p_estimate") or 0), reverse=True)
+    out.sort(key=lambda r: (float(r.get("desk_pick_score") or 0), float(r.get("desk_price_gap") or 0)), reverse=True)
     return out
 
 
@@ -209,17 +301,142 @@ def capture_atd_desk_takes(
     now: datetime | None = None,
     haircut: float | None = None,
 ) -> dict[str, Any]:
-    """Capture the current Desk decision without rewriting previous calls."""
-    from spe.shadow.desk_ledger import freeze_desk_rows
+    """Mark pre-kickoff shadow rows for the current one-per-game desk picks.
 
+    Mutates components.desk_take only. Settled takes keep their flag.
+    """
     moment = as_utc(now) or datetime.now(UTC)
+    threshold = 0.0 if haircut is None else float(haircut)
     props = list_anytime_prop_rows(session, league=league)
-    takes = select_desk_takes(props, now=moment)
-    saved = freeze_desk_rows(session, props, now=moment)
-    return {"status": "ok", "research_only": True, "play_enabled": False,
-            "validated_play": False, "selection": "opportunity_probability_with_role_and_price_checks",
-            "prop_rows_scanned": len(props), "takes_selected": len(takes),
-            "decisions_appended": saved, "captured_at": moment.isoformat()}
+    takes = select_desk_takes(props, haircut=threshold)
+
+    prefer_prefix = (
+        "blend_v1_c_recent-",
+        "m5_c_recent-",
+        "player_td_v1-",
+        "m3-",
+    )
+
+    open_preds = session.query(ShadowPrediction).filter(ShadowPrediction.market_id == "anytime_td").all()
+    games = {
+        g.game_id: g
+        for g in session.query(Game).filter(Game.game_id.in_({p.game_id for p in open_preds} or {"__none__"})).all()
+    }
+    settled_ids = {
+        s.shadow_id
+        for s in session.query(ShadowSettlement.shadow_id).filter(
+            ShadowSettlement.shadow_id.in_([p.shadow_id for p in open_preds] or ["__none__"])
+        )
+    }
+
+    cleared = 0
+    for pred in open_preds:
+        comps = dict(pred.components or {})
+        if comps.get("desk_take") not in {DESK_TAKE_KIND, "at_this_price"}:
+            continue
+        if pred.shadow_id in settled_ids:
+            continue
+        game = games.get(pred.game_id)
+        status = (game.status if game else "") or ""
+        if status in {"final", "cancelled", "canceled", "postponed"}:
+            continue
+        for key in ("desk_take", "desk_take_at", "desk_take_kind", "desk_take_ev_after_haircut", "desk_pick_score", "desk_pick_parts"):
+            comps.pop(key, None)
+        pred.components = comps
+        attributes.flag_modified(pred, "components")
+        cleared += 1
+
+    by_gp: dict[tuple[str, str], ShadowPrediction] = {}
+    for pred in open_preds:
+        if pred.shadow_id in settled_ids:
+            continue
+        game = games.get(pred.game_id)
+        if game is None:
+            continue
+        kick = as_utc(game.kickoff_utc)
+        if kick is not None and kick <= moment:
+            continue
+        if (game.status or "") not in {"scheduled", "preview", "pregame"}:
+            continue
+        key = (pred.game_id, pred.player_id)
+        mv = pred.model_version_id or ""
+        rank = next((i for i, pref in enumerate(prefer_prefix) if mv.startswith(pref)), 99)
+        prior = by_gp.get(key)
+        if prior is None:
+            by_gp[key] = pred
+            continue
+        prior_rank = next(
+            (i for i, pref in enumerate(prefer_prefix) if (prior.model_version_id or "").startswith(pref)),
+            99,
+        )
+        if rank < prior_rank:
+            by_gp[key] = pred
+
+    marked = 0
+    missing_shadow = 0
+    open_take_rows: list[dict[str, Any]] = []
+    for row in takes:
+        gid = str(row["game_id"])
+        pid = str(row.get("player_id") or "")
+        pred = by_gp.get((gid, pid))
+        parts = row.get("desk_pick_parts") or desk_pick_score(row)
+        edge = (row.get("forecast") or {}).get("ev_after_haircut")
+        open_take_rows.append(
+            {
+                "game_id": gid,
+                "player_id": pid,
+                "player_name": row.get("player_name"),
+                "league_id": row.get("league_id"),
+                "team": row.get("team"),
+                "opponent": row.get("opponent"),
+                "kickoff_utc": row.get("kickoff_utc"),
+                "book_price": row.get("book_price"),
+                "p": (row.get("forecast") or {}).get("p_estimate"),
+                "ev_after_haircut": edge,
+                "desk_pick_score": parts.get("total"),
+                "desk_pick_parts": parts,
+                "shadow_id": None if pred is None else pred.shadow_id,
+                "model_version_id": None if pred is None else pred.model_version_id,
+            }
+        )
+        if pred is None:
+            missing_shadow += 1
+            continue
+        comps = dict(pred.components or {})
+        comps["desk_take"] = DESK_TAKE_KIND
+        comps["desk_take_kind"] = DESK_TAKE_KIND
+        comps["desk_take_at"] = moment.isoformat()
+        comps["desk_take_ev_after_haircut"] = None if edge is None else float(edge)
+        comps["desk_pick_score"] = float(parts.get("total") or 0)
+        comps["desk_pick_parts"] = {
+            k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in parts.items()
+        }
+        comps["desk_take_id"] = comps.get("desk_take_id") or new_id()
+        pred.components = comps
+        attributes.flag_modified(pred, "components")
+        marked += 1
+
+    return {
+        "status": "ok",
+        "play_enabled": False,
+        "validated_play": False,
+        "research_only": True,
+        "selection": "scoring_role_ahead_of_price",
+        "weights": {"chance": W_CHANCE, "edge": W_EDGE, "fresh": W_FRESH, "avail": W_AVAIL},
+        "haircut": threshold,
+        "prop_rows_scanned": len(props),
+        "takes_selected": len(takes),
+        "games_with_takes": len({r["game_id"] for r in open_take_rows}),
+        "shadow_marked": marked,
+        "shadow_cleared": cleared,
+        "missing_shadow_for_take": missing_shadow,
+        "open_takes": open_take_rows,
+        "captured_at": utcnow().isoformat(),
+        "note": (
+            "One Anytime TD desk pick per game: the scoring role, when our chance is ahead of the price. "
+            "Official Play stays off."
+        ),
+    }
 
 
 def frozen_desk_row(pred: ShadowPrediction) -> dict[str, Any] | None:
@@ -377,9 +594,6 @@ def assign_unsettled_board_call(
     A settled take stays put. The call time has to be before kickoff.
     """
     game = session.get(Game, game_id)
-    from spe.shadow.desk_ledger import latest_decisions
-    if game_id in latest_decisions(session, [game_id]):
-        return {"status": "recorded_desk_decision_is_immutable"}
     if game is None:
         return {"status": "missing_game"}
     kick = as_utc(game.kickoff_utc)
@@ -449,6 +663,106 @@ def assign_unsettled_board_call(
         "player_id": player_id,
         "cleared": cleared,
     }
+
+
+def freeze_slate_claims(
+    session: Session,
+    *,
+    league: str,
+    date: str,
+    model_prefix: str = "player_td_v1-",
+) -> dict[str, Any]:
+    """Lock the one pregame scorer for each game on a dated slate.
+
+    The name is the board's current call. Kickoff has not happened.
+    """
+    _ensure_api_path()
+    from app.queries import list_props
+
+    moment = datetime.now(UTC)
+    takes = select_desk_takes(list_props(session, "anytime_td", None, None, league, date))
+    marked = 0
+    missing = 0
+    names: list[str] = []
+    for take in takes:
+        game = session.get(Game, str(take.get("game_id")))
+        player_id = str(take.get("player_id") or "")
+        if game is None or not player_id:
+            missing += 1
+            continue
+        kick = as_utc(game.kickoff_utc)
+        if kick is not None and kick <= moment:
+            continue
+        preds = (
+            session.query(ShadowPrediction)
+            .filter(
+                ShadowPrediction.game_id == game.game_id,
+                ShadowPrediction.player_id == player_id,
+                ShadowPrediction.market_id == "anytime_td",
+                ShadowPrediction.model_version_id.startswith(model_prefix),
+            )
+            .all()
+        )
+        chosen: ShadowPrediction | None = None
+        for pred in preds:
+            frozen = as_utc(pred.forecast_as_of)
+            if kick is not None and frozen is not None and frozen >= kick:
+                continue
+            if chosen is None or (frozen or moment) > (as_utc(chosen.forecast_as_of) or moment):
+                chosen = pred
+        if chosen is None:
+            price = take.get("book_price")
+            chance = (take.get("forecast") or {}).get("p_estimate")
+            outcome_id = str(take.get("outcome_id") or "")
+            if not isinstance(chance, (int, float)) or not outcome_id or price is None:
+                missing += 1
+                continue
+            try:
+                implied = american_to_implied(int(price))
+            except (TypeError, ValueError):
+                missing += 1
+                continue
+            chosen = ShadowPrediction(
+                shadow_id=new_id(),
+                player_id=player_id,
+                game_id=game.game_id,
+                league_id=game.league_id,
+                market_id="anytime_td",
+                outcome_id=outcome_id,
+                bookmaker_id=str(take.get("bookmaker") or "consensus")[:64],
+                line=None,
+                side=str(take.get("side") or "yes"),
+                price_american=int(price),
+                odds_tick_id=None,
+                forecast_probability=float(chance),
+                market_implied_raw=float(implied),
+                market_implied_novig=None,
+                expected_value=None,
+                model_version_id=f"{model_prefix}{game.league_id}-anytime_td",
+                forecast_as_of=moment,
+                data_quality_status="research",
+                abstain_reasons=["RESEARCH_ONLY", "PLAY_DISABLED"],
+                recommendation_status="no_bet",
+                components={"player_name": take.get("player_name")},
+                research_only=True,
+                play_enabled=False,
+                created_at=moment,
+            )
+            session.add(chosen)
+        comps = dict(chosen.components or {})
+        comps["desk_take"] = DESK_TAKE_KIND
+        comps["desk_take_kind"] = DESK_TAKE_KIND
+        comps["desk_take_at"] = moment.isoformat()
+        comps["desk_take_source"] = "tonight_board"
+        chance = (take.get("forecast") or {}).get("p_estimate")
+        if isinstance(chance, (int, float)):
+            comps["board_p"] = float(chance)
+        comps["desk_take_id"] = comps.get("desk_take_id") or new_id()
+        chosen.components = comps
+        attributes.flag_modified(chosen, "components")
+        marked += 1
+        names.append(str(take.get("player_name") or player_id))
+    return {"status": "ok", "date": date, "league": league, "marked": marked, "missing_shadow": missing, "names": names}
 
 
 def is_desk_take(pred: ShadowPrediction) -> bool:

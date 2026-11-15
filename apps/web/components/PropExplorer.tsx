@@ -38,16 +38,12 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
     }).sort((a, b) => compareRows(a, b, sort, dir));
   }, [rows, query, gameId, team, position, sort, dir]);
 
-  const visibleIds = new Set(visible.map(row => row.outcome_id));
-  // Filtering must never manufacture a different official Desk selection.
-  const allPlays = selectDeskTakes(rows);
-  const plays = allPlays.filter(row => visibleIds.has(row.outcome_id));
+  const plays = selectDeskTakes(visible);
   const priced = valueAtPrice(visible);
   const picked = new Set(plays.map((row) => row.outcome_id));
   const abstain = visible.filter((row) => !picked.has(row.outcome_id));
-  const pickedGames = new Set(allPlays.map((row) => row.game_id));
-  const visibleGames = new Set(visible.map(row => row.game_id));
-  const noPickGames = games.filter((game) => visibleGames.has(game.id) && !pickedGames.has(game.id));
+  const pickedGames = new Set(plays.map((row) => row.game_id));
+  const noPickGames = games.filter((game) => !pickedGames.has(game.id));
 
   const toolbar = (
     <div className="space-y-3">
@@ -172,7 +168,7 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
           {toolbar}
           <Section title="Desk picks" count={plays.length} accent="flare" />
           <p className="max-w-xl text-sm text-mute">
-            At most one name per game, using scoring opportunities, matchup, and price. These are the ones we grade. Experimental estimates; games with weak evidence are passed.
+            One name per game. These are the ones we grade on the record — a touchdown is a win, no touchdown is a loss.
           </p>
           {plays.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-2">
@@ -181,7 +177,7 @@ export function PropExplorer({ rows, mode }: { rows: PropRow[]; mode: "calls" | 
               ))}
             </div>
           ) : (
-            <p className="plate px-5 py-6 text-sm text-mute">No Desk pick matches these filters. Filtering does not change the chosen player.</p>
+            <p className="plate px-5 py-6 text-sm text-mute">No research projection matches these filters.</p>
           )}
           {noPickGames.length > 0 ? (
             <div className="space-y-2">
@@ -346,11 +342,7 @@ function ScorerCard({ row }: { row: PropRow }) {
         {row.position ? ` · ${row.position}` : ""}
       </p>
       <p className="mt-3 text-sm leading-relaxed text-paper/80">{deskPickReason(row)}</p>
-      {row.desk_analysis ? <div className="mt-3 border-t border-white/10 pt-3 text-xs leading-relaxed text-mute">
-        <p className="font-mono uppercase tracking-wide">What could change this pick</p>
-        {row.desk_analysis.risks.map(risk => <p key={risk} className="mt-1">{risk}</p>)}
-        <p className="mt-2">New research model · live accuracy is still being measured.</p>
-      </div> : null}
+      {row.desk_analysis?.sources?.length ? <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-mute">Sources: {row.desk_analysis.sources.join(" · ")}</p> : null}
       <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-mute">
         {price ? `Pays ${price}` : "Odds not posted yet"}
       </p>

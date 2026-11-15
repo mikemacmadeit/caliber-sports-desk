@@ -56,6 +56,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
 
+With `APP_ENV=dev` (the local default), opening Today or Anytime TD builds missing or
+stale research boards from the games, prices and history already in your database.
+The page updates automatically when that rebuild finishes. No scheduled worker or
+paid API request is needed to rebuild. The shipped NFL/CFB Desk weights load directly
+from the checkout when no local model file exists. A valid custom local model takes
+precedence. Production continues to use the scheduled publishing worker.
+
+An empty database still needs real schedules, roster/history and odds imported before
+live research can appear. The synthetic seed is not promoted into live research.
+
 The seed slate is synthetic demonstration data for the weekend of 7–8 November 2026 so the UI works before CFBD / Odds API keys exist.
 
 ```powershell

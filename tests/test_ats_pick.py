@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 
+from spe.models.ats.board_cache import keep_finished_spreads
 from spe.models.ats.predict import (
     _apply_live_spreads,
     apply_recorded_result,
@@ -67,6 +68,40 @@ def test_posted_number_can_flip_a_close_score():
     )
     assert pick["favored_side"] == "away"
     assert pick["pick_label"] == "Duke to win"
+
+
+def test_moneyline_switches_when_the_favorite_has_fewer_wins_and_we_like_the_dog():
+    tulane = choose_ats_pick(
+        predicted_margin=1.1,
+        home_handicap=-2.5,
+        p_home_cover=0.53,
+        p_away_cover=0.47,
+        home_team="Rice",
+        away_team="Tulane",
+        raw_margin=-7.0,
+        market_margin=2.5,
+        home_record="1-9",
+        away_record="5-5",
+    )
+    assert tulane["pick_label"] == "Tulane to win"
+    assert tulane["favored_side"] == "away"
+    assert tulane["pick_basis"] == "record"
+
+    # Our guess agrees with the favorite, so a worse record does not move the moneyline.
+    saints = choose_ats_pick(
+        predicted_margin=1.2,
+        home_handicap=-3.5,
+        p_home_cover=0.54,
+        p_away_cover=0.46,
+        home_team="New Orleans Saints",
+        away_team="Cleveland Browns",
+        raw_margin=2.0,
+        market_margin=3.5,
+        home_record="3-5",
+        away_record="5-4",
+    )
+    assert saints["pick_label"] == "New Orleans Saints to win"
+    assert saints["pick_basis"] == "blended"
 
 
 def test_missing_number_is_a_straight_up_pick():
@@ -226,19 +261,261 @@ def test_finished_game_keeps_the_closing_number_when_the_live_quote_is_gone():
     assert pd.isna(out.loc["blank", "spread_line"])
 
 
+def test_close_games_take_our_side_inside_the_band_that_covered():
+    nfl = choose_spread_pick(
+        predicted_margin=10.0,
+        home_handicap=-6.0,
+        margin_sigma=13.0,
+        home_team="Kansas City Chiefs",
+        away_team="Buffalo Bills",
+        league_id="nfl",
+    )
+    assert nfl is not None
+    assert nfl["ats_basis"] == "score"
+    assert nfl["ats_side"] == "home"
+    assert nfl["ats_pick_label"] == "Kansas City Chiefs -6"
+
+    college = choose_spread_pick(
+        predicted_margin=4.0,
+        home_handicap=-2.0,
+        margin_sigma=14.0,
+        home_team="Iowa",
+        away_team="Wisconsin",
+        league_id="fbs",
+    )
+    assert college is not None
+    assert college["ats_basis"] == "score"
+    assert college["ats_side"] == "home"
+
+    # College disagreements from a field goal to a touchdown stayed even.
+    assert (
+        choose_spread_pick(
+            predicted_margin=9.0,
+            home_handicap=-4.0,
+            margin_sigma=14.0,
+            home_team="Iowa",
+            away_team="Wisconsin",
+            league_id="fbs",
+        )
+        is None
+    )
+
+
 def test_spread_pick_is_the_side_of_the_number_not_the_winner():
-    # The home team is projected to win by 2 and is laying 7.5, so the dog covers.
+    # Without a league, a gap under a touchdown is not a spread pick.
+    assert (
+        choose_spread_pick(
+            predicted_margin=2.0,
+            home_handicap=-7.5,
+            margin_sigma=13.0,
+            home_team="Kansas City Chiefs",
+            away_team="Buffalo Bills",
+        )
+        is None
+    )
+    # The model has the home team winning by 20 against a 6-point number.
+    # That gap is a touchdown or more, so the pick is the number's side.
     pick = choose_spread_pick(
-        predicted_margin=2.0,
-        home_handicap=-7.5,
+        predicted_margin=20.0,
+        home_handicap=-6.0,
         margin_sigma=13.0,
         home_team="Kansas City Chiefs",
         away_team="Buffalo Bills",
     )
     assert pick is not None
     assert pick["ats_side"] == "away"
-    assert pick["ats_pick_label"] == "Buffalo Bills +7.5"
-    assert pick["ats_cover_margin"] == 5.5
+    assert pick["ats_pick_label"] == "Buffalo Bills +6"
+    assert pick["ats_cover_margin"] == 14.0
+    assert pick["ats_basis"] == "number"
+
+
+def test_a_fewer_win_favorite_stays_on_our_side():
+    rice = choose_spread_pick(
+        predicted_margin=1.1,
+        home_handicap=-2.5,
+        margin_sigma=14.0,
+        home_team="Rice",
+        away_team="Tulane",
+        model_vs_market=-9.5,
+        league_id="fbs",
+        home_record="1-9",
+        away_record="5-5",
+    )
+    assert rice is not None
+    assert rice["ats_basis"] == "record"
+    assert rice["ats_side"] == "away"
+    assert rice["ats_pick_label"] == "Tulane +2.5"
+
+    kansas = choose_spread_pick(
+        predicted_margin=3.1,
+        home_handicap=-5.5,
+        margin_sigma=14.0,
+        home_team="Kansas",
+        away_team="UCF Knights",
+        model_vs_market=-15.7,
+        league_id="fbs",
+        home_record="4-6",
+        away_record="5-5",
+    )
+    assert kansas is not None
+    assert kansas["ats_side"] == "away"
+    assert kansas["ats_pick_label"] == "UCF Knights +5.5"
+
+    # The same gap still follows the number when that favorite has more wins.
+    kept = choose_spread_pick(
+        predicted_margin=1.1,
+        home_handicap=-2.5,
+        margin_sigma=14.0,
+        home_team="Rice",
+        away_team="Tulane",
+        model_vs_market=-9.5,
+        league_id="fbs",
+        home_record="6-4",
+        away_record="5-5",
+    )
+    assert kept is not None
+    assert kept["ats_basis"] == "number"
+    assert kept["ats_pick_label"] == "Rice -2.5"
+
+
+def test_a_locked_fewer_win_favorite_flips_to_our_side():
+    row = attach_spread_pick(
+        {
+            "game_status": "final",
+            "home_score": 17,
+            "away_score": 20,
+            "home_handicap": -2.5,
+            "predicted_margin": 1.1,
+            "margin_sigma": 14.0,
+            "home_team": "Rice",
+            "away_team": "Tulane",
+            "home_record": "1-9",
+            "away_record": "5-5",
+            "model_vs_market": -9.5,
+            "league_id": "fbs",
+            "ats_side": "home",
+            "ats_team": "Rice",
+            "ats_line": -2.5,
+            "ats_pick_label": "Rice -2.5",
+            "ats_basis": "number",
+            "ats_locked": True,
+        }
+    )
+    assert row["ats_pick_label"] == "Tulane +2.5"
+    assert row["ats_pick_result"] == "correct"
+
+
+def test_our_side_stays_when_that_team_has_fewer_wins():
+    row = attach_spread_pick(
+        {
+            "game_status": "final",
+            "home_score": 23,
+            "away_score": 22,
+            "home_handicap": -3.5,
+            "predicted_margin": 4.0,
+            "margin_sigma": 13.0,
+            "home_team": "New Orleans Saints",
+            "away_team": "Cleveland Browns",
+            "home_record": "3-5",
+            "away_record": "5-4",
+            "model_vs_market": 8.0,
+            "league_id": "nfl",
+            "ats_side": "home",
+            "ats_team": "New Orleans Saints",
+            "ats_line": -3.5,
+            "ats_pick_label": "New Orleans Saints -3.5",
+            "ats_basis": "score",
+            "ats_locked": True,
+        }
+    )
+    assert row["ats_pick_label"] == "New Orleans Saints -3.5"
+    assert row["ats_basis"] == "score"
+
+
+def test_a_rebuild_flips_a_fewer_win_favorite_and_keeps_the_other_finals():
+    previous = {
+        "rows": [
+            {
+                "game_id": "rice",
+                "game_status": "final",
+                "home_team": "Rice",
+                "away_team": "Tulane",
+                "home_record": "1-9",
+                "away_record": "5-5",
+                "home_score": 17,
+                "away_score": 20,
+                "home_handicap": -2.5,
+                "ats_side": "home",
+                "ats_team": "Rice",
+                "ats_line": -2.5,
+                "ats_pick_label": "Rice -2.5",
+                "ats_basis": "number",
+            },
+            {
+                "game_id": "charlotte",
+                "game_status": "final",
+                "home_team": "Charlotte",
+                "away_team": "East Carolina",
+                "home_record": "4-6",
+                "away_record": "5-5",
+                "home_score": 16,
+                "away_score": 17,
+                "ats_side": "home",
+                "ats_team": "Charlotte",
+                "ats_line": 11.5,
+                "ats_pick_label": "Charlotte +11.5",
+                "ats_basis": "score",
+            },
+        ]
+    }
+    rebuilt = {
+        "rows": [
+            {
+                "game_id": "rice",
+                "game_status": "final",
+                "home_score": 17,
+                "away_score": 20,
+                "home_handicap": -2.5,
+                "ats_side": "away",
+                "ats_team": "Tulane",
+                "ats_line": 2.5,
+                "ats_pick_label": "Tulane +2.5",
+                "ats_basis": "record",
+            },
+            {
+                "game_id": "charlotte",
+                "game_status": "final",
+                "home_score": 16,
+                "away_score": 17,
+                "home_handicap": 5.0,
+                "ats_side": None,
+                "ats_pick_label": None,
+            },
+        ]
+    }
+    kept = keep_finished_spreads(previous, rebuilt)
+    rice, charlotte = kept["rows"]
+    assert rice["ats_pick_label"] == "Tulane +2.5"
+    assert rice["ats_pick_result"] == "correct"
+    assert charlotte["ats_pick_label"] == "Charlotte +11.5"
+    assert charlotte["ats_pick_result"] == "correct"
+
+
+def test_a_touchdown_gap_takes_the_numbers_side():
+    # The raw model likes Boise by 10 more than a 10.5-point number, so the pick is the dog.
+    pick = choose_spread_pick(
+        predicted_margin=12.0,
+        home_handicap=-10.5,
+        margin_sigma=14.0,
+        home_team="Boise State",
+        away_team="Oregon State",
+        model_vs_market=10.0,
+        league_id="fbs",
+    )
+    assert pick is not None
+    assert pick["ats_side"] == "away"
+    assert pick["ats_pick_label"] == "Oregon State +10.5"
+    assert pick["ats_basis"] == "number"
 
     winner = choose_ats_pick(
         predicted_margin=2.0,
@@ -249,6 +526,68 @@ def test_spread_pick_is_the_side_of_the_number_not_the_winner():
         away_team="Buffalo Bills",
     )
     assert winner["pick_label"] == "Kansas City Chiefs to win"
+
+
+def test_a_finished_spread_stays_when_the_gap_moves_out_of_the_band():
+    row = attach_spread_pick(
+        {
+            "game_status": "final",
+            "home_score": 16,
+            "away_score": 17,
+            "home_handicap": 11.5,
+            "predicted_margin": -10.0,
+            "margin_sigma": 14.0,
+            "home_team": "Charlotte",
+            "away_team": "East Carolina",
+            "model_vs_market": 5.0,
+            "ats_side": "home",
+            "ats_team": "Charlotte",
+            "ats_line": 11.5,
+            "ats_pick_label": "Charlotte +11.5",
+            "ats_cover_margin": 1.7,
+            "ats_basis": "score",
+            "pick_market": "straight_up",
+            "projection_withheld": False,
+        }
+    )
+    assert row["ats_pick_label"] == "Charlotte +11.5"
+    assert row["ats_pick_result"] == "correct"
+    assert row["ats_locked"] is True
+
+
+def test_a_rebuild_keeps_the_spread_that_was_already_on_the_card():
+    previous = {
+        "rows": [
+            {
+                "game_id": "charlotte",
+                "game_status": "scheduled",
+                "ats_side": "home",
+                "ats_pick_label": "Charlotte +11.5",
+                "ats_team": "Charlotte",
+                "ats_line": 11.5,
+                "ats_basis": "score",
+            }
+        ]
+    }
+    rebuilt = {
+        "rows": [
+            {
+                "game_id": "charlotte",
+                "game_status": "final",
+                "home_score": 16,
+                "away_score": 17,
+                "home_handicap": 5.0,
+                "ats_side": None,
+                "ats_pick_label": None,
+                "ats_pick_result": None,
+            }
+        ]
+    }
+    kept = keep_finished_spreads(previous, rebuilt)
+    assert kept["rows"][0]["ats_pick_label"] == "Charlotte +11.5"
+    assert kept["rows"][0]["ats_locked"] is True
+    assert kept["rows"][0]["ats_pick_result"] == "correct"
+    assert kept["rows"][0]["home_handicap"] == 11.5
 
 
 def test_finished_game_grades_the_spread_and_keeps_the_winner():
@@ -262,6 +601,7 @@ def test_finished_game_grades_the_spread_and_keeps_the_winner():
             "margin_sigma": 13.0,
             "home_team": "Arizona",
             "away_team": "TCU",
+            "model_vs_market": 8.0,
             "pick_market": "straight_up",
             "pick_label": "Arizona to win",
             "projection_withheld": False,
@@ -283,6 +623,7 @@ def test_a_final_score_marks_the_moneyline_and_the_spread():
             "margin_sigma": 13.0,
             "home_team": "Baltimore Ravens",
             "away_team": "Jacksonville Jaguars",
+            "model_vs_market": -9.0,
             "favored_side": "away",
             "pick_market": "straight_up",
             "pick_label": "Jacksonville Jaguars to win",

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import time
 from datetime import UTC, datetime
+from datetime import date as calendar_date
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import OperationalError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -30,18 +33,23 @@ from spe.licensing import LICENSES
 from spe.market.odds import american_to_decimal, ev_per_dollar
 from spe.simulate.engine import PlayerRole, simulate_game
 
+from app.auth_routes import router as auth_router
 from app.deps import db_session, disclaimer
+from app.gate import board_query_for, redact, should_redact, subscription_required
 from app.queries import (
     eligible_roster_index,
     forecast_payload,
     games_for_slate,
+    grade_parlay_tickets,
     kickoff_day,
     latest_forecast,
     latest_tick,
     latest_weather,
     list_called_scorers,
+    list_desk_calls,
     list_props,
     prop_row,
+    published_game_props,
     ruled_out_keys,
     slate_game,
     slate_today,
@@ -71,6 +79,49 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(auth_router)
+
+
+def _viewer_is_subscribed(request: Request) -> bool:
+    from spe.db.session import session_factory
+
+    from app.access import request_is_subscribed
+
+    db = session_factory()
+    try:
+        return request_is_subscribed(request, db)
+    except Exception:
+        return False
+    finally:
+        db.close()
+
+
+@app.middleware("http")
+async def hide_calls_until_kickoff(request: Request, call_next):
+    """Free accounts see the schedule and the ledger. The call waits for kickoff."""
+    path = request.url.path
+    needs_sub = subscription_required(request.method, path)
+    redact_body = request.method == "GET" and should_redact(path)
+    subscribed = _viewer_is_subscribed(request) if needs_sub or redact_body else False
+    if needs_sub and not subscribed:
+        return JSONResponse({"detail": "subscription_required", "price_usd": "19.99"}, status_code=402)
+    response = await call_next(request)
+    if not redact_body or subscribed or response.status_code >= 400:
+        return response
+    media = response.headers.get("content-type") or ""
+    if "application/json" not in media:
+        return response
+    body = getattr(response, "body", None)
+    if not body:
+        chunks = [chunk async for chunk in response.body_iterator]
+        body = b"".join(chunks)
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return Response(content=body, status_code=response.status_code, media_type="application/json")
+    if not isinstance(payload, dict):
+        return Response(content=body, status_code=response.status_code, media_type="application/json")
+    return JSONResponse(redact(path, payload, subscribed=False), status_code=response.status_code)
 
 
 @app.on_event("startup")
@@ -133,7 +184,13 @@ def slate(
     include_historical: bool = Query(default=False),
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
-    games = games_for_slate(session, date, league, include_historical=include_historical)
+    games = games_for_slate(
+        session,
+        date,
+        league,
+        include_historical=include_historical,
+        keep_finished=bool(date),
+    )
     versions = {
         league: version_id
         for league in ("nfl", "fbs")
@@ -228,46 +285,27 @@ def game_detail(game_id: str, session: Session = Depends(db_session)) -> dict[st
         .order_by(InjuryEvent.reported_at.desc())
         .all()
     )
-    outcomes = session.query(Outcome).filter(Outcome.game_id == game_id).all()
-    from spe.models.prop_projection import COUNTING_MARKETS, logs_for_players
-
-    stat_logs = logs_for_players(
-        session,
-        {o.player_id for o in outcomes if o.player_id and o.market_id in COUNTING_MARKETS},
-    )
-    unavailable = ruled_out_keys(session, [game_id])
-    props = without_duplicate_props(
-        [
-            p
-            for p in (
-                prop_row(session, o, roster_index=roster, stat_logs=stat_logs, ruled_out=unavailable)
-                for o in outcomes
-            )
-            if p
-        ]
-    )
+    props = published_game_props(session, game)
     features = [
         f
         for f in session.query(FeatureRow).filter(FeatureRow.game_id == game_id).all()
         if not f.player_id or f.player_id in roster
     ]
     disagreement = []
-    for o in outcomes:
-        if o.player_id and o.player_id not in roster:
-            continue
-        fc = latest_forecast(session, o.outcome_id)
-        tick = latest_tick(session, o.outcome_id)
-        if fc and tick:
+    for row in props:
+        probability = (row.get("forecast") or {}).get("p_estimate")
+        price = row.get("book_price")
+        if probability is not None and price is not None:
             from spe.market.odds import american_to_implied
 
-            implied = american_to_implied(tick.price_american)
-            if abs(fc.p - implied) >= 0.05:
+            implied = american_to_implied(price)
+            if abs(probability - implied) >= 0.05:
                 disagreement.append(
                     {
-                        "outcome_id": o.outcome_id,
-                        "model_p": fc.p,
+                        "outcome_id": row["outcome_id"],
+                        "model_p": probability,
                         "market_implied": implied,
-                        "delta": fc.p - implied,
+                        "delta": probability - implied,
                     }
                 )
     return {
@@ -311,9 +349,11 @@ def days(
     league: str = Query(default="all"),
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
+    today = slate_today()
     games = games_for_slate(session, None, league)
-    dates = sorted({kickoff_day(g.kickoff_utc) for g in games})
-    return {"today": slate_today(), "timezone": "America/Chicago", "dates": dates}
+    finished_today = games_for_slate(session, today, league, keep_finished=True)
+    dates = sorted({kickoff_day(g.kickoff_utc) for g in (*games, *finished_today)})
+    return {"today": today, "timezone": "America/Chicago", "dates": dates}
 
 
 @app.get("/v1/props")
@@ -330,10 +370,53 @@ def props(
     from spe.props.board_cache import load_props
 
     rows = load_props(session, market, min_odds, min_ev, league, date)
+    from spe.desk.day_results import apply_recorded_results
+
+    apply_recorded_results(session, [], rows)
     from spe.publishing.ledger import current_picks
     published = {r["outcome_id"]: r["pick_id"] for r in current_picks(session, rows)}
     rows = [{**row, "published_pick_id": published.get(row.get("outcome_id"))} for row in rows]
-    return {"market": market or "all", "date": date or "all", "rows": rows, "disclaimer": disclaimer()}
+    from spe.publishing.local_board import ensure_local_board
+    refresh_status = ensure_local_board(session, date or slate_today(), league or "all")
+    return {"market": market or "all", "date": date or "all", "rows": rows,
+            "refresh_status": refresh_status, "disclaimer": disclaimer()}
+
+
+@app.get("/v1/anytime-td/calls")
+def anytime_td_calls(
+    league: str | None = Query(default="all"),
+    date: str | None = None,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    """The one scorer the desk locked for each game. These rows are the win-loss column."""
+    payload = list_desk_calls(session, league, date)
+    payload["disclaimer"] = disclaimer()
+    return payload
+
+
+@app.get("/v1/anytime-td/replay")
+def combined_replay(date: calendar_date, league: str = Query(default="all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
+    from spe.models.player_td.desk_replay import replay_day
+    from spe.models.player_td.desk_replay_results import ensure_results
+    from spe.models.player_td.scorer_refresh import ensure_refresh
+    day = date.isoformat()
+    from app.queries import attach_game_marks
+    from sqlalchemy.exc import IntegrityError
+    for attempt in range(2):
+        try:
+            result = replay_day(session, day, league, cached_only=True)
+            attach_game_marks(session, result.get("rows") or [])
+            session.commit()
+            break
+        except IntegrityError as exc:
+            session.rollback()
+            # Two local requests may finish the same new replay together.
+            # Re-read the winner's saved snapshots; never rewrite the ledger.
+            if attempt or "board_snapshots.key" not in str(exc.orig):
+                raise
+    result["refresh_status"] = ensure_refresh(day)
+    result["results_refresh_status"] = ensure_results(day)
+    return result
 
 
 @app.get("/v1/anytime-td/called")
@@ -346,18 +429,128 @@ def anytime_td_called(
     return {"date": date or slate_today(), "rows": rows, "disclaimer": disclaimer()}
 
 
+@app.get("/v1/props/desk")
+def prop_desk(
+    league: str = Query(default="all"),
+    date: str | None = None,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    """One receptions, receiving, or rushing call per game. Touchdowns stay off."""
+    from sqlalchemy import select
+
+    from spe.db.models import ClosingLine
+    from spe.desk.day_results import apply_recorded_results
+    from spe.models.prop_projection import apply_matchup, load_defense
+    from spe.props.board_cache import load_slate_props
+    from spe.props.game_picks import attach_team_spreads, select_desk_props
+
+    selected = date or slate_today()
+    rows = load_slate_props(session, league, selected)
+    game_ids = {row.get("game_id") for row in rows if row.get("game_id")}
+    home_team = {
+        game.game_id: game.home_team_id
+        for game in session.scalars(select(Game).where(Game.game_id.in_(game_ids)))
+    }
+    home_spread: dict[str, float] = {}
+    for line in session.scalars(
+        select(ClosingLine).where(ClosingLine.market_id == "point_spread", ClosingLine.game_id.in_(game_ids))
+    ):
+        if line.home_line is not None:
+            home_spread.setdefault(line.game_id, float(line.home_line))
+    attach_team_spreads(rows, home_team, home_spread)
+    tables = {
+        league_id: load_defense(session, league_id)
+        for league_id in {str(row.get("league_id") or "") for row in rows if row.get("league_id")}
+    }
+    for row in rows:
+        table = tables.get(str(row.get("league_id") or ""))
+        if table is not None:
+            apply_matchup(row, table)
+    chosen = select_desk_props(rows)
+    index = {row.get("game_id"): session.get(Game, row.get("game_id")) for row in chosen if row.get("game_id")}
+    try:
+        apply_recorded_results(session, [], chosen)
+        session.commit()
+    except Exception:
+        session.rollback()
+    return {
+        "date": selected,
+        "league": league or "all",
+        "calls": [_prop_call(row, index.get(row.get("game_id"))) for row in chosen],
+        "disclaimer": disclaimer(),
+    }
+
+
+def _prop_call(row: dict[str, Any], game: Any) -> dict[str, Any]:
+    away = row.get("away_abbr")
+    home = row.get("home_abbr")
+    away_score = None if game is None else game.away_score
+    home_score = None if game is None else game.home_score
+    final = None
+    if away and home and away_score is not None and home_score is not None:
+        final = f"{away} {away_score}, {home} {home_score}"
+    kick = row.get("kickoff_utc")
+    if hasattr(kick, "isoformat"):
+        kick = kick.isoformat()
+    return {
+        "outcome_id": row.get("outcome_id"),
+        "game_id": row.get("game_id"),
+        "league_id": row.get("league_id"),
+        "player_name": row.get("player_name"),
+        "position": row.get("position"),
+        "team_abbr": row.get("team"),
+        "team_mark": row.get("team_mark"),
+        "away_abbr": away,
+        "home_abbr": home,
+        "kickoff_utc": kick,
+        "game_status": row.get("game_status") or (None if game is None else game.status),
+        "final_score": final,
+        "market_id": row.get("market_id"),
+        "side": row.get("side"),
+        "line": row.get("line"),
+        "book_price": row.get("book_price"),
+        "bookmaker": row.get("bookmaker"),
+        "p": (row.get("forecast") or {}).get("p_estimate"),
+        "pick": row.get("pick"),
+        "result": row.get("result") or "pending",
+        "actual": row.get("actual"),
+        "player_average": row.get("player_average"),
+        "defense_allowed": row.get("defense_allowed"),
+        "defense_baseline": row.get("defense_baseline"),
+        "defense_games": row.get("defense_games"),
+        "team_spread": row.get("team_spread"),
+        "matchup_note": _matchup_note(row),
+    }
+
+
+def _matchup_note(row: dict[str, Any]) -> str | None:
+    games = row.get("defense_games") or 0
+    allowed = row.get("defense_allowed")
+    baseline = row.get("defense_baseline")
+    if games < 4 or allowed is None or baseline is None:
+        return None
+    unit = {
+        "rushing_yards": "rush yards",
+        "receiving_yards": "receiving yards",
+        "receptions": "receptions",
+    }.get(str(row.get("market_id") or ""), "yards")
+    return f"Defense allowed {allowed:.0f} {unit} a game over {int(games)} games, versus {baseline:.0f}."
+
+
 @app.get("/v1/props/picks")
 def prop_picks(league: str = Query(default="all"), date: str | None = None,
                session: Session = Depends(db_session)) -> dict[str, Any]:
     from spe.props.board_cache import load_slate_props, read_entry, WARM_MARKETS
-    from spe.publishing.ledger import current_picks
+    from spe.publishing.ledger import current_picks, day_picks, settle
     selected = date or slate_today()
     games = games_for_slate(session, selected, league)
     rows = load_slate_props(session, league, selected)
     degraded = bool(games) and any(read_entry(market, league, selected) is None for market in WARM_MARKETS)
+    settle(session)
     return {"date": selected, "league": league, "games_on_slate": len(games), "degraded": degraded,
             "picks": current_picks(session, rows),
-            "note": "Published research opportunities. Only verified prices meeting the value threshold appear.",
+            "day": day_picks(session, league, selected),
+            "note": "Published research opportunities. The day's card stays up after the price window closes and is graded when the result is recorded.",
             "disclaimer": disclaimer()}
 
 
@@ -384,7 +577,8 @@ def today_desk(
 ):
     from spe.db.models import BoardSnapshot
     from spe.db.base import as_utc
-    from spe.publishing.desk import build
+    from app.queries import _team_mark, desk_club_marks
+    from spe.publishing.desk import build, public_mark
     from spe.props.board_cache import WARM_MARKETS, entry_key
     selected = date or slate_today()
     try:
@@ -401,7 +595,12 @@ def today_desk(
         for row in snapshot.payload.get("rows", []):
             game = game_index.get(row.get("game_id"))
             if game is not None:
-                rows.append({**row, "game_status": game.status, "kickoff_utc": as_utc(game.kickoff_utc).isoformat()})
+                rows.append({
+                    **row,
+                    "game_status": game.status,
+                    "kickoff_utc": as_utc(game.kickoff_utc).isoformat(),
+                    **desk_club_marks(game, row),
+                })
     payload = build(rows, now=now, book=book, market=market, search=search,
                     saved=set(saved.split(",")) if saved is not None else None, offset=offset, limit=limit)
     updated = min((as_utc(s.updated_at) for s in snapshots), default=None)
@@ -409,9 +608,20 @@ def today_desk(
     stale = bool(updated and (now - updated).total_seconds() > 900)
     upcoming = [g for g in games if as_utc(g.kickoff_utc) > now and g.status in {"scheduled", "pre", "upcoming"}]
     status = "warming" if missing and upcoming else ("delayed" if stale and upcoming else "ready")
+    from spe.publishing.local_board import ensure_local_board
+    refresh_status = ensure_local_board(session, selected, league) if upcoming else "idle"
+    if refresh_status == "running":
+        status = "warming"
+    elif refresh_status == "failed":
+        status = "delayed"
     return {**payload, "date": selected, "league": league, "status": status,
+            "refresh_status": refresh_status,
             "checked_at": now.isoformat(), "updated_at": updated.isoformat() if updated else None,
-            "games": [{"id": g.game_id, "league": g.league_id, "matchup": f"{g.away_team.abbreviation} at {g.home_team.abbreviation}",
+            "games": [{"id": g.game_id, "league": g.league_id,
+                       "matchup": f"{g.away_team.abbreviation} at {g.home_team.abbreviation}",
+                       "away_abbr": g.away_team.abbreviation, "home_abbr": g.home_team.abbreviation,
+                       "away_mark": public_mark(_team_mark(g.away_team)),
+                       "home_mark": public_mark(_team_mark(g.home_team)),
                        "kickoff": as_utc(g.kickoff_utc).isoformat()} for g in upcoming],
             "note": "Experimental research. Qualification checks data and price; it does not validate the model's predictive accuracy."}
 
@@ -754,6 +964,11 @@ _PARLAY_CARD_NOTE = (
     "Spread tickets use the model's cover chance for that side. They are research leans, not plays. "
     "A cover and a prop from the same game stay off."
 )
+_POSTED_PARLAY_NOTE = (
+    "Built from the last number posted for this slate, including games that have kicked off. "
+    "Anytime touchdown tickets use each player's chance. "
+    "Spread tickets use the model's cover chance for that side. They are research leans, not plays."
+)
 
 
 @app.get("/v1/parlays/card")
@@ -783,15 +998,19 @@ def parlay_card(
         "disclaimer": disclaimer(),
     }
     try:
-        games = games_for_slate(session, selected, league_id)
+        games = games_for_slate(session, selected, league_id, keep_finished=True)
         payload["games_on_slate"] = len(games)
         if games:
             from spe.props.board_cache import load_slate_props
 
             rows = load_slate_props(session, league_id, selected)
             from spe.publishing.policy import assess
-            rows = [r for r in rows if assess(r)["eligible"]]
-            pair = best_same_game_pair(rows)
+
+            eligible = [r for r in rows if assess(r)["eligible"]]
+            spreads = _spreads_for_slate(session, league_id, selected)
+            source = eligible if eligible and not _slate_has_started(games) else rows
+            posted = source is rows
+            pair = best_same_game_pair(source if not posted else eligible)
             joints: dict[tuple[str, str, str], float] = {}
             if pair is not None:
                 game_id, player_a, player_b = pair
@@ -800,14 +1019,32 @@ def parlay_card(
                 if joint is not None:
                     lo, hi = sorted((player_a, player_b))
                     joints[(game_id, lo, hi)] = float(joint)
-            card = build_parlay_card(rows, joints, [])
+            card = build_parlay_card(source, joints, spreads, posted=posted)
             payload["eligible_legs"] = card["eligible_legs"]
             payload["games_with_legs"] = card["games_with_legs"]
             payload["tickets"] = card["tickets"]
+            grade_parlay_tickets(session, payload["tickets"])
+            if posted:
+                payload["note"] = _POSTED_PARLAY_NOTE
     except Exception:
         payload["degraded"] = True
     _PARLAY_CARD_CACHE[key] = (now, payload)
     return payload
+
+
+def _slate_has_started(games: list[Any]) -> bool:
+    """A slate that has kicked off keeps the tickets from the last posted numbers."""
+    now = datetime.now(UTC)
+    for game in games:
+        status = str(getattr(game, "status", "") or "").lower()
+        if status in {"in_progress", "final", "complete", "closed"}:
+            return True
+        kick = getattr(game, "kickoff_utc", None)
+        if isinstance(kick, datetime):
+            kickoff = kick if kick.tzinfo else kick.replace(tzinfo=UTC)
+            if kickoff <= now:
+                return True
+    return False
 
 
 def _spreads_for_slate(session: Session, league_id: str, selected: str) -> list[dict[str, Any]]:
@@ -1106,8 +1343,28 @@ def atd_desk_status(session: Session = Depends(db_session)) -> dict[str, Any]:
     return payload
 
 
+@app.get("/v1/best-bets")
+def best_bets(
+    league: str = Query("all"),
+    date: str | None = None,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    """Spread sides and price picks for one day. The named rows are the shortlist."""
+    from app.queries import attach_team_marks
+    from spe.desk.best_bets import build_best_bets
+
+    payload = build_best_bets(league=league, date=date or slate_today())
+    from spe.desk.day_results import apply_recorded_results
+
+    apply_recorded_results(session, payload["spreads"], payload["prices"])
+    payload["spreads"] = attach_team_marks(session, payload["spreads"])
+    payload["disclaimer"] = disclaimer()
+    return payload
+
+
 @app.get("/v1/ats")
 def ats_finder(
+    request: Request,
     league: str = Query("all"),
     sort: str = Query("kickoff"),
     side: str = Query("all"),
@@ -1121,7 +1378,11 @@ def ats_finder(
     from spe.models.ats.board_cache import load_board
 
     payload = load_board(session)
+    sort, side = board_query_for(sort, side, subscribed=_viewer_is_subscribed(request))
     rows = _with_recorded_results(session, list(payload.get("rows") or []))
+    from app.queries import attach_team_marks
+
+    rows = attach_team_marks(session, rows)
     if league not in {"all", ""}:
         rows = [r for r in rows if r.get("league_id") == league]
     # Favorites/dogs use sportsbook handicap h (negative = that side favored).

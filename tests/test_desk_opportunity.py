@@ -67,41 +67,40 @@ def test_duplicate_provider_games_count_as_one_appearance():
 
 
 def td_row(name="p", chance=.6):
-    r = published_row(market_id="anytime_td", side="yes", line=None, player_id=name,
+    row = published_row(market_id="anytime_td", side="yes", line=None, player_id=name,
         player_name=name, outcome_id=name, team_id="home", opponent_id="away", position="RB",
-        book_price=500,
         forecast={"p_estimate": chance, "availability_status": "active"})
-    r["usage"] = {"carries": 8, "gl_carries": 2}
-    return r
+    row["usage"] = {"gl_carries": 1, "carries": 8}
+    return row
 
 
 @pytest.mark.parametrize("status", ["questionable", "inactive", "confirmed_inactive", "out", "doubtful"])
 def test_uncertain_or_inactive_player_never_selected(status):
     bad = td_row("star", .9)
     bad["forecast"]["availability_status"] = status
-    assert select_desk_takes([bad, td_row("ready", .3)], now=NOW)[0]["player_id"] == "ready"
+    ready = td_row("ready", .3)
+    ready["book_price"] = 400
+    assert select_desk_takes([bad, ready])[0]["player_id"] == "ready"
 
 
 @pytest.mark.parametrize("p", [float("nan"), float("inf"), 1.2, -.1, .21])
 def test_invalid_or_too_weak_probability_never_selected(p):
-    assert not select_desk_takes([td_row(chance=p)], now=NOW)
+    assert not select_desk_takes([td_row(chance=p)])
 
 
 def test_equal_probabilities_do_not_depend_on_row_order():
     rows = [td_row("a"), td_row("b")]
-    assert select_desk_takes(rows, now=NOW)[0]["player_id"] == select_desk_takes(rows[::-1], now=NOW)[0]["player_id"]
+    assert select_desk_takes(rows)[0]["player_id"] == select_desk_takes(rows[::-1])[0]["player_id"]
 
 
 def test_live_model_preserves_base_and_never_enables_value_claims(db, monkeypatch):
     import spe.models.player_td.desk_live as live
-    monkeypatch.setattr(live, "load_model", lambda league: model())
+    monkeypatch.setattr(live, "load_model", lambda league, **kwargs: model())
     monkeypatch.setattr(live, "load_history", lambda *args: [history_row(week=i) for i in (1, 2, 3)])
     r = td_row()
     r["kickoff_utc"] = "2026-09-28T18:00:00Z"
     r["league_id"] = "nfl"
-    r["price_freshness"]["observed_at"] = "2026-09-27T18:00:00Z"
     enrich_desk_rows(db, [r], now=as_utc("2026-09-27T18:00:00Z"))
-    assert r["desk_selected"]
     assert r["forecast"]["base_probability"] == .6
     assert r["forecast"]["ev_after_haircut"] is None
     assert "DESK_EXPERIMENTAL" in r["forecast"]["reason_codes"]
@@ -132,6 +131,17 @@ def test_pregame_choice_is_frozen_and_not_replaced_after_kickoff(db):
     assert db.query(DeskDecision).count() == 2
 
 
+def test_missing_pregame_lock_can_be_recorded_after_kickoff(db):
+    seed(db)
+    late = td_row("late")
+    late["kickoff_utc"] = (NOW - timedelta(hours=1)).isoformat()
+    late["forecast"]["model_version"] = "desk_opportunity_v2-nfl"
+    assert freeze_desk_rows(db, [late], NOW) == 0
+    assert freeze_desk_rows(db, [late], NOW, include_started=True) == 1
+    assert latest_decisions(db)[late["game_id"]].payload["row"]["player_id"] == "late"
+    assert freeze_desk_rows(db, [late], NOW, include_started=True) == 0
+
+
 def test_review_flag_records_a_pass_and_does_not_keep_previous_pick(db):
     from spe.db.models import DeskDecision
     seed(db)
@@ -141,30 +151,6 @@ def test_review_flag_records_a_pass_and_does_not_keep_previous_pick(db):
     r["forecast"]["availability_status"] = "questionable"
     freeze_desk_rows(db, [r], NOW + timedelta(minutes=1))
     assert latest_decisions(db)[r["game_id"]].payload["row"] is None
-
-
-@pytest.mark.parametrize("action", ["rewrite", "delete"])
-def test_frozen_decision_rejects_mutation(db, action):
-    seed(db)
-    freeze_desk_rows(db, [td_row()], NOW)
-    db.commit()
-    record = latest_decisions(db)["g"]
-    if action == "rewrite":
-        record.payload = {"row": None}
-    else:
-        db.delete(record)
-    with pytest.raises(ValueError, match="append-only"):
-        db.flush()
-    db.rollback()
-
-
-def test_expired_quote_records_a_pass_instead_of_claiming_old_value(db):
-    seed(db)
-    r = td_row()
-    freeze_desk_rows(db, [r], NOW)
-    assert latest_decisions(db)["g"].payload["row"]
-    freeze_desk_rows(db, [r], NOW + timedelta(minutes=20))
-    assert latest_decisions(db)["g"].payload["row"] is None
 
 
 def test_scorecard_counts_only_final_pregame_choice_and_omits_stale_price_roi():

@@ -42,6 +42,12 @@ FALLBACK_SIGMA = {
     "rushing_yards": 30.0,
 }
 RECENT_GAMES = 16
+DEFENSE_GAMES = 8
+DEFENSE_MIN_GAMES = 4
+# Half the gap to a league-average defense, and never more than an 18% move.
+DEFENSE_WEIGHT = 0.5
+DEFENSE_FLOOR = 0.82
+DEFENSE_CAP = 1.18
 # Below this many played games, blend toward the saved model mean.
 TRUST_RECENT_AT = 8
 THIN_SHRINK_K = 4.0
@@ -110,6 +116,141 @@ def side_probability(p_over: float, side: str | None) -> tuple[float, float, flo
         flipped = 1.0 - p
         return flipped, max(1e-6, 1.0 - high), min(1.0, 1.0 - low)
     return p, low, high
+
+
+@dataclass(frozen=True)
+class AllowedGame:
+    kickoff: datetime
+    rush_yards: float
+    rec_yards: float
+    receptions: float
+
+
+@dataclass(frozen=True)
+class DefenseTable:
+    """What each team has allowed, newest game first, plus the league's typical output."""
+
+    games: dict[str, tuple[AllowedGame, ...]]
+    baseline: dict[str, float]
+
+
+def matchup_factor(allowed: float, baseline: float, games: int) -> float:
+    """Scale a player's average by the defense, shrunk toward the league."""
+    if games < DEFENSE_MIN_GAMES or baseline <= 0:
+        return 1.0
+    raw = float(allowed) / float(baseline)
+    shifted = 1.0 + DEFENSE_WEIGHT * (raw - 1.0)
+    return max(DEFENSE_FLOOR, min(DEFENSE_CAP, shifted))
+
+
+def opponent_allowance(
+    table: DefenseTable,
+    opponent_id: str | None,
+    market_id: str,
+    kickoff: datetime | None,
+) -> tuple[float | None, float | None, int]:
+    """Recent yards or catches allowed before this kickoff, and the league baseline."""
+    stat = {"rushing_yards": "rush_yards", "receiving_yards": "rec_yards", "receptions": "receptions"}.get(market_id)
+    moment = as_utc(kickoff)
+    if stat is None or not opponent_id or moment is None:
+        return None, None, 0
+    played = [
+        game
+        for game in table.games.get(str(opponent_id), ())
+        if as_utc(game.kickoff) is not None and as_utc(game.kickoff) < moment
+    ][:DEFENSE_GAMES]
+    if not played:
+        return None, table.baseline.get(market_id), 0
+    allowed = sum(float(getattr(game, stat)) for game in played) / len(played)
+    return allowed, table.baseline.get(market_id), len(played)
+
+
+def apply_matchup(row: dict[str, Any], table: DefenseTable) -> None:
+    """Move a recent-average prop by what this defense has allowed. Once only."""
+    if row.get("defense_games") is not None:
+        return
+    market_id = str(row.get("market_id") or "")
+    if market_id not in STAT_COLUMN or row.get("projection_source") != "recent":
+        row["defense_games"] = 0
+        return
+    player_average = row.get("projection")
+    if not isinstance(player_average, (int, float)):
+        row["defense_games"] = 0
+        return
+    allowed, baseline, games = opponent_allowance(table, row.get("opponent_id"), market_id, row.get("kickoff_utc"))
+    factor = matchup_factor(allowed or 0.0, baseline or 0.0, games)
+    mean = float(player_average) * factor
+    row["player_average"] = round(float(player_average), 1)
+    row["defense_factor"] = round(factor, 3)
+    row["defense_allowed"] = None if allowed is None else round(allowed, 1)
+    row["defense_baseline"] = None if baseline is None else round(baseline, 1)
+    row["defense_games"] = games
+    row["projection"] = round(mean, 1)
+    if row.get("line") is None:
+        return
+    sigma = market_sigma(str(row.get("league_id") or ""), market_id)
+    p, low, high = side_probability(over_probability(market_id, mean, float(row["line"]), sigma), row.get("side"))
+    forecast = dict(row.get("forecast") or {})
+    forecast["p_estimate"] = p
+    forecast["confidence_interval"] = (low, high)
+    _refresh_ev(forecast, row.get("book_price"))
+    row["forecast"] = forecast
+    row["model_lean"] = model_lean(p)
+
+
+def load_defense(session: Session, league_id: str) -> DefenseTable:
+    """Yards and catches each team has allowed, from the opponent's box score."""
+    from collections import defaultdict
+
+    from sqlalchemy import func, select
+
+    from spe.db.models import Game, PlayerGameStat
+
+    summed = session.execute(
+        select(
+            Game.game_id,
+            Game.kickoff_utc,
+            Game.home_team_id,
+            Game.away_team_id,
+            PlayerGameStat.team_id,
+            func.sum(PlayerGameStat.rush_yards),
+            func.sum(PlayerGameStat.rec_yards),
+            func.sum(PlayerGameStat.receptions),
+        )
+        .join(Game, Game.game_id == PlayerGameStat.game_id)
+        .where(Game.league_id == league_id, Game.status == "final", PlayerGameStat.team_id.isnot(None))
+        .group_by(Game.game_id, Game.kickoff_utc, Game.home_team_id, Game.away_team_id, PlayerGameStat.team_id)
+    ).all()
+    by_game: dict[str, dict[str, tuple[float, float, float]]] = defaultdict(dict)
+    meta: dict[str, tuple[Any, str, str]] = {}
+    for game_id, kickoff, home, away, team, rush, rec, catches in summed:
+        moment = as_utc(kickoff)
+        if moment is None or not home or not away or not team:
+            continue
+        meta[game_id] = (moment, home, away)
+        by_game[game_id][team] = (float(rush or 0), float(rec or 0), float(catches or 0))
+
+    allowed: dict[str, list[AllowedGame]] = defaultdict(list)
+    totals = {"rushing_yards": [], "receiving_yards": [], "receptions": []}
+    for game_id, teams in by_game.items():
+        moment, home, away = meta[game_id]
+        if home not in teams or away not in teams:
+            continue
+        for offense, defense in ((home, away), (away, home)):
+            rush, rec, catches = teams[offense]
+            allowed[defense].append(AllowedGame(moment, rush, rec, catches))
+            totals["rushing_yards"].append(rush)
+            totals["receiving_yards"].append(rec)
+            totals["receptions"].append(catches)
+    games = {
+        team: tuple(sorted(rows, key=lambda game: game.kickoff, reverse=True))
+        for team, rows in allowed.items()
+    }
+    baseline = {
+        market: (sum(values) / len(values) if values else 0.0)
+        for market, values in totals.items()
+    }
+    return DefenseTable(games, baseline)
 
 
 def model_lean(p: float | None) -> bool | None:

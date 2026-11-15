@@ -42,11 +42,15 @@ def build_parlay_card(
     spreads: list[dict[str, Any]] | None = None,
     *,
     now: datetime | None = None,
+    posted: bool = False,
 ) -> dict[str, Any]:
     """Return the tickets for one slate.
 
     ``joints`` maps ``(game_id, player_lo, player_hi)`` to a same-draw
     anytime-touchdown joint. Pairs without an entry are left off the card.
+
+    ``posted`` keeps the last number on a slate that has already kicked off.
+    The chance still has to sit near that price. A ruled-out player stays off.
     """
     standard = _collapse(_priced(rows, _standard))
     long_pool = _collapse(_priced(rows, _longshot))
@@ -110,13 +114,17 @@ def build_parlay_card(
     if same is not None:
         tickets.append(same)
 
-    tickets.extend(_anytime_tickets(rows, now=now or datetime.now(UTC)))
-    tickets.extend(_spread_tickets(spreads or [], now=now or datetime.now(UTC)))
+    moment = now or datetime.now(UTC)
+    tickets.extend(_anytime_tickets(rows, now=moment, posted=posted))
+    tickets.extend(_spread_tickets(spreads or [], now=moment, posted=posted))
 
+    on_tickets = [leg for ticket in tickets for leg in ticket["legs"]]
+    priced_legs = len(standard) + len(long_pool) + len({str(row["player_id"]) for row in lottery_pool})
     return {
         "tickets": tickets,
-        "eligible_legs": len(standard) + len(long_pool) + len({str(row["player_id"]) for row in lottery_pool}),
-        "games_with_legs": len({str(row["game_id"]) for row in standard}),
+        "eligible_legs": len({str(leg.get("outcome_id")) for leg in on_tickets}) if posted else priced_legs,
+        "games_with_legs": len({str(leg.get("game_id")) for leg in on_tickets}) if posted else len({str(row["game_id"]) for row in standard}),
+        "posted": posted,
     }
 
 
@@ -318,12 +326,12 @@ def _diverse_plus(pool: list[dict[str, Any]], avoid_players: set[str]) -> list[d
     return chosen
 
 
-def _anytime_tickets(rows: list[dict[str, Any]], *, now: datetime) -> list[dict[str, Any]]:
+def _anytime_tickets(rows: list[dict[str, Any]], *, now: datetime, posted: bool = False) -> list[dict[str, Any]]:
     """Scorer tickets. A positive price edge is not required. An out player is."""
     by_game: dict[str, dict[str, Any]] = {}
     long_by_game: dict[str, dict[str, Any]] = {}
     for row in rows:
-        if not _td_leg(row, now):
+        if not _td_leg(row, now, posted=posted):
             continue
         game_id = str(row["game_id"])
         current = by_game.get(game_id)
@@ -370,7 +378,7 @@ def _anytime_tickets(rows: list[dict[str, Any]], *, now: datetime) -> list[dict[
     return tickets
 
 
-def _td_leg(row: dict[str, Any], now: datetime) -> bool:
+def _td_leg(row: dict[str, Any], now: datetime, *, posted: bool = False) -> bool:
     if row.get("market_id") != "anytime_td" or not row.get("player_id"):
         return False
     if str(row.get("side") or "yes") not in {"yes", "over"}:
@@ -380,7 +388,7 @@ def _td_leg(row: dict[str, Any], now: datetime) -> bool:
     forecast = row.get("forecast") or {}
     if str(forecast.get("availability_status") or "") == "out":
         return False
-    if not _price_still_posted(row, now):
+    if not posted and not _price_still_posted(row, now):
         return False
     if not (TD_MIN_P <= _p(row) <= TD_MAX_P):
         return False
@@ -400,8 +408,8 @@ def _price_still_posted(row: dict[str, Any], now: datetime) -> bool:
     return kick is not None and kick > as_utc(now)
 
 
-def _spread_tickets(rows: list[dict[str, Any]], *, now: datetime) -> list[dict[str, Any]]:
-    legs = [leg for leg in (_spread_leg(row, now) for row in rows) if leg is not None]
+def _spread_tickets(rows: list[dict[str, Any]], *, now: datetime, posted: bool = False) -> list[dict[str, Any]]:
+    legs = [leg for leg in (_spread_leg(row, now, posted=posted) for row in rows) if leg is not None]
     legs.sort(key=lambda row: str(row.get("kickoff_utc") or ""))
     summary = (
         "The model's side against the number. The chance is that side's cover chance. "
@@ -431,14 +439,18 @@ def _spread_tickets(rows: list[dict[str, Any]], *, now: datetime) -> list[dict[s
     return tickets
 
 
-def _spread_leg(row: dict[str, Any], now: datetime) -> dict[str, Any] | None:
+def _spread_leg(row: dict[str, Any], now: datetime, *, posted: bool = False) -> dict[str, Any] | None:
     if row.get("projection_withheld"):
         return None
-    if str(row.get("game_status") or "scheduled") not in {"scheduled", "preview", "pregame"}:
+    status = str(row.get("game_status") or "scheduled")
+    if status in {"canceled", "cancelled"}:
         return None
     kick = _kickoff(row.get("kickoff_utc"))
-    if kick is None or kick <= as_utc(now):
-        return None
+    if not posted:
+        if status not in {"scheduled", "preview", "pregame"}:
+            return None
+        if kick is None or kick <= as_utc(now):
+            return None
     side = row.get("ats_side") or row.get("favored_side")
     if side not in {"home", "away"}:
         return None

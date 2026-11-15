@@ -1,7 +1,11 @@
 from datetime import UTC, datetime
 
 from spe.models.prop_projection import (
+    AllowedGame,
+    DefenseTable,
     PlayedGame,
+    apply_matchup,
+    matchup_factor,
     mean_before,
     model_lean,
     over_probability,
@@ -49,6 +53,47 @@ def test_thin_sample_stays_near_the_model():
     mean, source = projection_mean(100.0, 2, 40.0)
     assert source == "recent"
     assert abs(mean - (2 / 6 * 100 + 4 / 6 * 40)) < 1e-9
+
+
+def test_a_stingy_defense_shrinks_the_projection_and_a_soft_one_lifts_it():
+    stingy = matchup_factor(110, 163, 8)
+    soft = matchup_factor(220, 163, 8)
+    assert 0.82 <= stingy < 1
+    assert 1 < soft <= 1.18
+    assert matchup_factor(220, 163, 3) == 1.0
+
+
+def test_matchup_moves_the_chance_once():
+    from datetime import UTC, datetime
+
+    table = DefenseTable(
+        games={
+            "opp": tuple(
+                AllowedGame(datetime(2026, 10, day, tzinfo=UTC), rush_yards=220, rec_yards=220, receptions=22)
+                for day in range(1, 9)
+            )
+        },
+        baseline={"rushing_yards": 160, "receiving_yards": 160, "receptions": 18},
+    )
+    row = {
+        "market_id": "rushing_yards",
+        "league_id": "fbs",
+        "opponent_id": "opp",
+        "kickoff_utc": "2026-11-14T20:00:00+00:00",
+        "side": "under",
+        "line": 44.5,
+        "book_price": -114,
+        "projection": 39.2,
+        "projection_source": "recent",
+        "forecast": {},
+    }
+    apply_matchup(row, table)
+    lifted = row["projection"]
+    chance = row["forecast"]["p_estimate"]
+    apply_matchup(row, table)
+    assert lifted > 39.2
+    assert row["projection"] == lifted
+    assert row["forecast"]["p_estimate"] == chance
 
 
 def test_star_rusher_is_not_a_two_percent_over():

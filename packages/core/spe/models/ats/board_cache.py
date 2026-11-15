@@ -74,10 +74,83 @@ def is_fresh(payload: dict[str, Any], *, ttl_sec: int = TTL_SEC, now: datetime |
     return age is not None and age <= ttl_sec
 
 
+_LOCKED_SPREAD_KEYS = (
+    "ats_side",
+    "ats_team",
+    "ats_line",
+    "ats_pick_label",
+    "ats_cover_margin",
+    "ats_probability",
+    "ats_basis",
+    "ats_locked",
+)
+
+
+def _started(status: object) -> bool:
+    return str(status or "").lower() in {"final", "in_progress"}
+
+
+def keep_finished_spreads(previous: dict[str, Any] | None, payload: dict[str, Any]) -> dict[str, Any]:
+    """A rebuild can change the margin. It cannot take a started game's spread off the card."""
+    from spe.models.ats.predict import grade_displayed_pick, lays_points_with_fewer_wins
+
+    if not previous:
+        return payload
+    saved: dict[str, tuple[str, dict[str, Any], dict[str, Any]]] = {}
+    for row in previous.get("rows") or []:
+        if row.get("ats_side") not in {"home", "away"} or not row.get("ats_pick_label"):
+            continue
+        kept = {key: row.get(key) for key in _LOCKED_SPREAD_KEYS}
+        kept["ats_locked"] = True
+        saved[str(row.get("game_id"))] = (str(row.get("game_status") or ""), kept, row)
+    for row in payload.get("rows") or []:
+        prior = saved.get(str(row.get("game_id")))
+        if prior is None:
+            continue
+        previous_status, kept, previous_row = prior
+        if not (_started(previous_status) or _started(row.get("game_status"))):
+            continue
+        if (
+            previous_row.get("ats_basis") == "number"
+            and lays_points_with_fewer_wins(previous_row)
+            and row.get("ats_side") in {"home", "away"}
+            and row.get("ats_pick_label")
+        ):
+            if str(previous_status).lower() == "final":
+                row["game_status"] = "final"
+            row["ats_pick_result"] = grade_displayed_pick(
+                status=row.get("game_status"),
+                home_score=row.get("home_score"),
+                away_score=row.get("away_score"),
+                pick_market="spread",
+                favored_side=row.get("ats_side"),
+                home_handicap=row.get("home_handicap"),
+            )
+            continue
+        row.update(kept)
+        if str(previous_status).lower() == "final":
+            row["game_status"] = "final"
+        line = row.get("ats_line")
+        side = row.get("ats_side")
+        if line is not None and side in {"home", "away"}:
+            row["home_handicap"] = float(line) if side == "home" else -float(line)
+        row["ats_pick_result"] = grade_displayed_pick(
+            status=row.get("game_status"),
+            home_score=row.get("home_score"),
+            away_score=row.get("away_score"),
+            pick_market="spread",
+            favored_side=side,
+            home_handicap=row.get("home_handicap"),
+        )
+    return payload
+
+
 def refresh_board(session: Session, path: Path | None = None) -> dict[str, Any]:
     from spe.models.ats.predict import predict_upcoming_ats
 
+    previous = read_board(path)
     payload = predict_upcoming_ats(session, include_simulation=False)
+    payload = keep_finished_spreads(previous, payload)
     write_board(payload, path)
     return payload
 

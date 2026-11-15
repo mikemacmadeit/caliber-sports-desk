@@ -68,6 +68,12 @@ class Settings(BaseSettings):
         "No wagering and no automated placement in this product."
     )
 
+    # Stripe. Server-side only. Checkout is $19.99/month unless STRIPE_PRICE_ID is set.
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_id: str = ""
+    subscription_price_cents: int = 1999
+
     @property
     def odds_market_list(self) -> list[str]:
         return [m.strip() for m in self.odds_markets.split(",") if m.strip()]

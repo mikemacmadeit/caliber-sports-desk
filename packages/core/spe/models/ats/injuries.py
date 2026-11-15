@@ -7,14 +7,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 SKILL_POSITIONS = ("WR", "RB", "TE")
-OUT_DESIGNATIONS = ("Out", "Doubtful")
 
 
-def load_nfl_injury_features(session: Session) -> pd.DataFrame:
-    """One row per NFL game that has a report filed before kickoff.
+def load_injury_features(session: Session, league_id: str) -> pd.DataFrame:
+    """One row per game that has a report filed before kickoff.
 
     Counts only Out and Doubtful players whose roster says they were on the
-    home or away team at kickoff.
+    home or away team at kickoff. A missing report stays missing.
     """
     raw = pd.read_sql(
         text(
@@ -33,12 +32,13 @@ def load_nfl_injury_features(session: Session) -> pd.DataFrame:
              AND r.team_id IN (g.home_team_id, g.away_team_id)
              AND r.valid_from <= g.kickoff_utc
              AND (r.valid_to IS NULL OR r.valid_to >= g.kickoff_utc)
-            WHERE g.league_id = 'nfl'
+            WHERE g.league_id = :lg
               AND i.reported_at <= g.kickoff_utc
-              AND i.designation IN ('Out', 'Doubtful')
+              AND lower(i.designation) IN ('out', 'doubtful')
             """
         ),
         session.connection(),
+        params={"lg": league_id},
     )
     if raw.empty:
         return pd.DataFrame(
@@ -61,6 +61,11 @@ def load_nfl_injury_features(session: Session) -> pd.DataFrame:
     )
     grouped["injury_report"] = 1.0
     return grouped
+
+
+def load_nfl_injury_features(session: Session) -> pd.DataFrame:
+    """NFL reports. College uses the same counts through ``load_injury_features``."""
+    return load_injury_features(session, "nfl")
 
 
 def _counts(group: pd.DataFrame) -> pd.Series:

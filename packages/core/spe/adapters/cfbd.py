@@ -16,6 +16,8 @@ SUPPORTED = {
     "teams": "/teams",
     "roster": "/roster",
     "plays": "/plays",
+    "play_stats": "/plays/stats",
+    "play_stat_types": "/plays/stats/types",
     "ppa_players": "/ppa/players/games",
     "ppa_players_season": "/ppa/players/season",
     "stats_player": "/stats/player/season",
@@ -90,6 +92,7 @@ class CfbdAdapter(ProviderAdapter):
             headers=self._headers(),
             params=query,
             timeout=timeout,
+            retries=1 if endpoint_key in {"play_stats", "play_stat_types"} else 5,
             client=self._client,
         )
         self.calls_made += 1

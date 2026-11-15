@@ -73,6 +73,22 @@ def changes_for(row, old, now):
     return [c for c in old.get("changes", []) if as_utc(c.get("at")) and as_utc(c["at"]) > now - timedelta(hours=24)]
 
 
+def public_mark(value):
+    """Club color and logo only. Drop empty fields and anything else on the row."""
+    if not isinstance(value, dict):
+        return None
+    out = {}
+    for key in ("location", "nick", "primary", "secondary", "logo"):
+        item = value.get(key)
+        if isinstance(item, str):
+            text = item.strip()
+            if text:
+                out[key] = text[:300]
+    if not out.get("logo") and not out.get("primary"):
+        return None
+    return out
+
+
 def card(row, now):
     row = annotate(row, now)
     f, q = row["forecast"], row["qualification"]
@@ -106,6 +122,9 @@ def card(row, now):
         "id": selection_key(row), "outcome_id": row.get("outcome_id"), "game_id": row["game_id"],
         "league": row["league_id"], "player": row.get("player_name") or "Player", "team": row.get("team"),
         "opponent": row.get("opponent"), "matchup": f"{row.get('away_abbr', '?')} at {row.get('home_abbr', '?')}",
+        "team_mark": public_mark(row.get("team_mark")), "opponent_mark": public_mark(row.get("opponent_mark")),
+        "away_abbr": row.get("away_abbr") or None, "home_abbr": row.get("home_abbr") or None,
+        "away_mark": public_mark(row.get("away_mark")), "home_mark": public_mark(row.get("home_mark")),
         "kickoff": row["kickoff_utc"], "market": row["market_id"], "pick": pick,
         "book": row.get("bookmaker"), "price": int(price) if price is not None else None,
         "probability": p, "break_even": american_to_implied(int(price)) if price is not None and abs(price) >= 100 else None,
@@ -121,12 +140,14 @@ def card(row, now):
 def build(rows, *, now=None, book=None, market=None, search=None, saved=None, offset=0, limit=30):
     now = as_utc(now) or datetime.now(UTC)
     available_books, cards = set(), []
+    market_keys = {key: set() for key in LABELS}
     for original in rows:
         if original.get("market_id") not in LABELS or original.get("data_tier") == "demo":
             continue
         kick = as_utc(original.get("kickoff_utc"))
         if not kick or kick <= now or original.get("game_status") in {"final", "in_progress", "canceled", "cancelled", "postponed"}:
             continue
+        market_keys[original["market_id"]].add(selection_key(original))
         offers = original.get("offers") or [{k: original.get(k) for k in ("bookmaker", "book_price", "price_freshness", "source_timestamp")}]
         available_books.update(o["bookmaker"] for o in offers if o.get("bookmaker"))
         matching = [o for o in offers if not book or o.get("bookmaker") == book]
@@ -147,6 +168,7 @@ def build(rows, *, now=None, book=None, market=None, search=None, saved=None, of
     cards = sorted(unique.values(), key=lambda c: (not c["qualification"]["eligible"], "price_not_verified_recently" in c["qualification"]["reasons"], -(c["conservative_ev"] if c["conservative_ev"] is not None else -100), str(c["kickoff"]), c["id"]))
     reasons = Counter(r for c in cards for r in c["qualification"]["reasons"])
     return {"rows": cards[offset:offset + limit], "total": len(cards), "offset": offset, "limit": limit,
+            "market_counts": {key: len(keys) for key, keys in market_keys.items()},
             "books": sorted(available_books), "qualified": sum(c["qualification"]["eligible"] for c in cards),
             "changed": sum(bool(c["changes"]) for c in cards),
             "blockers": [{"reason": REASONS.get(r, r), "count": count} for r, count in reasons.most_common(4)]}

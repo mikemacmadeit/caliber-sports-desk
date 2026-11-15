@@ -1884,6 +1884,9 @@ def main() -> None:
     sub.add_parser("odds-budget")
     sub.add_parser("ingest-odds-fixture")
     sub.add_parser("coverage")
+    nfl_context = sub.add_parser("refresh-nflverse-desk", help="Free NFL snap counts, scoring opportunities, NGS, roster and depth context")
+    nfl_context.add_argument("--year", type=int, default=None)
+    nfl_context.add_argument("--force", action="store_true")
     free = sub.add_parser("ingest-free", help="Participation, NGS, rosters, depth charts, forecasts, NOAA, GDELT")
     free.add_argument("--start", type=int, default=2016)
     free.add_argument("--end", type=int, default=2025)
@@ -2211,6 +2214,13 @@ def main() -> None:
         cmd_ingest_odds_fixture()
     elif args.command == "coverage":
         cmd_coverage()
+    elif args.command == "refresh-nflverse-desk":
+        from spe.ingest.nflverse_desk import refresh_nflverse_desk
+        init_db()
+        with session_factory() as session:
+            result = refresh_nflverse_desk(session, year=args.year, force=args.force)
+            session.commit()
+        print(json.dumps(result, indent=2, default=str))
     elif args.command == "ingest-free":
         cmd_ingest_free(args.start, args.end, args.refresh, news=not args.skip_news)
     elif args.command == "ingest-weather":

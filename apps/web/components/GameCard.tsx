@@ -37,14 +37,17 @@ export function GameCard({ game, featured = false }: { game: SlateGame; featured
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             {featured ? (
               <span className={game.status === "in_progress" ? "kicker kicker-signal" : "kicker"}>
-                {game.status === "in_progress" ? "Live" : "Next kickoff"}
+                {game.status === "in_progress" ? "Live" : game.status === "final" ? "Final" : "Next kickoff"}
               </span>
             ) : null}
             {game.status === "in_progress" && !featured ? (
               <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal">Live</span>
             ) : null}
+            {game.status === "final" && !featured ? (
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-mute">Final</span>
+            ) : null}
             <LeagueBadge league={game.league_id} />
-            <TierChip tier={game.data_tier} />
+            {game.status === "final" ? null : <TierChip tier={game.data_tier} />}
             {game.conference ? (
               <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-mute">{game.conference}</span>
             ) : null}
@@ -58,7 +61,7 @@ export function GameCard({ game, featured = false }: { game: SlateGame; featured
               <TeamMark team={away} size="lg" />
               <TeamSide abbr={away.abbr} nick={away.nick} featured />
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-signal">at</div>
+            <MatchDivider game={game} featured />
             <div className="flex items-center gap-4">
               <TeamMark team={home} size="lg" />
               <TeamSide abbr={home.abbr} nick={home.nick} featured />
@@ -68,7 +71,7 @@ export function GameCard({ game, featured = false }: { game: SlateGame; featured
           <div className="mt-5 grid grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-3">
             <TeamMark team={away} />
             <TeamSide abbr={away.abbr} nick={away.nick} />
-            <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-signal">at</div>
+            <MatchDivider game={game} />
             <TeamSide abbr={home.abbr} nick={home.nick} align="right" />
             <TeamMark team={home} />
           </div>
@@ -100,6 +103,23 @@ export function GameCard({ game, featured = false }: { game: SlateGame; featured
       </div>
     </Link>
   );
+}
+
+function MatchDivider({ game, featured = false }: { game: SlateGame; featured?: boolean }) {
+  const score = finalScore(game);
+  if (score) {
+    return (
+      <div className={`text-center font-display uppercase leading-none text-paper ${featured ? "text-4xl sm:text-6xl" : "text-2xl"}`}>
+        {score}
+      </div>
+    );
+  }
+  return <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-signal">at</div>;
+}
+
+function finalScore(game: SlateGame) {
+  if (game.status !== "final" || game.away_score == null || game.home_score == null) return null;
+  return `${game.away_score}–${game.home_score}`;
 }
 
 function TeamSide({

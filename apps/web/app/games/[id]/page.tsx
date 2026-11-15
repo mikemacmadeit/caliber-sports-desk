@@ -1,4 +1,5 @@
 import { BackLink } from "@/components/BackLink";
+import { LockedCall } from "@/components/LockedCall";
 import { GameMarkets } from "@/components/GameMarkets";
 import { PickPair } from "@/components/CallCard";
 import { MarginBar } from "@/components/MarginBar";
@@ -90,6 +91,14 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
         <p className="mt-3 max-w-2xl text-sm text-mute">
           Weather, who is out, and where the model and the price disagree. The call above is the published number.
         </p>
+      {data.locked ? (
+        <div className="mt-6">
+          <LockedCall
+            title="The game call is locked"
+            detail="Weather and the injury report stay visible. The call opens at kickoff, or now with a subscription."
+          />
+        </div>
+      ) : (
       <section
         className={`mt-6 border p-5 sm:p-6 ${
           call.tone === "play" ? "border-gold/40" : call.tone === "demo" ? "border-ice/40" : "border-heat/25"
@@ -134,6 +143,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
           </ul>
         ) : null}
       </section>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title={weatherTitle} hint="How the field should play">
@@ -254,7 +264,11 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
             Filter by market type. Probability is the official model number; EV needs a book price.
           </p>
         </div>
-        <GameMarkets rows={data.props} />
+        {data.locked ? (
+          <LockedCall title="Player markets are locked" detail="Prices and the model number open at kickoff. Subscribers see them now — $19.99 a month." />
+        ) : (
+          <GameMarkets rows={data.props} />
+        )}
       </section>
     </div>
   );
@@ -310,6 +324,7 @@ function Panel({
 }
 
 type CardRow = {
+  locked?: boolean;
   game_id: string;
   pick_label?: string | null;
   pick_chance_label?: string | null;
@@ -356,6 +371,13 @@ function CardReadout({
   homeColor: string;
 }) {
   const settled = row.game_status === "final";
+  if (row.locked) {
+    return (
+      <div className="mt-6">
+        <LockedCall />
+      </div>
+    );
+  }
   return (
     <div className="plate relative mt-6 overflow-hidden px-4 py-4 sm:px-5">
       <span aria-hidden className="absolute bottom-0 left-0 top-0 w-1.5" style={{ background: awayColor }} />

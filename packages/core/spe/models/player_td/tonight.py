@@ -83,8 +83,10 @@ def score_players(
         games = float(player.get("games") or 0.0)
         own = float(player.get("rush_tds") or 0.0) + float(player.get("rec_tds") or 0.0)
         if games > 0:
-            own_rate = own / games
-            lam = (SHRINK_GAMES * lam + games * own_rate) / (SHRINK_GAMES + games)
+            # A recent score can lift the chance. It cannot take the ball away
+            # from the player who is actually getting the carries and targets.
+            own_rate = min(own / games, 1.25)
+            lam = (6.0 * lam + own_rate) / 7.0
         out[str(player["person"])] = _poisson(lam)
     return out
 

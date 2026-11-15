@@ -54,9 +54,18 @@ def format_spread_line(line: float) -> str:
     return text
 
 
-# College holdout from 2024-08-15: the side covered 52.4% of 2,244 decided games.
-# A 14-point disagreement covered 53%. The gaussian tail (80%+) does not.
+# Saved margin model, scored on games after its training cutoff through October 2026.
+# NFL model side covered 55.5% of 470 games when it was 1 to 7 points off the number.
+# College model side covered 54.6% of 326 games when it was 1 to 3 points off the
+# number. From 3 to 7 points it was 50.7% of 592, so those stay unpublished.
+# A gap under a point is not a pick in either league.
+# A gap of a touchdown or more names the number's side. The close bands name ours.
+# The number's side is skipped when it is laying points with fewer wins than
+# the opponent. That pick stays on our side.
 FBS_GRADED_COVER_RATE = 0.524
+SPREAD_MIN_DISAGREEMENT = 7.0
+CLOSE_MIN_DISAGREEMENT = 1.0
+FBS_CLOSE_MAX = 3.0
 FBS_GRADED_COVER_LABEL = "Covered 52% of recent college games"
 # NFL holdout from 2024-09-01 with pre-kickoff Out/Doubtful counts: 53.7% of 681 games.
 # The same window without injuries covered 51.8%.
@@ -86,6 +95,34 @@ def blend_margin_toward_market(
     return (1.0 - share) * float(predicted_margin) + share * float(market_margin)
 
 
+def moneyline_record_side(
+    *,
+    blended_margin: float,
+    raw_margin: float | None,
+    market_margin: float | None,
+    home_record: object = None,
+    away_record: object = None,
+) -> str:
+    """Use our winner when the favorite has fewer wins and our guess already likes the dog.
+
+    The blended margin otherwise stays. A missing record does not move the pick.
+    """
+    side = "home" if blended_margin >= 0 else "away"
+    market = _finite(market_margin)
+    raw = _finite(raw_margin)
+    if market is None or market == 0 or raw is None or raw == 0:
+        return side
+    book = "home" if market > 0 else "away"
+    our = "home" if raw > 0 else "away"
+    if our == book:
+        return side
+    favorite_wins = record_wins(home_record if book == "home" else away_record)
+    dog_wins = record_wins(away_record if book == "home" else home_record)
+    if favorite_wins is None or dog_wins is None or favorite_wins >= dog_wins:
+        return side
+    return our
+
+
 def choose_ats_pick(
     *,
     predicted_margin: float,
@@ -94,9 +131,19 @@ def choose_ats_pick(
     p_away_cover: float | None,
     home_team: str,
     away_team: str,
+    raw_margin: float | None = None,
+    market_margin: float | None = None,
+    home_record: object = None,
+    away_record: object = None,
 ) -> dict[str, Any]:
     """Name the team expected to win. The number can still be attached for context."""
-    side = "home" if predicted_margin >= 0 else "away"
+    side = moneyline_record_side(
+        blended_margin=predicted_margin,
+        raw_margin=raw_margin,
+        market_margin=market_margin,
+        home_record=home_record,
+        away_record=away_record,
+    )
     team = home_team if side == "home" else away_team
     chance = p_home_cover if side == "home" else p_away_cover
     line = None
@@ -109,7 +156,48 @@ def choose_ats_pick(
         "pick_market": "straight_up",
         "p_cover": chance,
         "pick_label": f"{team} to win",
+        "pick_basis": "record" if raw_margin is not None and side != ("home" if predicted_margin >= 0 else "away") else "blended",
     }
+
+
+def _spread_basis(gap: float, league_id: str | None) -> str | None:
+    """score = our side of a close number. number = the posted side of a big gap."""
+    size = abs(gap)
+    league = str(league_id or "").lower()
+    if league == "nfl" and CLOSE_MIN_DISAGREEMENT <= size < SPREAD_MIN_DISAGREEMENT:
+        return "score"
+    if league == "fbs" and CLOSE_MIN_DISAGREEMENT <= size < FBS_CLOSE_MAX:
+        return "score"
+    if size >= SPREAD_MIN_DISAGREEMENT:
+        return "number"
+    return None
+
+
+def record_wins(record: object) -> int | None:
+    """Wins from a record like ``1-9``. A missing record stays missing."""
+    if not isinstance(record, str) or "-" not in record:
+        return None
+    head = record.split("-", 1)[0].strip()
+    if not head.isdigit():
+        return None
+    return int(head)
+
+
+def lays_points_with_fewer_wins(row: dict[str, Any]) -> bool:
+    """The named side is laying points and has fewer wins than the opponent."""
+    line = _finite(row.get("ats_line"))
+    if line is None or line >= 0:
+        return False
+    team = row.get("ats_team")
+    if team and team == row.get("home_team"):
+        our_record, opp_record = row.get("home_record"), row.get("away_record")
+    elif team and team == row.get("away_team"):
+        our_record, opp_record = row.get("away_record"), row.get("home_record")
+    else:
+        return False
+    our_wins = record_wins(our_record)
+    opp_wins = record_wins(opp_record)
+    return our_wins is not None and opp_wins is not None and our_wins < opp_wins
 
 
 def choose_spread_pick(
@@ -119,28 +207,87 @@ def choose_spread_pick(
     margin_sigma: float | None,
     home_team: str,
     away_team: str,
+    model_vs_market: float | None = None,
+    league_id: str | None = None,
+    home_record: str | None = None,
+    away_record: str | None = None,
 ) -> dict[str, Any] | None:
-    """The side of the posted number. A missing number has no spread pick."""
+    """Name a spread side from the raw disagreement with the number.
+
+    Pass model_vs_market when the stored margin has already been pulled
+    toward the number. The blended leftover is not the gap.
+    """
     handicap = _finite(home_handicap)
-    margin = _finite(predicted_margin)
-    if handicap is None or margin is None:
+    if handicap is None:
         return None
-    edge = margin + handicap
-    if abs(edge) < 1e-6:
+    gap = _finite(model_vs_market)
+    if gap is None:
+        margin = _finite(predicted_margin)
+        if margin is None:
+            return None
+        gap = margin + handicap
+    basis = _spread_basis(gap, league_id)
+    if basis is None:
         return None
-    side = "home" if edge > 0 else "away"
+    side = "home" if gap > 0 else "away"
+    if basis == "number":
+        book_side = "away" if side == "home" else "home"
+        book_line = handicap if book_side == "home" else -handicap
+        book_team = home_team if book_side == "home" else away_team
+        if lays_points_with_fewer_wins(
+            {
+                "ats_line": book_line,
+                "ats_team": book_team,
+                "home_team": home_team,
+                "away_team": away_team,
+                "home_record": home_record,
+                "away_record": away_record,
+            }
+        ):
+            basis = "record"
+        else:
+            side = book_side
     line = handicap if side == "home" else -handicap
     team = home_team if side == "home" else away_team
     sigma = _finite(margin_sigma) or 13.0
-    probs = normal_cover_probs(margin, handicap, sigma)
+    raw_margin = gap - handicap
+    probs = normal_cover_probs(raw_margin, handicap, sigma)
     return {
         "ats_side": side,
         "ats_team": team,
         "ats_line": line,
         "ats_pick_label": f"{team} {format_spread_line(line)}",
-        "ats_cover_margin": edge if side == "home" else -edge,
+        "ats_cover_margin": abs(gap),
+        "ats_basis": basis,
         "ats_probability": probs["p_home_cover"] if side == "home" else probs["p_away_cover"],
     }
+
+
+def _apply_saved_moneyline_record(row: dict[str, Any]) -> None:
+    """Flip a saved moneyline when the favorite has fewer wins and our guess likes the dog."""
+    blended = _finite(row.get("predicted_margin"))
+    market = _finite(row.get("market_home_margin"))
+    gap = _finite(row.get("model_vs_market"))
+    if blended is None or row.get("pick_market") == "withheld":
+        return
+    raw = None if market is None or gap is None else gap + market
+    side = moneyline_record_side(
+        blended_margin=blended,
+        raw_margin=raw,
+        market_margin=market,
+        home_record=row.get("home_record"),
+        away_record=row.get("away_record"),
+    )
+    if side == row.get("favored_side"):
+        return
+    home = str(row.get("home_team") or "Home")
+    away = str(row.get("away_team") or "Away")
+    handicap = _finite(row.get("home_handicap"))
+    row["favored_side"] = side
+    row["pick_team"] = home if side == "home" else away
+    row["pick_label"] = f"{row['pick_team']} to win"
+    row["pick_line"] = None if handicap is None else (handicap if side == "home" else -handicap)
+    row["pick_basis"] = "record"
 
 
 def apply_recorded_result(
@@ -151,6 +298,7 @@ def apply_recorded_result(
     away_score: int | None,
 ) -> dict[str, Any]:
     """Grade both calls once the game has a recorded score."""
+    _apply_saved_moneyline_record(row)
     if status and home_score is not None and away_score is not None and status.lower() in {"final", "in_progress"}:
         row["game_status"] = status.lower()
         row["home_score"] = int(home_score)
@@ -167,8 +315,29 @@ def apply_recorded_result(
     return attach_spread_pick(row)
 
 
+def _game_has_started(row: dict[str, Any]) -> bool:
+    return str(row.get("game_status") or "").lower() in {"final", "in_progress"}
+
+
+def _named_spread(row: dict[str, Any]) -> bool:
+    return row.get("ats_side") in {"home", "away"} and bool(row.get("ats_pick_label"))
+
+
 def attach_spread_pick(row: dict[str, Any]) -> dict[str, Any]:
     """Add the cover side to a board row. The winner pick stays as it is."""
+    if _game_has_started(row) and (_named_spread(row) or row.get("ats_locked") is True) and not (
+        row.get("ats_basis") == "number" and lays_points_with_fewer_wins(row)
+    ):
+        row["ats_locked"] = True
+        row["ats_pick_result"] = grade_displayed_pick(
+            status=row.get("game_status"),
+            home_score=row.get("home_score"),
+            away_score=row.get("away_score"),
+            pick_market="spread",
+            favored_side=row.get("ats_side"),
+            home_handicap=row.get("home_handicap"),
+        )
+        return row
     if row.get("projection_withheld") or row.get("pick_market") == "withheld":
         row["ats_side"] = None
         row["ats_team"] = None
@@ -176,6 +345,7 @@ def attach_spread_pick(row: dict[str, Any]) -> dict[str, Any]:
         row["ats_pick_label"] = None
         row["ats_cover_margin"] = None
         row["ats_probability"] = None
+        row["ats_basis"] = None
         row["ats_pick_result"] = None
         return row
     pick = choose_spread_pick(
@@ -184,6 +354,10 @@ def attach_spread_pick(row: dict[str, Any]) -> dict[str, Any]:
         margin_sigma=row.get("margin_sigma"),
         home_team=str(row.get("home_team") or "Home"),
         away_team=str(row.get("away_team") or "Away"),
+        model_vs_market=row.get("model_vs_market"),
+        league_id=row.get("league_id") or row.get("league"),
+        home_record=row.get("home_record"),
+        away_record=row.get("away_record"),
     )
     if pick is None:
         row["ats_side"] = None
@@ -192,9 +366,12 @@ def attach_spread_pick(row: dict[str, Any]) -> dict[str, Any]:
         row["ats_pick_label"] = None
         row["ats_cover_margin"] = None
         row["ats_probability"] = None
+        row["ats_basis"] = None
         row["ats_pick_result"] = None
         return row
     row.update(pick)
+    if _game_has_started(row):
+        row["ats_locked"] = True
     row["ats_pick_result"] = grade_displayed_pick(
         status=row.get("game_status"),
         home_score=row.get("home_score"),
@@ -346,6 +523,9 @@ def predict_upcoming_ats(
         team_names = _team_names(session, lg)
         records = _live_records(session, lg, now)
         cover_enabled = bool(bundle.cover_probs_enabled)
+        from spe.models.ats.close_check import apply_close_look, load_close_look
+
+        close_look = load_close_look(session, lg, now)
 
         for row in scored.itertuples(index=False):
             spread = getattr(row, "spread_line", None)
@@ -400,6 +580,10 @@ def predict_upcoming_ats(
                 p_away_cover=win_away,
                 home_team=home_name,
                 away_team=away_name,
+                raw_margin=raw_margin,
+                market_margin=market_margin_f,
+                home_record=records.get(home_id),
+                away_record=records.get(away_id),
             )
             side = pick["favored_side"]
             side_line = pick["pick_line"]
@@ -568,6 +752,8 @@ def predict_upcoming_ats(
                 }
             )
             attach_spread_pick(rows[-1])
+            if not _game_has_started(rows[-1]):
+                apply_close_look(rows[-1], close_look)
         summaries[lg] = {
             "status": "ok",
             "n": int(len(upcoming)),

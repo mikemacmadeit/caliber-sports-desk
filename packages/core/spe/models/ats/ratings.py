@@ -466,10 +466,10 @@ def build_team_strength_frame(session: Session, league_id: str) -> pd.DataFrame:
         med_temp = float(frame["weather_temp_c"].median()) if frame["weather_temp_c"].notna().any() else 18.0
         frame["weather_temp_c"] = frame["weather_temp_c"].fillna(med_temp)
         frame["weather_wind_mps"] = frame["weather_wind_mps"].fillna(0.0)
-    if league_id == "nfl":
-        from spe.models.ats.injuries import INJURY_FEATURES, load_nfl_injury_features
+    if league_id in {"nfl", "fbs"}:
+        from spe.models.ats.injuries import INJURY_FEATURES, load_injury_features
 
-        injuries = load_nfl_injury_features(session)
+        injuries = load_injury_features(session, league_id)
         frame = frame.merge(injuries, on="game_id", how="left")
         for col in INJURY_FEATURES:
             if col not in frame.columns:

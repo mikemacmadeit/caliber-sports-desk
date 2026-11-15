@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from collections import defaultdict
+from zoneinfo import ZoneInfo
 from sqlalchemy import event
 from sqlalchemy.exc import IntegrityError
 from spe.db.base import as_utc, new_id
@@ -69,6 +70,42 @@ def publish(db, rows, now=None):
             ):
                 raise
     return {"status": "ok", "published": written, "eligible": len(selected)}
+
+
+SLATE = ZoneInfo("America/Chicago")
+
+
+def day_picks(db, league=None, date=None):
+    """Published props for one slate day, including ones whose price window has closed.
+
+    The live card drops a pick when the game starts or the quote expires. This list
+    keeps that same frozen pick up for the day and attaches the settled result.
+    """
+    if not date:
+        return []
+    query = db.query(PublishedPick, PublishedResult).outerjoin(
+        PublishedResult, PublishedPick.pick_id == PublishedResult.pick_id
+    )
+    if league and league != "all":
+        query = query.filter(PublishedPick.league_id == league)
+    out = []
+    for pick, settled in query.all():
+        kick = as_utc(pick.kickoff_utc)
+        if kick is None or kick.astimezone(SLATE).date().isoformat() != date:
+            continue
+        out.append(
+            {
+                **pick.snapshot,
+                "pick_id": pick.pick_id,
+                "published_at": as_utc(pick.published_at).isoformat(),
+                "kickoff_utc": kick.isoformat(),
+                "result": settled.result if settled else "pending",
+                "actual": settled.actual if settled else None,
+                "units": settled.units if settled else None,
+            }
+        )
+    out.sort(key=lambda row: (str(row.get("kickoff_utc") or ""), str(row.get("market_id") or ""), str(row.get("player_name") or "")))
+    return out
 
 
 def current_picks(db, rows, now=None):

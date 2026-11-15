@@ -11,7 +11,7 @@ def parse(payload):
     for team in (payload.get("boxscore") or {}).get("players") or []:
         for group in team.get("statistics") or []:
             kind = str(group.get("name", "")).lower()
-            if kind not in {"rushing", "receiving", "kickreturns", "puntreturns"}:
+            if kind not in {"passing", "rushing", "receiving", "kickreturns", "puntreturns"}:
                 continue
             labels = [str(s).upper() for s in group.get("labels") or []]
             for item in group.get("athletes") or []:
@@ -20,10 +20,21 @@ def parse(payload):
                 if not name:
                     continue
                 values = dict(zip(labels, item.get("stats") or []))
+                if kind == "passing":
+                    # A QB with actual pass attempts participated even without a
+                    # rushing/receiving row. Passing TDs never count as ATD.
+                    try:
+                        attempts = int(str(values.get("C/ATT", "")).split("/")[1])
+                    except (IndexError, ValueError):
+                        continue
+                    if attempts <= 0:
+                        continue
                 row = people.setdefault(
                     str(athlete.get("id") or name),
                     {"name": name, "markets": {}, "td": 0, "td_complete": True},
                 )
+                if kind == "passing":
+                    continue
 
                 def number(label):
                     try:

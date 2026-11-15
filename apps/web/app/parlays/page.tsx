@@ -1,4 +1,5 @@
 import { DayStrip, EmptyDay } from "@/components/DayStrip";
+import { LockedCall } from "@/components/LockedCall";
 import { LeagueToggle } from "@/components/LeagueToggle";
 import { PageHeader } from "@/components/PageHeader";
 import { ParlayBoard } from "@/components/ParlayBoard";
@@ -52,7 +53,12 @@ export default async function ParlaysPage({
         />
       ) : null}
 
-      {card.data && card.data.games_on_slate > 0 && tickets.length > 0 ? (
+      {card.data?.locked && tickets.length === 0 ? (
+        <LockedCall
+          title="The tickets are locked"
+          detail="They open when the games kick off. Subscribers see them now — $19.99 a month."
+        />
+      ) : card.data && card.data.games_on_slate > 0 && tickets.length > 0 ? (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
             <Stat label="Tickets" value={String(tickets.length).padStart(2, "0")} hint="Built for this slate" />
@@ -66,7 +72,7 @@ export default async function ParlaysPage({
         </>
       ) : null}
 
-      {card.data && card.data.games_on_slate > 0 && tickets.length === 0 && !card.error ? (
+      {card.data && !card.data.locked && card.data.games_on_slate > 0 && tickets.length === 0 && !card.error ? (
         <div className="plate px-5 py-6">
           <p className="font-display text-3xl uppercase leading-none">Nothing cleared</p>
           <p className="mt-3 max-w-xl text-sm text-mute">

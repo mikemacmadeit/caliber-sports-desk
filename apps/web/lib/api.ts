@@ -67,7 +67,6 @@ export type PriceFreshness = {
   status: "fresh" | "stale" | "missing" | string;
   age_minutes: number | null;
   captured_at: string | null;
-  observed_at?: string | null;
   source_timestamp: string | null;
   max_age_minutes: number;
   is_current_opportunity: boolean;
@@ -112,6 +111,8 @@ export type SlateGame = {
   week: number | null;
   kickoff_utc: string;
   status: string;
+  home_score?: number | null;
+  away_score?: number | null;
   home: {
     team_id: string;
     name: string;
@@ -231,14 +232,77 @@ export type ResearchDetail = ResearchSummary & {
 };
 
 export type Qualification = { eligible: boolean; reasons: string[]; verified_at: string | null; valid_until: string | null; minimum_american_odds: number | null };
+export type TdPriceCase = {
+  american: number | null;
+  bookmaker?: string | null;
+  recorded_at?: string | null;
+  break_even: number | null;
+  fair_american: number | null;
+  estimated_edge: number | null;
+  note: string;
+};
+
+export type TdCustomerExplanation = {
+  version: string; label: string; chance: string; why: string; matchup: string;
+  caution: string; price: string; research_note: string;
+  comparison: { heading: string; text: string } | null;
+};
+
+export type TdScoutingReport = {
+  customer?: TdCustomerExplanation;
+  case?: { thesis: string; support: string[]; counter: string[]; verdict: string;
+    paths: { path: string; label: string; projected_opportunities: number; share: number;
+      conversion_rate: number; opponent_rate_ratio: number; player_sample: number;
+      opponent_position_sample: number; inherited_share: number }[] };
+  version: string;
+  headline: string;
+  information_cutoff: string | null;
+  frozen_inputs_only: boolean;
+  role: string[];
+  matchup: string[];
+  game_script: string[];
+  checks: string[];
+  gaps: string[];
+  alternatives: { player_id: string; name: string; team: string; probability: number;
+    team_implied_points: number | null; gap_to_pick: number | null; price: TdPriceCase;
+    role: string; allocation_probability: number | null; policy_excluded?: boolean }[];
+  comparison: string;
+  price: TdPriceCase;
+  model_note: string;
+  sources: { label: string; url: string | null }[];
+};
+
+export type TdDecisionCandidate = {
+  customer?: TdCustomerExplanation;
+  football_case?: { supported: boolean; reasons: { kind: string; text: string; source: string; window: string }[];
+    cautions: string[]; missing: string[] };
+  player_id: string; name: string; team: string; position: string | null;
+  probability: number; stress_low: number; stress_high: number;
+  american: number | null; bookmaker: string | null; source_at: string | null;
+  break_even: number | null; model_edge: number | null; expected_return: number | null;
+  stress_edge: number | null; price_supported: boolean; cautions: string[];
+  price_status: string; uncertainty_note: string;
+};
+
 export type PropRow = {
-  desk_selected?: boolean;
-  desk_analysis?: {
-    version: string; as_of: string; eligible: boolean; blockers: string[];
-    candidate_status: string; candidate_probability: number | null;
-    valid_until?: string | null;
-    reasons: string[]; risks: string[];
-  };
+  decision_results?: Partial<Record<"most_likely" | "value_candidate", { result: string; hypothetical_unit_profit: number | null }>>;
+  decision?: { version: string; status: string; reason: string; policy: string; validation_note: string;
+    eligible_candidates: number; price_supported_candidates: number;
+    alternative_status?: string; alternative_note?: string;
+    most_likely: TdDecisionCandidate; value_candidate: TdDecisionCandidate | null;
+    selected: TdDecisionCandidate; alternatives: TdDecisionCandidate[] };
+  retrospective?: boolean;
+  replay_selection?: "historical_price_edge" | "scorer_only" | "balanced_scorer" | "scoring_case";
+  selection_version?: string;
+  selection_reason?: string;
+  selection_warnings?: string[];
+  selection_readiness?: { status: "provisional" | "availability_checked"; reasons: string[]; note?: string };
+  market_context?: { usable?: boolean; home_handicap?: number | null; total?: number | null; retrospective_market_data?: boolean };
+  team_implied_points?: number | null;
+  result?: "scored" | "blank" | "pending" | "awaiting_box" | "win" | "loss" | "push" | "void" | "blocked";
+  actual?: number | null;
+  game_status?: string | null;
+  final_score?: string | null;
   qualification?: Qualification;
   published_pick_id?: string | null;
   locked?: boolean;
@@ -273,9 +337,42 @@ export type PropRow = {
   price_freshness?: PriceFreshness;
   best_available?: boolean;
   forecast: Forecast;
+  selection_safety?: { policy_version: string; eligible: boolean; blockers: string[]; estimated_edge: number | null; minimum_probability: number };
+  desk_analysis?: {
+    scouting_report?: TdScoutingReport;
+    // Context and fitted features are deliberately separate.
+    matchup_features_active?: boolean;
+    market_total_active?: boolean;
+    free_opportunities_active?: boolean;
+    free_opportunities_status?: string;
+    situational_features_active?: boolean;
+    current_context?: {
+      weather?: { wind_mps: number | null; precip_probability: number | null; roof: string; probability_effect: string } | null;
+      depth?: { rank: number; source: string } | null;
+      availability?: { status: string; source: string } | null;
+      missing?: string[];
+      personnel_alerts?: { player_id: string; name: string; position: string; side: string; status: string; probability_effect: string }[];
+    };
+    eligible?: boolean;
+    combination_status?: string;
+    combination?: {
+      player_probability: number;
+      allocation_probability: number;
+      combined_probability: number;
+      allocation_weight: number;
+      rush_lambda: number;
+      rec_lambda: number;
+      pool_size: number;
+      team_expected_tds: { rush: number; rec: number };
+    } | null;
+    sources?: string[];
+    reasons?: string[];
+    risks?: string[];
+    candidate_probability?: number | null;
+    candidate_status?: string;
+  };
   usage?: {
     carries?: number | null;
-    receptions?: number | null;
     targets?: number | null;
     rz_targets?: number | null;
     gl_carries?: number | null;
@@ -310,6 +407,9 @@ export type PropPick = {
   stale?: boolean;
   sentence: string;
   research_only?: boolean;
+  result?: "win" | "loss" | "push" | "void" | "pending" | string;
+  actual?: number | null;
+  units?: number | null;
 };
 
 export type PropPickCard = {
@@ -319,6 +419,8 @@ export type PropPickCard = {
   games_on_slate: number;
   degraded?: boolean;
   picks: PropPick[];
+  /** Frozen picks for this slate day. They stay up after the live price window closes. */
+  day?: PropPick[];
   note: string;
   disclaimer: string;
 };
@@ -382,6 +484,11 @@ export type ParlayLeg = {
   line: number | null;
   book_price: number | null;
   p: number;
+  result?: "win" | "loss" | "push" | "pending" | string | null;
+  game_status?: string | null;
+  actual?: number | null;
+  home_score?: number | null;
+  away_score?: number | null;
 };
 
 export type ParlayTicket = {
@@ -394,6 +501,7 @@ export type ParlayTicket = {
   independent_probability: number;
   price_american: number | null;
   ev: number | null;
+  result?: "win" | "loss" | "push" | "pending" | string | null;
   legs: ParlayLeg[];
 };
 
