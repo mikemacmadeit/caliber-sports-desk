@@ -13,16 +13,18 @@ export function LedgerRecord({
   league,
   title,
   card,
+  units,
 }: {
   month: string;
   selected: string;
   league: string;
   title: string;
   card: LedgerCard | null;
+  units: Record<string, number>;
 }) {
   return (
     <>
-      <LedgerCalendar month={month} selected={selected} marked={card?.dates ?? []} league={league} />
+      <LedgerCalendar month={month} selected={selected} units={units} league={league} />
       {card ? (
         <LedgerDay title={title} rows={card.rows ?? []} />
       ) : (

@@ -5,19 +5,18 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export function LedgerCalendar({
   month,
   selected,
-  marked,
+  units,
   league,
 }: {
   month: string;
   selected: string;
-  marked: string[];
+  units: Record<string, number>;
   league: string;
 }) {
   const [year, monthNumber] = month.split("-").map(Number);
   const first = new Date(Date.UTC(year, monthNumber - 1, 1));
   const blanks = first.getUTCDay();
   const count = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-  const has = new Set(marked);
   const label = first.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
   return (
@@ -44,23 +43,34 @@ export function LedgerCalendar({
           const day = String(index + 1).padStart(2, "0");
           const iso = `${month}-${day}`;
           const active = iso === selected;
+          const total = units[iso];
+          const figure = total == null ? "" : signed(total);
           return (
             <Link
               key={iso}
               href={href(month, iso, league)}
               aria-current={active ? "date" : undefined}
-              className={`flex min-h-12 flex-col items-center justify-center rounded-md border text-sm ${
+              aria-label={figure ? `${index + 1}, ${figure} units` : String(index + 1)}
+              className={`flex min-h-14 flex-col items-center justify-center rounded-md border px-0.5 text-sm ${
                 active ? "border-gold bg-gold text-ink-950" : "border-white/10 text-paper hover:border-white/30"
               }`}
             >
               <span className="font-display text-xl leading-none">{index + 1}</span>
-              <span className={`mt-1 h-1.5 w-1.5 rounded-full ${has.has(iso) ? (active ? "bg-ink-950" : "bg-gold") : "bg-transparent"}`} />
+              {figure ? (
+                <span className={`mt-1 font-mono text-[10px] leading-none ${active ? "text-ink-950" : total > 0 ? "text-green-300" : total < 0 ? "text-red-300" : "text-mute"}`}>
+                  {figure}
+                </span>
+              ) : null}
             </Link>
           );
         })}
       </div>
     </section>
   );
+}
+
+function signed(value: number) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
 function href(month: string, date: string, league: string) {

@@ -4,9 +4,22 @@ import { LedgerRecord, type LedgerCard } from "@/components/LedgerRecord";
 import { PageHeader } from "@/components/PageHeader";
 import { dayParts, slateToday } from "@/lib/days";
 
-const SAVED: Record<string, LedgerCard & { rows: { league_id: string }[] }> = {
+const SAVED: Record<string, LedgerCard & { rows: SavedRow[] }> = {
   "2026-11-14": savedSaturday,
 };
+
+type SavedRow = { league_id: string; result: string; units?: number | null };
+
+export function unitsFor(league: string): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const [date, card] of Object.entries(SAVED)) {
+    const rows = league === "all" ? card.rows : (card.rows ?? []).filter((row) => row.league_id === league);
+    const priced = rows.filter((row) => row.units != null && row.result !== "pending");
+    if (!priced.length) continue;
+    totals[date] = priced.reduce((sum, row) => sum + Number(row.units), 0);
+  }
+  return totals;
+}
 
 export default async function TrackRecordPage({
   searchParams,
@@ -40,6 +53,7 @@ export default async function TrackRecordPage({
         league={league}
         title={`${when.weekday} · ${when.monthDay}`}
         card={card}
+        units={unitsFor(league)}
       />
     </div>
   );
