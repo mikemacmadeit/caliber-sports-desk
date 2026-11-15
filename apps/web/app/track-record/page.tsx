@@ -10,7 +10,7 @@ const SAVED: Record<string, LedgerCard & { rows: SavedRow[] }> = {
 
 type SavedRow = { league_id: string; result: string; units?: number | null };
 
-export function unitsFor(league: string): Record<string, number> {
+function unitsFor(league: string): Record<string, number> {
   const totals: Record<string, number> = {};
   for (const [date, card] of Object.entries(SAVED)) {
     const rows = league === "all" ? card.rows : (card.rows ?? []).filter((row) => row.league_id === league);
