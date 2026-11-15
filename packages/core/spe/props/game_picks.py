@@ -51,6 +51,52 @@ def attach_team_spreads(
         row["team_spread"] = float(home_line) if team_id == home_team else -float(home_line)
 
 
+DESK_CARD_PREFIX = "prop-desk-card-v1:"
+
+
+def desk_card_key(date: str, league: str) -> str:
+    return f"{DESK_CARD_PREFIX}{date}:{league or 'all'}"
+
+
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
+def saved_desk_props(session, league: str, date: str) -> list[dict[str, Any]] | None:
+    """Picks already chosen for this day. Missing card means they have not been saved yet."""
+    from spe.db.models import BoardSnapshot
+
+    saved = session.get(BoardSnapshot, desk_card_key(date, league))
+    rows = (saved.payload or {}).get("rows") if saved is not None else None
+    if not rows:
+        return None
+    return [dict(row) for row in rows]
+
+
+def store_desk_props(session, league: str, date: str, rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+    from datetime import UTC, datetime as clock
+    from spe.db.models import BoardSnapshot
+
+    key = desk_card_key(date, league)
+    payload = {"rows": _jsonable(rows)}
+    saved = session.get(BoardSnapshot, key)
+    now = clock.now(UTC)
+    if saved is None:
+        session.add(BoardSnapshot(key=key, payload=payload, updated_at=now))
+    else:
+        saved.payload, saved.updated_at = payload, now
+
+
 def load_desk_props(session, league: str, date: str) -> list[dict[str, Any]]:
     """The prop calls the desk gives out: the best counting prop in each game."""
     from sqlalchemy import select

@@ -116,6 +116,54 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
     return {"date": date, "scoreboard_games": sum(map(len, boards.values())), "graded_players": written, "missing_boxes": missing}
 
 
+def ensure_live_touchdowns(date):
+    """Write touchdowns that have already happened, then grade the saved card.
+
+    Page changes read the saved names. This only fills in wins and losses.
+    """
+    key = ("live", settings.database_url, date)
+    with _lock:
+        state = _states.get(key, {})
+        if state.get("running"):
+            return "running"
+        if time.monotonic() - state.get("attempted", -1000) < 20:
+            return "ready"
+        _states[key] = {"running": True, "attempted": time.monotonic()}
+
+    def refresh():
+        failed = False
+        try:
+            from datetime import timedelta
+            from spe.db.base import as_utc
+            from spe.db.session import session_factory
+            from spe.desk.day_results import refresh_live_touchdowns
+            from spe.models.player_td.desk_replay import ZONE, saved_day_card
+            start = datetime.fromisoformat(date).replace(tzinfo=ZONE)
+            with session_factory() as db:
+                games = db.scalars(select(Game).where(
+                    Game.kickoff_utc >= start.astimezone(UTC),
+                    Game.kickoff_utc < (start + timedelta(days=1)).astimezone(UTC),
+                    Game.data_tier.notin_(("demo", "alias")),
+                )).all()
+                started = [game for game in games if as_utc(game.kickoff_utc) <= datetime.now(UTC)]
+                if started:
+                    refresh_live_touchdowns(db, started)
+                    db.commit()
+            with session_factory() as db:
+                for league in ("all", "nfl", "fbs"):
+                    saved_day_card(db, date, league)
+                db.commit()
+        except Exception:
+            failed = True
+            logging.getLogger(__name__).exception("Live touchdown refresh failed for %s", date)
+        finally:
+            with _lock:
+                _states[key].update(running=False, failed=failed)
+
+    threading.Thread(target=refresh, daemon=True, name=f"live-td-{date}").start()
+    return "running"
+
+
 def ensure_results(date):
     """Local pages refresh free results in the background, at most once a minute."""
     if settings.app_env != "dev":

@@ -205,6 +205,33 @@ def test_cached_board_reports_pending_without_doing_first_prediction(db, monkeyp
     assert not result['rows'] and 'update queued' in result['unavailable_games'][0]['reason']
 
 
+def test_a_saved_card_shows_a_touchdown_without_rebuilding_the_model(db, monkeypatch):
+    from test_publication_pipeline import seed, NOW
+    from spe.db.models import BoardSnapshot, PublishedStat
+    from spe.models.player_td.desk_replay import day_card_key, saved_day_card
+    import spe.models.player_td.desk_replay as replay
+    game = seed(db)
+    game.status = "in_progress"
+    db.flush()
+    row = candidate(game_id=game.game_id, kickoff_utc=as_utc(game.kickoff_utc).isoformat())
+    row["result"] = "pending"
+    db.add(BoardSnapshot(
+        key=day_card_key("2026-11-15", "all"),
+        payload={"date": "2026-11-15", "league": "all", "rows": [row], "wins": 0, "losses": 0},
+        updated_at=NOW,
+    ))
+    db.add(PublishedStat(
+        key=f"{game.game_id}|pick|anytime_td", game_id=game.game_id, player_id="pick",
+        market_id="anytime_td", actual=1, source="espn.live", observed_at=NOW,
+    ))
+    db.flush()
+    monkeypatch.setattr(replay, "load_history", lambda *a, **k: pytest.fail("A saved card must not rebuild the model"))
+    card = saved_day_card(db, "2026-11-15", "all")
+    assert card["wins"] == 1
+    assert card["rows"][0]["result"] == "scored"
+    assert card["rows"][0]["player_name"] == "pick"
+
+
 def test_scorer_refresh_coalesces_requests_and_keeps_failed_state(monkeypatch):
     import spe.models.player_td.scorer_refresh as refresh
     import spe.models.player_td.desk_replay as replay

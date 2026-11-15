@@ -194,6 +194,8 @@ def refresh_live_touchdowns(session: Session, games: list[Game]) -> None:
         gid = game.game_id
         filters.append(BoardSnapshot.key.in_([f"scorer-desk-v1:{gid}", f"guarded-desk-v1:{gid}"]))
         filters.append(BoardSnapshot.key.like(f"retrained-desk-v1:{gid}:%"))
+        filters.append(BoardSnapshot.key.like(f"scorer-replay-v1:{gid}:%"))
+        filters.append(BoardSnapshot.key.like(f"combined-replay-v4-free:{gid}:%"))
     snaps = session.scalars(select(BoardSnapshot).where(or_(*filters))).all()
     rows: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()

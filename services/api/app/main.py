@@ -402,12 +402,19 @@ def anytime_td_calls(
 
 @app.get("/v1/anytime-td/replay")
 def combined_replay(date: calendar_date, league: str = Query(default="all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
-    from spe.models.player_td.desk_replay import replay_day
-    from spe.models.player_td.desk_replay_results import ensure_results
+    from spe.models.player_td.desk_replay import replay_day, saved_day_card
+    from spe.models.player_td.desk_replay_results import ensure_live_touchdowns, ensure_results
     from spe.models.player_td.scorer_refresh import ensure_refresh
     day = date.isoformat()
     from app.queries import attach_game_marks
     from sqlalchemy.exc import IntegrityError
+    saved = saved_day_card(session, day, league)
+    if saved and saved.get("rows"):
+        attach_game_marks(session, saved.get("rows") or [])
+        session.commit()
+        saved["refresh_status"] = "ready"
+        saved["results_refresh_status"] = ensure_live_touchdowns(day)
+        return saved
     for attempt in range(2):
         try:
             result = replay_day(session, day, league, cached_only=True)
@@ -443,13 +450,18 @@ def prop_desk(
 ) -> dict[str, Any]:
     """One receptions, receiving, or rushing call per game. Touchdowns stay off."""
     from spe.desk.day_results import apply_recorded_results
-    from spe.props.game_picks import load_desk_props
+    from spe.props.game_picks import load_desk_props, saved_desk_props, store_desk_props
 
     selected = date or slate_today()
-    chosen = load_desk_props(session, league, selected)
+    chosen = saved_desk_props(session, league, selected)
+    already_saved = chosen is not None
+    if chosen is None:
+        chosen = load_desk_props(session, league, selected)
+        store_desk_props(session, league, selected, chosen)
     index = {row.get("game_id"): session.get(Game, row.get("game_id")) for row in chosen if row.get("game_id")}
     try:
-        apply_recorded_results(session, [], chosen)
+        # A saved card is graded from stats already on file. The first build may still read the box.
+        apply_recorded_results(session, [], chosen, fetch=(lambda *_args, **_kwargs: None) if already_saved else None)
         session.commit()
     except Exception:
         session.rollback()

@@ -17,6 +17,11 @@ export function peekBrowserCache<T>(path: string): T | null {
   return hit.value as T;
 }
 
+/** Keep a desk card on screen while a later page reads it back. */
+export function rememberBrowserCache(path: string, value: unknown, ttlMs = BOARD_TTL_MS) {
+  boardCache.set(path, { expires: Date.now() + ttlMs, value });
+}
+
 export async function browserGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (cacheablePath(path)) {
     const hit = boardCache.get(path);

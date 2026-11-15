@@ -6,7 +6,7 @@ import type { PropRow, TdCustomerExplanation, TdDecisionCandidate } from "@/lib/
 import { PropExplorer } from "@/components/PropExplorer";
 import { TeamMark } from "@/components/TeamMark";
 import { dayParts } from "@/lib/days";
-import { browserGet, peekBrowserCache } from "@/lib/browserApi";
+import { browserGet, peekBrowserCache, rememberBrowserCache } from "@/lib/browserApi";
 import { deskPickReason } from "@/lib/atdDeskTakes";
 import { american, kickoffDate, kickoffParts, pct } from "@/lib/format";
 import { presentTeam } from "@/lib/teams";
@@ -38,42 +38,47 @@ export function AnytimeTdBoard({
 }) {
   const path = boardPath(league, date);
   const cached = peekBrowserCache<BoardPayload>(path);
+  const cachedPicks = peekBrowserCache<BoardPayload>(calledPath(league, date));
   const [data, setData] = useState<BoardPayload | null>(cached);
-  const [called, setCalled] = useState<PropRow[]>([]);
-  const [unavailable, setUnavailable] = useState<NonNullable<BoardPayload["unavailable_games"]>>([]);
+  const [called, setCalled] = useState<PropRow[]>(cachedPicks?.rows || []);
+  const [unavailable, setUnavailable] = useState<NonNullable<BoardPayload["unavailable_games"]>>(cachedPicks?.unavailable_games || []);
   const [error, setError] = useState<string | null>(null);
   const [oddsError, setOddsError] = useState<string | null>(null);
   const [resultFilter, setResultFilter] = useState("all");
-  const [loading, setLoading] = useState(!(cached && (cached.rows?.length ?? 0) > 0));
+  const [loading, setLoading] = useState(!((cachedPicks?.rows?.length ?? 0) > 0));
   const [refresh, setRefresh] = useState(0);
   const [scorerStatus, setScorerStatus] = useState<string | undefined>();
   useEffect(() => {
-    if (loading) return;
-    const timer = setTimeout(() => setRefresh(n => n + 1), scorerStatus === "running" ? 3000 : 60000);
+    if (loading && !called.length) return;
+    const timer = setTimeout(() => setRefresh(n => n + 1), called.length ? 20000 : 60000);
     return () => clearTimeout(timer);
-  }, [scorerStatus, refresh, loading]);
+  }, [scorerStatus, refresh, loading, called.length]);
 
   useEffect(() => {
     const ctrl = new AbortController();
-    const warm = refresh === 0 ? peekBrowserCache<BoardPayload>(boardPath(league, date)) : null;
-    if (warm && (warm.rows?.length ?? 0) > 0) {
-      setData(warm);
+    const warmPicks = peekBrowserCache<BoardPayload>(calledPath(league, date));
+    const warm = peekBrowserCache<BoardPayload>(boardPath(league, date));
+    if (warmPicks?.rows?.length) {
+      setCalled(warmPicks.rows);
+      setUnavailable(warmPicks.unavailable_games || []);
       setLoading(false);
       setError(null);
-    } else {
+    } else if (!called.length) {
       setLoading(true);
       setError(null);
     }
+    if (warm && (warm.rows?.length ?? 0) > 0) setData(warm);
 
     // Price research must not block the day's saved scorer cards.
     void browserGet<BoardPayload>(calledPath(league, date), ctrl.signal).then(locked => {
       if (ctrl.signal.aborted) return;
+      rememberBrowserCache(calledPath(league, date), locked);
       setCalled(locked.rows || []);
       setUnavailable(locked.unavailable_games || []);
       setScorerStatus(locked.refresh_status);
       setError(null);
     }).catch((err: unknown) => {
-      if (!ctrl.signal.aborted) setError(err instanceof Error ? err.message : "Picks unavailable");
+      if (!ctrl.signal.aborted && !called.length) setError(err instanceof Error ? err.message : "Picks unavailable");
     }).finally(() => { if (!ctrl.signal.aborted) setLoading(false); });
     void browserGet<BoardPayload>(boardPath(league, date), ctrl.signal).then(payload => {
       if (ctrl.signal.aborted) return;

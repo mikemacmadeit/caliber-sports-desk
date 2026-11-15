@@ -19,6 +19,7 @@ from spe.models.player_td.desk_market import context_for_game, market_features, 
 ZONE = ZoneInfo("America/Chicago")
 SELECTION_VERSION = "market_scorer_v3"
 CACHE_PREFIX = "combined-replay-v4-free:"
+DAY_CARD_PREFIX = "atd-desk-card-v1:"
 MIN_SCORING_CHANCE = .40
 MAX_CHANCE_SACRIFICE = .10
 MOST_EXPENSIVE_PREFERRED_PRICE = -200
@@ -82,6 +83,79 @@ def grade(db, game, player):
     row = max(stats, key=lambda s: (s.provider in {"nflverse", "cfbd"}, s.revision or 0,
                                    as_utc(s.ingested_at) or datetime.min.replace(tzinfo=UTC)))
     return "scored" if (row.rush_td or 0) + (row.rec_td or 0) > 0 else "blank"
+
+
+def day_card_key(date, league) -> str:
+    return f"{DAY_CARD_PREFIX}{date}:{league or 'all'}"
+
+
+def saved_day_card(db, date, league="all"):
+    """The picks already chosen for this day. Grades update; the names do not."""
+    getter = getattr(db, "get", None)
+    if getter is None:
+        return None
+    saved = getter(BoardSnapshot, day_card_key(date, league))
+    payload = saved.payload if saved is not None else None
+    if not payload or not payload.get("rows"):
+        return None
+    card = {**payload, "rows": [{**row} for row in payload["rows"]]}
+    _refresh_card_grades(db, card)
+    saved.payload = card
+    saved.updated_at = datetime.now(UTC)
+    return card
+
+
+def _refresh_card_grades(db, card) -> None:
+    ids = [row.get("game_id") for row in card["rows"] if row.get("game_id")]
+    games = {
+        game.game_id: game
+        for game in db.scalars(select(Game).where(Game.game_id.in_(ids or ["__none__"])))
+    }
+    for row in card["rows"]:
+        game = games.get(row.get("game_id"))
+        if game is None or not row.get("player_id"):
+            continue
+        row["game_status"] = game.status
+        row["result"] = grade(db, game, row["player_id"])
+        row["final_score"] = (
+            f"{game.away_score}–{game.home_score}"
+            if str(game.status or "") == "final" and game.away_score is not None and game.home_score is not None
+            else None
+        )
+        decision = row.get("decision") or {}
+        results = {** (row.get("decision_results") or {})}
+        for lane in ("most_likely", "value_candidate"):
+            entry = decision.get(lane) or {}
+            if not entry.get("player_id"):
+                continue
+            if lane == "value_candidate" and not (entry.get("research_selected") or entry.get("price_supported")):
+                continue
+            prior = {**(results.get(lane) or {})}
+            prior["result"] = grade(db, game, entry["player_id"])
+            results[lane] = prior
+        if results:
+            row["decision_results"] = results
+    card["wins"] = sum(row.get("result") == "scored" for row in card["rows"])
+    card["losses"] = sum(row.get("result") == "blank" for row in card["rows"])
+
+
+def _store_day_card(db, payload) -> None:
+    if not payload.get("rows"):
+        return
+    key = day_card_key(payload.get("date"), payload.get("league"))
+    kept = {
+        field: payload.get(field)
+        for field in (
+            "date", "league", "rows", "unavailable_games", "decision_record",
+            "selection_version", "games", "retrospective", "wins", "losses", "note",
+        )
+    }
+    now = datetime.now(UTC)
+    saved = db.get(BoardSnapshot, key)
+    if saved is None:
+        db.add(BoardSnapshot(key=key, payload=kept, updated_at=now))
+    else:
+        saved.payload, saved.updated_at = kept, now
 
 
 def select_replay_candidate(rows):
@@ -476,9 +550,11 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
             'priced_bets':sum(bool(r.get('bet_qualified')) for r in recorded),
             'hypothetical_unit_profit':sum(r['hypothetical_unit_profit'] for r in recorded if r.get('hypothetical_unit_profit') is not None)
                 if lane=='value_candidate' and any(r.get('hypothetical_unit_profit') is not None for r in recorded) else None}
-    return {"date": date, "league": league, "rows": rows, "unavailable_games": unavailable,
+    payload = {"date": date, "league": league, "rows": rows, "unavailable_games": unavailable,
             "decision_record": decision_record,
             "selection_version": "highest_chance_scorer_v2" if revised else SELECTION_VERSION,
             "games": len(games), "retrospective": True,
             "wins": sum(r["result"] == "scored" for r in rows), "losses": sum(r["result"] == "blank" for r in rows),
             "note": "Combined-model replay using prior-game inputs and recorded pregame prices. Recomputed picks are not the original pregame record."}
+    _store_day_card(db, payload)
+    return payload
