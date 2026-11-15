@@ -143,6 +143,30 @@ def test_two_lines_for_one_player_save_once(db):
     assert rows[1]["actual"] == 4
 
 
+def test_a_game_that_has_not_kicked_off_is_not_fetched(db):
+    _seed(db)
+    game = db.get(Game, "nfl:2026_10_NE_DET")
+    game.status = "scheduled"
+    game.kickoff_utc = datetime.now(UTC) + timedelta(hours=4)
+    db.flush()
+    rows = [
+        {
+            "game_id": "nfl:2026_10_NE_DET",
+            "player_id": "nfl:9139",
+            "player_name": "Receiver",
+            "market_id": "receptions",
+            "side": "over",
+            "line": 4.5,
+        }
+    ]
+
+    def fail(league, event):
+        raise AssertionError("future game was fetched")
+
+    apply_recorded_results(db, [], rows, fetch=fail)
+    assert rows[0]["result"] == "pending"
+
+
 def test_a_live_touchdown_is_green_and_a_blank_teammate_stays_open(db):
     _seed(db)
     rows = [

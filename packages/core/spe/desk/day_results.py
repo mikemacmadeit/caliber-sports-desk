@@ -110,12 +110,11 @@ def _fill_counting_stats(
     missing = _missing_stats(session, rows)
     live_touchdowns = _live_touchdowns(games, rows)
     missing_games = {item[0] for item in missing}
+    now = datetime.now(UTC)
     needed = [
         game
         for game in games.values()
-        if game.game_id not in _CHECKED
-        and str(game.status or "").lower() not in {"canceled", "cancelled"}
-        and (str(game.status or "").lower() not in {"final", "post"} or game.game_id in missing_games)
+        if _needs_a_box(game, missing_games, now)
     ]
     if not needed:
         return
@@ -250,6 +249,21 @@ def _live_touchdowns(
         seen.add(key)
         wanted.append((game_id, player_id, str(row.get("player_name") or ""), TOUCHDOWN, key))
     return wanted
+
+
+def _needs_a_box(game: Game, missing_games: set[str], now: datetime) -> bool:
+    """A game that has not kicked off has no box. Fetching it only slows the page."""
+    status = str(game.status or "").lower()
+    if status in {"canceled", "cancelled"} or game.game_id in _CHECKED:
+        return False
+    if status in {"final", "post"}:
+        return game.game_id in missing_games
+    if status in {"in_progress", "halftime"}:
+        return True
+    kick = game.kickoff_utc
+    if kick is not None and kick.tzinfo is None:
+        kick = kick.replace(tzinfo=UTC)
+    return kick is None or kick <= now
 
 
 def _missing_stats(session: Session, rows: list[dict[str, Any]]) -> list[tuple[str, str, str, str, str]]:
