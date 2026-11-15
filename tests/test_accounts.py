@@ -195,7 +195,7 @@ def test_a_future_prop_desk_call_stays_on_the_card():
     assert [call["player_name"] for call in out["calls"]] == ["Secret Receiver", "Started Back"]
 
 
-def test_future_ticket_legs_are_removed():
+def test_a_future_parlay_ticket_stays_on_the_card():
     out = redact(
         "/v1/parlays/card",
         {
@@ -210,10 +210,9 @@ def test_future_ticket_legs_are_removed():
         },
         subscribed=False,
     )
-    assert out["locked"] is True
-    assert out["tickets"] == []
-    assert out["eligible_legs"] == 0
-    assert "Secret Player" not in json.dumps(out)
+    assert out.get("locked") is not True
+    assert out["tickets"][0]["legs"][0]["player_name"] == "Secret Player"
+    assert out["eligible_legs"] == 4
 
 
 def test_free_board_cannot_sort_by_the_call():

@@ -106,8 +106,6 @@ def redact(path: str, payload: dict[str, Any], *, subscribed: bool) -> dict[str,
                 game["research"] = None
                 game["locked"] = True
         return data
-    if path.startswith("/v1/parlays"):
-        return _lock_parlays(data)
     if path.startswith("/v1/props/picks") and isinstance(data.get("picks"), list):
         data["picks"] = [_lock_pick(row) if isinstance(row, dict) and not started(row) else row for row in data["picks"]]
         if isinstance(data.get("day"), list):
@@ -197,28 +195,6 @@ def _lock_pick(row: dict[str, Any]) -> dict[str, Any]:
         "loud": False,
         "price_ahead": False,
     }
-
-
-def _lock_parlays(payload: dict[str, Any]) -> dict[str, Any]:
-    tickets = payload.get("tickets") or []
-    visible: list[Any] = []
-    hidden = 0
-    for ticket in tickets:
-        if not isinstance(ticket, dict):
-            hidden += 1
-            continue
-        legs = ticket.get("legs") or []
-        if legs and all(isinstance(leg, dict) and started(leg) for leg in legs):
-            visible.append(ticket)
-        else:
-            hidden += 1
-    payload["tickets"] = visible
-    if hidden:
-        payload["locked"] = True
-        payload["locked_count"] = hidden
-        payload["eligible_legs"] = 0
-        payload["games_with_legs"] = 0
-    return payload
 
 
 def _lock_game_detail(payload: dict[str, Any]) -> dict[str, Any]:

@@ -32,7 +32,7 @@ export default async function ParlaysPage({
       <PageHeader
         kicker={when}
         title="Parlay card"
-        lede="Anytime touchdown tickets, including a six-player long shot, sit next to spread tickets from the model's side. A chance that sits far from the price stays off."
+        lede="Each ticket takes the best price in the game. The short spread ticket is the highest cover chances. A chance far from the price stays off."
         action={<LeagueToggle value={league} basePath="/parlays" date={selected} today={today} />}
       />
 
