@@ -375,7 +375,10 @@ def props(
     rows = load_props(session, market, min_odds, min_ev, league, date)
     from spe.desk.day_results import apply_recorded_results
 
-    apply_recorded_results(session, [], rows)
+    try:
+        apply_recorded_results(session, [], rows)
+    except Exception:
+        session.rollback()
     from spe.publishing.ledger import current_picks
     published = {r["outcome_id"]: r["pick_id"] for r in current_picks(session, rows)}
     rows = [{**row, "published_pick_id": published.get(row.get("outcome_id"))} for row in rows]

@@ -116,6 +116,33 @@ def test_a_live_touchdown_grades_green_before_the_final(db):
     assert grade(db, game, "nfl:9139") == "pending"
 
 
+def test_two_lines_for_one_player_save_once(db):
+    _seed(db)
+    box = _box({("nfl:9139", "Receiver"): 0})
+    rows = [
+        {
+            "game_id": "nfl:2026_10_NE_DET",
+            "player_id": "nfl:9139",
+            "player_name": "Receiver",
+            "market_id": "receptions",
+            "side": "over",
+            "line": 4.5,
+        },
+        {
+            "game_id": "nfl:2026_10_NE_DET",
+            "player_id": "nfl:9139",
+            "player_name": "Receiver",
+            "market_id": "receptions",
+            "side": "under",
+            "line": 4.5,
+        },
+    ]
+    apply_recorded_results(db, [], rows, fetch=lambda league, event: box)
+    db.flush()
+    assert rows[0]["actual"] == 4
+    assert rows[1]["actual"] == 4
+
+
 def test_a_live_touchdown_is_green_and_a_blank_teammate_stays_open(db):
     _seed(db)
     rows = [

@@ -150,18 +150,24 @@ def _fill_counting_stats(
             item for item in [*missing, *live_touchdowns]
             if item[0] == game_id
         ]
+        # autoflush is off, so a second line for the same player is invisible to
+        # session.get until the write. Adding it again takes the whole board down.
+        staged: dict[str, PublishedStat] = {}
         for _game_id, player_id, name, market, key in refreshing:
             person = by_espn.get(str(player_id).split(":")[-1]) or by_name.get(normalize_name(name))
             markets = None if person is None else (person.get("markets") or {})
             actual = box_actual(markets, market, final=finished)
             if actual is None:
                 continue
-            stat = session.get(PublishedStat, key)
+            stat = staged.get(key)
+            if stat is None:
+                stat = session.get(PublishedStat, key)
             if stat is None:
                 stat = PublishedStat(
                     key=key, game_id=game_id, player_id=player_id, market_id=market,
                 )
                 session.add(stat)
+            staged[key] = stat
             stat.actual = actual
             stat.observed_at = now
             # A live touchdown can show green. It is not the official final box.
