@@ -56,7 +56,7 @@ export default async function PropsPage({
             : dayParts(selected).monthDay
         }
         title="Props"
-        lede="One prop per game, and only when that team is favored by a touchdown or more. The strongest chance under 90%. The board under it is every priced line."
+        lede="The best receptions, receiving, or rushing prop in each game. The strongest chance under 90%. The board under it is every priced line."
         action={
           <LeagueToggle
             value={league}
@@ -176,7 +176,7 @@ async function DeskSection({ league, date }: { league: string; date: string }) {
             <p className="mt-3 max-w-xl text-sm text-mute">
               {deskLocked
                 ? "The calls open when the games kick off."
-                : "A call is the strongest receptions, receiving, or rushing line on a team favored by a touchdown or more. Close games stay off the card."}
+                : "A call is the strongest receptions, receiving, or rushing line in each game."}
             </p>
           </div>
         )}

@@ -67,7 +67,7 @@ export function PropDesk({ calls }: { calls: PropDeskCall[] }) {
   return (
     <div className="space-y-4">
       <p className="max-w-xl text-sm text-mute">
-        One prop per game, for a team favored by a touchdown or more. The strongest chance under 90%. Touchdowns stay on the Anytime TD page.
+        The best prop in each game. The strongest chance under 90%. Touchdowns stay on the Anytime TD page.
       </p>
       <p className="text-sm text-mute">Today · {parts.join(" · ")}</p>
       <div className="grid gap-3 md:grid-cols-2">

@@ -33,8 +33,6 @@ TARGET_P = 0.58
 # A chance above this is a line sitting far from the player's average.
 # Those sides have not held, so the desk takes the strongest chance under it.
 DESK_MAX_P = 0.90
-# Props on a team favored by a touchdown or more held. Close games did not.
-DESK_FAVORITE_MARGIN = 7.0
 
 
 def attach_team_spreads(
@@ -54,7 +52,7 @@ def attach_team_spreads(
 
 
 def load_desk_props(session, league: str, date: str) -> list[dict[str, Any]]:
-    """The prop calls the desk gives out: one per game, on a clear favorite."""
+    """The prop calls the desk gives out: the best counting prop in each game."""
     from sqlalchemy import select
 
     from spe.db.models import ClosingLine, Game
@@ -86,14 +84,13 @@ def load_desk_props(session, league: str, date: str) -> list[dict[str, Any]]:
 
 
 def select_desk_props(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """One counting prop per game, for a team favored by a touchdown or more.
+    """The best counting prop in each game.
 
     The strongest chance under 90%. A touchdown row stays off.
-    A game with no spread stored keeps the old rule.
     """
     best: dict[str, dict[str, Any]] = {}
     for row in rows:
-        if not _desk_prop(row) or not _on_a_clear_favorite(row):
+        if not _desk_prop(row):
             continue
         game_id = str(row.get("game_id") or "")
         if not game_id:
@@ -136,16 +133,6 @@ def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None 
 
     picks.sort(key=lambda pick: (str(pick.get("kickoff_utc") or ""), str(pick.get("game_id")), MARKETS.index(pick["market_id"])))
     return picks
-
-
-def _on_a_clear_favorite(row: dict[str, Any]) -> bool:
-    spread = row.get("team_spread")
-    if spread is None:
-        return True
-    try:
-        return float(spread) <= -DESK_FAVORITE_MARGIN
-    except (TypeError, ValueError):
-        return True
 
 
 def _desk_rank(row: dict[str, Any]) -> tuple[int, float]:

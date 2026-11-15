@@ -125,7 +125,7 @@ def test_desk_props_leave_a_ninety_percent_line_for_the_next_chance():
     assert picks[0]["player_name"] == "Next"
 
 
-def test_desk_props_take_the_clear_favorite_and_skip_a_close_game():
+def test_desk_props_take_the_best_prop_in_every_game():
     rows = [
         _row(
             market_id="receiving_yards",
@@ -163,7 +163,7 @@ def test_desk_props_take_the_clear_favorite_and_skip_a_close_game():
         ),
     ]
     picks = select_desk_props(rows)
-    assert [pick["player_name"] for pick in picks] == ["Favorite"]
+    assert [pick["player_name"] for pick in picks] == ["Dog", "TossUp"]
 
 
 def test_desk_props_keep_one_call_per_game():
