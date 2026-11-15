@@ -124,3 +124,23 @@ def test_unvalidated_or_mismatched_calibration_never_publishes(db,fault):
     fitted,status=load_calibration(config,'model',NOW)
     assert fitted is None and status['simulation_specific'] is False
     assert status['requested_calibration_unavailable']
+
+
+def test_saved_card_withholds_a_new_absence_without_altering_saved_pick_or_started_game(db):
+    from test_publication_pipeline import seed, NOW as moment
+    from spe.db.models import BoardSnapshot, InjuryEvent, Player
+    from spe.models.player_td.desk_replay import saved_day_card, day_card_key
+    game=seed(db)
+    game.kickoff_utc=moment+timedelta(hours=1)
+    db.add(Player(player_id='candidate',name='Candidate',position='RB',position_group='RB'));db.flush()
+    row={'game_id':game.game_id,'player_id':'candidate','player_name':'Candidate','kickoff_utc':game.kickoff_utc.isoformat()}
+    key=day_card_key('2026-11-15','nfl')
+    db.add(BoardSnapshot(key=key,payload={'rows':[row]},updated_at=moment))
+    db.add(InjuryEvent(game_id=game.game_id,player_id='candidate',designation='out',reported_at=moment,
+        observed_at=moment,effective_at=moment,source='official',confidence=1,provider='test',provider_record_id='out'))
+    db.flush()
+    card=saved_day_card(db,'2026-11-15','nfl',now=moment)
+    assert not card['rows'] and 'withheld' in card['unavailable_games'][0]['reason']
+    assert db.get(BoardSnapshot,key).payload['rows'][0]['player_id']=='candidate'
+    game.status='in_progress';db.flush()
+    assert saved_day_card(db,'2026-11-15','nfl',now=moment+timedelta(hours=2))['rows'][0]['player_id']=='candidate'

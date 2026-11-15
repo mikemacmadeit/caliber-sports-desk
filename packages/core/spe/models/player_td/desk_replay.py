@@ -89,7 +89,7 @@ def day_card_key(date, league) -> str:
     return f"{DAY_CARD_PREFIX}{date}:{league or 'all'}"
 
 
-def saved_day_card(db, date, league="all"):
+def saved_day_card(db, date, league="all", *, now=None):
     """The picks already chosen for this day. Grades update; the names do not."""
     getter = getattr(db, "get", None)
     if getter is None:
@@ -102,7 +102,42 @@ def saved_day_card(db, date, league="all"):
     _refresh_card_grades(db, card)
     saved.payload = card
     saved.updated_at = datetime.now(UTC)
-    return card
+    return _withhold_current_absences(db, card, as_utc(now) or datetime.now(UTC))
+
+
+def _withhold_current_absences(db, card, now):
+    """Cheap pregame safety check; never rebuild or rewrite the saved selection."""
+    from copy import deepcopy
+    from spe.models.player_td.availability_status import resolved_reports
+    upcoming = {r['game_id'] for r in card['rows'] if as_utc(r.get('kickoff_utc'))
+        and as_utc(r['kickoff_utc']) > now and r.get('game_status') not in ('in_progress','final')}
+    if not upcoming:
+        return card
+    reports = db.scalars(select(InjuryEvent).where(InjuryEvent.game_id.in_(upcoming),
+        InjuryEvent.reported_at <= now, InjuryEvent.observed_at <= now,
+        InjuryEvent.quality_status.notin_(('invalid','quarantined')))).all()
+    absent = {gid:{pid for pid,r in resolved_reports([r for r in reports if r.game_id==gid]).items()
+        if r['status'] in INACTIVE | {'doubtful'}} for gid in upcoming}
+    response = deepcopy(card)
+    kept = []
+    unavailable = {r['game_id']:r for r in response.get('unavailable_games',[])}
+    for row in response['rows']:
+        blocked = absent.get(row['game_id'],set())
+        if row.get('player_id') in blocked:
+            unavailable[row['game_id']] = {'game_id':row['game_id'],
+                'reason':'Saved pick withheld after a reported absence; replacement update queued.'}
+            continue
+        decision = row.get('decision') or {}
+        alternative = decision.get('value_candidate') or {}
+        if alternative.get('player_id') in blocked:
+            decision.update(value_candidate=None, alternative_status='availability_update_pending',
+                alternative_note='The saved alternative was reported unavailable; replacement update queued.')
+        if decision.get('alternatives'):
+            decision['alternatives'] = [r for r in decision['alternatives'] if r.get('player_id') not in blocked]
+        kept.append(row)
+    response['rows'] = kept
+    response['unavailable_games'] = list(unavailable.values())
+    return response
 
 
 def _refresh_card_grades(db, card) -> None:

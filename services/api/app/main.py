@@ -412,7 +412,10 @@ def combined_replay(date: calendar_date, league: str = Query(default="all", patt
     if saved and saved.get("rows"):
         attach_game_marks(session, saved.get("rows") or [])
         session.commit()
-        saved["refresh_status"] = "ready"
+        from spe.db.base import as_utc
+        upcoming = any(as_utc(r.get('kickoff_utc')) and as_utc(r['kickoff_utc']) > datetime.now(UTC)
+                       for r in saved['rows'])
+        saved["refresh_status"] = ensure_refresh(day) if upcoming or saved.get('unavailable_games') else "ready"
         saved["results_refresh_status"] = ensure_live_touchdowns(day)
         return saved
     for attempt in range(2):
