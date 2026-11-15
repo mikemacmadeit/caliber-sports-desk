@@ -114,6 +114,10 @@ def test_a_live_touchdown_grades_green_before_the_final(db):
     db.flush()
     assert grade(db, game, "nfl:6963") == "scored"
     assert grade(db, game, "nfl:9139") == "pending"
+    game.status = "final"
+    db.flush()
+    assert grade(db, game, "nfl:6963") == "scored"
+    assert grade(db, game, "nfl:9139") == "awaiting_box"
 
 
 def test_two_lines_for_one_player_save_once(db):
@@ -184,3 +188,23 @@ def test_a_live_touchdown_is_green_and_a_blank_teammate_stays_open(db):
     assert by_name["Amon-Ra St. Brown"] == "win"
     assert by_name["Isaac TeSlaa"] == "win"
     assert by_name["Jahmyr Gibbs"] == "pending"
+
+
+def test_a_final_game_without_a_box_is_graded(db):
+    from spe.models.player_td.desk_replay import grade
+
+    _seed(db)
+    game = db.get(Game, "nfl:2026_10_NE_DET")
+    game.status = "final"
+    game.away_score = 10
+    game.home_score = 35
+    db.flush()
+    rows = [_row("nfl:6963", "Amon-Ra St. Brown"), _row("nfl:9139", "Jahmyr Gibbs")]
+    box = _box({
+        ("nfl:6963", "Amon-Ra St. Brown"): 0,
+        ("nfl:9139", "Jahmyr Gibbs"): 1,
+    })
+    box["header"]["competitions"][0]["status"]["type"]["name"] = "STATUS_FINAL"
+    apply_recorded_results(db, [], rows, fetch=lambda league, event: box)
+    assert grade(db, game, "nfl:6963") == "blank"
+    assert grade(db, game, "nfl:9139") == "scored"

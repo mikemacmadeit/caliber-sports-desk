@@ -67,12 +67,16 @@ def load_replay_model(date, league):
 def grade(db, game, player):
     """A touchdown already on the live box shows green. A miss waits until the final."""
     official = db.get(PublishedStat, f"{game.game_id}|{player}|anytime_td")
+    source = str(official.source or "") if official is not None else ""
+    scored_live = official is not None and (official.actual or 0) > 0 and source.startswith("espn.")
     if str(game.status or "") != "final":
-        if official and (official.actual or 0) > 0 and str(official.source or "").startswith("espn."):
+        if scored_live:
             return "scored"
         return "pending"
-    if official and official.source.startswith("espn.summary"):
-        return "scored" if official.actual > 0 else "blank"
+    if source.startswith("espn.summary"):
+        return "scored" if (official.actual or 0) > 0 else "blank"
+    if scored_live:
+        return "scored"
     stats = db.scalars(select(PlayerGameStat).where(
         PlayerGameStat.game_id == game.game_id, PlayerGameStat.player_id == player,
         PlayerGameStat.quality_status.notin_(("invalid", "quarantined")),

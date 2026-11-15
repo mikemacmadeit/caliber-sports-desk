@@ -108,13 +108,14 @@ def _fill_counting_stats(
     fetch,
 ) -> None:
     missing = _missing_stats(session, rows)
-    live_touchdowns = _live_touchdowns(games, rows)
+    live_touchdowns = _live_touchdowns(session, games, rows)
     missing_games = {item[0] for item in missing}
+    touchdown_games = {item[0] for item in live_touchdowns}
     now = datetime.now(UTC)
     needed = [
         game
         for game in games.values()
-        if _needs_a_box(game, missing_games, now)
+        if game.game_id in touchdown_games or _needs_a_box(game, missing_games, now)
     ]
     if not needed:
         return
@@ -181,7 +182,7 @@ def refresh_live_touchdowns(session: Session, games: list[Game]) -> None:
     """Write live touchdowns for saved picks before the card is graded."""
     started = [
         game for game in games
-        if str(game.status or "").lower() not in {"final", "post", "canceled", "cancelled"}
+        if str(game.status or "").lower() not in {"canceled", "cancelled"}
     ]
     if not started:
         return
@@ -228,18 +229,23 @@ def refresh_live_touchdowns(session: Session, games: list[Game]) -> None:
 
 
 def _live_touchdowns(
+    session: Session,
     games: dict[str, Game],
     rows: list[dict[str, Any]],
 ) -> list[tuple[str, str, str, str, str]]:
-    """Anytime rows for games that are not final. A later score has to replace a stored zero."""
+    """Anytime rows still waiting on a box.
+
+    A live game is always refreshed, so a new score can replace a stored zero.
+    A final game is fetched until the official box is saved.
+    """
     wanted: list[tuple[str, str, str, str, str]] = []
+    finals: list[tuple[str, str, str, str, str]] = []
     seen: set[str] = set()
     for row in rows:
         if str(row.get("market_id") or "") != TOUCHDOWN:
             continue
         game = games.get(str(row.get("game_id") or ""))
-        closed = {"final", "post", "canceled", "cancelled"}
-        if game is None or str(game.status or "").lower() in closed:
+        if game is None or str(game.status or "").lower() in {"canceled", "cancelled"}:
             continue
         game_id = str(row.get("game_id") or "")
         player_id = str(row.get("player_id") or "")
@@ -249,7 +255,22 @@ def _live_touchdowns(
         if key in seen:
             continue
         seen.add(key)
-        wanted.append((game_id, player_id, str(row.get("player_name") or ""), TOUCHDOWN, key))
+        item = (game_id, player_id, str(row.get("player_name") or ""), TOUCHDOWN, key)
+        if str(game.status or "").lower() in {"final", "post"}:
+            finals.append(item)
+        else:
+            wanted.append(item)
+    if not finals:
+        return wanted
+    saved = {
+        stat.key: stat
+        for stat in session.scalars(select(PublishedStat).where(PublishedStat.key.in_([item[4] for item in finals])))
+    }
+    for item in finals:
+        stat = saved.get(item[4])
+        if stat is not None and str(stat.source or "").startswith("espn.summary"):
+            continue
+        wanted.append(item)
     return wanted
 
 
