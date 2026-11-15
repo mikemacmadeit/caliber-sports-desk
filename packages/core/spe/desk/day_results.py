@@ -20,6 +20,7 @@ from spe.publishing.boxes import box_actual, parse
 from spe.shadow.settle import _grade
 
 COUNTING = ("receptions", "rushing_yards", "receiving_yards")
+TOUCHDOWN = "anytime_td"
 _CHECKED: set[str] = set()
 
 
@@ -45,7 +46,7 @@ def apply_recorded_results(
         for stat in session.scalars(
             select(PublishedStat).where(
                 PublishedStat.game_id.in_(game_ids),
-                PublishedStat.market_id.in_(COUNTING),
+                PublishedStat.market_id.in_((*COUNTING, TOUCHDOWN)),
             )
         )
     }
@@ -82,6 +83,9 @@ def _grade_spread(row: dict[str, Any], game: Game | None) -> None:
 
 def _settled_result(side: str, line: float | None, actual: float, market_id: str, status: str) -> str:
     """Final games grade normally. A live line grades only when the stat can no longer reverse."""
+    if market_id == TOUCHDOWN and status not in {"final", "post"}:
+        # A touchdown already scored cannot be taken back. A zero can still change.
+        return "win" if actual > 0 else "pending"
     if status in {"final", "post"}:
         return _grade(side, line, actual, market_id)
     if line is None:
@@ -104,6 +108,7 @@ def _fill_counting_stats(
     fetch,
 ) -> None:
     missing = _missing_stats(session, rows)
+    live_touchdowns = _live_touchdowns(games, rows)
     missing_games = {item[0] for item in missing}
     needed = [
         game
@@ -114,19 +119,20 @@ def _fill_counting_stats(
     ]
     if not needed:
         return
-    from spe.ingest.espn_box import _fetch_summary
+    from spe.ingest.espn_box import _espn_event_id, _fetch_summary
 
     loader = fetch or _fetch_summary
+    targets = [(game, _espn_event_id(session, game)) for game in needed]
 
-    def load(game: Game) -> tuple[str, dict[str, Any] | None]:
-        event_id = game.game_id.split(":")[-1] if game.game_id.startswith("espn:") else None
+    def load(item: tuple[Game, str | None]) -> tuple[str, dict[str, Any] | None]:
+        game, event_id = item
         if not event_id:
             return game.game_id, None
         payload = loader(game.league_id, event_id)
         return game.game_id, payload if isinstance(payload, dict) else None
 
     with ThreadPoolExecutor(max_workers=8) as pool:
-        loaded = list(pool.map(load, needed))
+        loaded = list(pool.map(load, targets))
     now = datetime.now(UTC)
     for game_id, payload in loaded:
         game = games.get(game_id)
@@ -140,9 +146,11 @@ def _fill_counting_stats(
             continue
         by_espn = {str(person.get("espn_id")): person for person in people if person.get("espn_id")}
         by_name = {normalize_name(str(person.get("name") or "")): person for person in people}
-        for wanted_game, player_id, name, market, key in missing:
-            if wanted_game != game_id:
-                continue
+        refreshing = [
+            item for item in [*missing, *live_touchdowns]
+            if item[0] == game_id
+        ]
+        for _game_id, player_id, name, market, key in refreshing:
             person = by_espn.get(str(player_id).split(":")[-1]) or by_name.get(normalize_name(name))
             markets = None if person is None else (person.get("markets") or {})
             actual = box_actual(markets, market, final=finished)
@@ -150,12 +158,44 @@ def _fill_counting_stats(
                 continue
             stat = session.get(PublishedStat, key)
             if stat is None:
-                stat = PublishedStat(key=key, game_id=game_id, player_id=player_id, market_id=market)
+                stat = PublishedStat(
+                    key=key, game_id=game_id, player_id=player_id, market_id=market,
+                )
                 session.add(stat)
             stat.actual = actual
             stat.observed_at = now
-            stat.source = "espn.summary" if finished else "espn.summary.live"
+            # A live touchdown is not the official final box. Replay grading ignores this source.
+            if market == TOUCHDOWN and not finished:
+                stat.source = "espn.live"
+            else:
+                stat.source = "espn.summary" if finished else "espn.summary.live"
     session.flush()
+
+
+def _live_touchdowns(
+    games: dict[str, Game],
+    rows: list[dict[str, Any]],
+) -> list[tuple[str, str, str, str, str]]:
+    """Anytime rows for games that are not final. A later score has to replace a stored zero."""
+    wanted: list[tuple[str, str, str, str, str]] = []
+    seen: set[str] = set()
+    for row in rows:
+        if str(row.get("market_id") or "") != TOUCHDOWN:
+            continue
+        game = games.get(str(row.get("game_id") or ""))
+        closed = {"final", "post", "canceled", "cancelled"}
+        if game is None or str(game.status or "").lower() in closed:
+            continue
+        game_id = str(row.get("game_id") or "")
+        player_id = str(row.get("player_id") or "")
+        if not game_id or not player_id:
+            continue
+        key = f"{game_id}|{player_id}|{TOUCHDOWN}"
+        if key in seen:
+            continue
+        seen.add(key)
+        wanted.append((game_id, player_id, str(row.get("player_name") or ""), TOUCHDOWN, key))
+    return wanted
 
 
 def _missing_stats(session: Session, rows: list[dict[str, Any]]) -> list[tuple[str, str, str, str, str]]:

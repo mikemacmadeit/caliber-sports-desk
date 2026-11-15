@@ -1,0 +1,106 @@
+"""A live touchdown turns green. A teammate who has not scored stays unmarked."""
+
+from datetime import UTC, datetime, timedelta
+
+from spe.db.models import Game, League, ProviderIdMap, Season, Sport, Team, Venue
+from spe.desk.day_results import apply_recorded_results
+
+NOW = datetime(2026, 11, 15, 16, tzinfo=UTC)
+
+
+def _seed(db) -> None:
+    db.add(Sport(sport_id="s", name="Football"))
+    db.flush()
+    db.add(League(league_id="nfl", sport_id="s", name="NFL", classification="pro"))
+    db.flush()
+    db.add(Season(
+        season_id="season",
+        league_id="nfl",
+        year=2026,
+        start_at=NOW - timedelta(days=50),
+        end_at=NOW + timedelta(days=50),
+    ))
+    db.add(Venue(venue_id="v", name="Field", lat=0, lon=0, roof_type="open", surface="grass"))
+    db.add_all([
+        Team(team_id="det", league_id="nfl", name="Lions", abbreviation="DET"),
+        Team(team_id="ne", league_id="nfl", name="Patriots", abbreviation="NE"),
+    ])
+    db.flush()
+    db.add(Game(
+        game_id="nfl:2026_10_NE_DET",
+        season_id="season",
+        league_id="nfl",
+        home_team_id="det",
+        away_team_id="ne",
+        venue_id="v",
+        kickoff_utc=NOW,
+        data_tier="upcoming",
+        status="in_progress",
+    ))
+    db.add(ProviderIdMap(
+        map_id="map",
+        provider="espn",
+        entity_type="game",
+        external_id="401873053",
+        canonical_id="nfl:2026_10_NE_DET",
+        confidence=1,
+    ))
+    db.commit()
+
+
+def _row(player_id: str, name: str) -> dict:
+    return {
+        "game_id": "nfl:2026_10_NE_DET",
+        "player_id": player_id,
+        "player_name": name,
+        "market_id": "anytime_td",
+        "side": "yes",
+    }
+
+
+def _box(scorers: dict[tuple[str, str], int]) -> dict:
+    athletes = []
+    for (player_id, name), tds in scorers.items():
+        athletes.append({
+            "athlete": {"id": player_id.split(":")[-1], "displayName": name},
+            "stats": ["4", "40", str(tds)],
+        })
+    return {
+        "header": {
+            "competitions": [{
+                "status": {"type": {"name": "STATUS_IN_PROGRESS"}},
+                "competitors": [
+                    {"homeAway": "home", "score": "14"},
+                    {"homeAway": "away", "score": "3"},
+                ],
+            }],
+        },
+        "boxscore": {
+            "players": [{
+                "statistics": [{
+                    "name": "receiving",
+                    "labels": ["REC", "YDS", "TD"],
+                    "athletes": athletes,
+                }],
+            }],
+        },
+    }
+
+
+def test_a_live_touchdown_is_green_and_a_blank_teammate_stays_open(db):
+    _seed(db)
+    rows = [
+        _row("nfl:6963", "Amon-Ra St. Brown"),
+        _row("nfl:40669", "Isaac TeSlaa"),
+        _row("nfl:9139", "Jahmyr Gibbs"),
+    ]
+    box = _box({
+        ("nfl:6963", "Amon-Ra St. Brown"): 1,
+        ("nfl:40669", "Isaac TeSlaa"): 1,
+        ("nfl:9139", "Jahmyr Gibbs"): 0,
+    })
+    apply_recorded_results(db, [], rows, fetch=lambda league, event: box)
+    by_name = {row["player_name"]: row["result"] for row in rows}
+    assert by_name["Amon-Ra St. Brown"] == "win"
+    assert by_name["Isaac TeSlaa"] == "win"
+    assert by_name["Jahmyr Gibbs"] == "pending"
