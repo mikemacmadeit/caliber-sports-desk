@@ -162,3 +162,36 @@ def test_background_slate_update_refreshes_league_tabs_without_recomputing_picks
     assert saved['decision_record']['most_likely']['pending']==1
     saved=db.get(BoardSnapshot,day_card_key('2026-11-15','fbs')).payload
     assert saved['rows']==[college] and saved['wins']==1
+
+
+@pytest.mark.parametrize('source_failure',[False,True])
+def test_cold_source_import_cannot_delay_the_initial_stored_input_rerun(monkeypatch,source_failure):
+    import spe.models.player_td.scorer_refresh as refresh
+    import spe.models.player_td.desk_replay as replay
+    import spe.db.session as sessions
+    events=[];jobs=[]
+    class Session:
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def commit(self):pass
+        def query(self,*args):return self
+        def filter(self,*args):return self
+        def first(self):return None
+    class Thread:
+        def __init__(self,*,target,**kwargs):self.target=target
+        def start(self):jobs.append(self.target)
+    def sources(*args,**kwargs):
+        assert events==['predictions']
+        events.append('sources')
+        if source_failure:raise RuntimeError('source failed after saved rerun')
+    monkeypatch.setattr(refresh,'_states',{})
+    monkeypatch.setattr(refresh.threading,'Thread',Thread)
+    monkeypatch.setattr(sessions,'session_factory',Session)
+    monkeypatch.setattr(refresh,'_rebuild',lambda date:events.append('predictions'))
+    monkeypatch.setattr(replay,'requested_retrain',lambda *args:{'simulation':{'weekly_context':VERSION}})
+    monkeypatch.setattr('spe.ingest.nfl_availability.refresh_nfl_availability',lambda *a,**k:{'status':'ok'})
+    monkeypatch.setattr('spe.ingest.nflverse_desk.refresh_nflverse_desk',sources)
+    monkeypatch.setattr('spe.ingest.nfl_matchup_evidence.refresh',lambda *a,**k:None)
+    monkeypatch.setattr('spe.ingest.nws_live.ingest_nws_forecasts',lambda *a,**k:None)
+    refresh.ensure_refresh('2026-11-15');jobs[0]()
+    assert events==(['predictions','sources'] if source_failure else ['predictions','sources','predictions'])

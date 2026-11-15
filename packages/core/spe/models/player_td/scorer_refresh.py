@@ -10,6 +10,22 @@ _source_lock = threading.Lock()
 _states = {}
 
 
+def _rebuild(date):
+    from spe.db.session import session_factory
+    from spe.models.player_td.desk_replay import replay_day
+    from sqlalchemy.exc import IntegrityError
+    with session_factory() as db:
+        for attempt in range(2):
+            try:
+                replay_day(db, date, 'all')
+                db.commit()
+                return
+            except IntegrityError as exc:
+                db.rollback()
+                if attempt or 'board_snapshots.key' not in str(exc.orig):
+                    raise
+
+
 def ensure_refresh(date):
     key = (settings.database_url, date)
     with _lock:
@@ -24,8 +40,6 @@ def ensure_refresh(date):
         failed = False
         try:
             from spe.db.session import session_factory
-            from spe.models.player_td.desk_replay import replay_day
-            from sqlalchemy.exc import IntegrityError
             with _source_lock, session_factory() as db:
                 from spe.ingest.nfl_availability import refresh_nfl_availability
                 status = refresh_nfl_availability(db)
@@ -33,6 +47,23 @@ def ensure_refresh(date):
                     logging.getLogger(__name__).warning('NFL availability refresh unavailable: %s', status)
                 from spe.models.player_td.desk_replay import requested_retrain
                 simulation = (requested_retrain(date, 'nfl') or {}).get('simulation')
+                if simulation:
+                    from datetime import UTC, datetime, timedelta
+                    from spe.db.models import IngestRun
+                    moment = datetime.now(UTC)
+                    year = moment.year-int(moment.month<7)
+                    warm = db.query(IngestRun).filter(IngestRun.provider=='nflverse',
+                        IngestRun.dataset=='desk_context', IngestRun.season_year==year,
+                        IngestRun.status=='ok', IngestRun.started_at>moment-timedelta(hours=6)).first()
+                    db.commit()
+                    if not warm:
+                        # Historical identity imports can take minutes remotely.
+                        # First publish from already observed inputs and fresh
+                        # game availability; repeat after the source job finishes.
+                        try:
+                            _rebuild(date)
+                        except Exception:
+                            logging.getLogger(__name__).exception('Initial scorer rebuild unavailable; refreshing sources')
                 if settings.app_env=='dev' or simulation:
                     from spe.ingest.nflverse_desk import refresh_nflverse_desk
                     # This free-source job has its own six-hour due check.
@@ -48,16 +79,7 @@ def ensure_refresh(date):
                     # check avoids requesting weather on every card refresh.
                     ingest_nws_forecasts(db, horizon_hours=48)
                     db.commit()
-            with session_factory() as db:
-                for attempt in range(2):
-                    try:
-                        replay_day(db, date, 'all')
-                        db.commit()
-                        break
-                    except IntegrityError as exc:
-                        db.rollback()
-                        if attempt or 'board_snapshots.key' not in str(exc.orig):
-                            raise
+            _rebuild(date)
         except Exception:
             failed = True
             logging.getLogger(__name__).exception('Scorer refresh failed for %s; saved picks retained', date)
