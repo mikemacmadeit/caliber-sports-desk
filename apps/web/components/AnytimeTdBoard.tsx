@@ -50,7 +50,7 @@ export function AnytimeTdBoard({
   const [scorerStatus, setScorerStatus] = useState<string | undefined>();
   useEffect(() => {
     if (loading && !called.length) return;
-    const timer = setTimeout(() => setRefresh(n => n + 1), called.length ? 20000 : 60000);
+    const timer = setTimeout(() => setRefresh(n => n + 1), called.length ? 120000 : 60000);
     return () => clearTimeout(timer);
   }, [scorerStatus, refresh, loading, called.length]);
 
@@ -181,7 +181,7 @@ function extraResult(row: PropRow, result: string) {
 function DailyTdResults({ rows, date, filter, onFilter }: { rows: PropRow[]; date: string; filter: string; onFilter: (value: string) => void }) {
   const wins = rows.filter(r => r.result === "scored").length + rows.filter(r => extraResult(r, "scored")).length;
   const losses = rows.filter(r => r.result === "blank").length + rows.filter(r => extraResult(r, "blank")).length;
-  const pending = rows.length - wins - losses;
+  const pending = rows.filter(r => r.result !== "scored" && r.result !== "blank").length;
   const awaiting = rows.filter(r => r.result === "awaiting_box").length;
   return <div className="plate space-y-3 p-4" aria-label="Daily touchdown results">
     <p className="font-display text-2xl uppercase">{date} · Daily replay results</p>
