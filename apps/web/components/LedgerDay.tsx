@@ -40,12 +40,14 @@ export function LedgerDay({
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [market, setMarket] = useState("all");
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const totals = useMemo(() => score(rows), [rows]);
   const markets = useMemo(
     () => GROUPS.map(([id, label]) => ({ id, label, ...score(rows.filter((row) => row.market_id === id)) })).filter((item) => item.count > 0),
     [rows],
   );
   const visible = rows.filter((row) => (market === "all" || row.market_id === market) && (filter === "all" || row.result === filter));
+  const narrowed = market !== "all" || filter !== "all";
 
   if (!rows.length) {
     return (
@@ -114,21 +116,34 @@ export function LedgerDay({
         const group = visible.filter((row) => row.market_id === id);
         if (!group.length) return null;
         const full = score(rows.filter((row) => row.market_id === id));
+        const expanded = narrowed ? open[id] !== false : Boolean(open[id]);
         return (
-          <div key={id} className="space-y-2">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="font-display text-2xl uppercase leading-none tracking-wide">{label}</h3>
-              <p className="font-mono text-xs uppercase tracking-[0.14em] text-mute">
-                {full.win}–{full.loss}
-                {full.hit == null ? "" : ` · ${percent(full.hit)}`}
-                {full.priced ? ` · ${signed(full.units)}` : ""}
-              </p>
+          <div key={id} className="plate">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                <h3 className="font-display text-2xl uppercase leading-none tracking-wide">{label}</h3>
+                <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-mute">
+                  {full.win}–{full.loss}
+                  {full.hit == null ? "" : ` · ${percent(full.hit)}`}
+                  {full.priced ? ` · ${signed(full.units)}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => setOpen((current) => ({ ...current, [id]: !expanded }))}
+                className={chip(expanded)}
+              >
+                {expanded ? "Hide calls" : `Show ${group.length} calls`}
+              </button>
             </div>
-            <ul className="divide-y divide-white/10 border-y border-white/10">
-              {group.map((row) => (
-                <ResultLine key={row.pick_id} row={row} />
-              ))}
-            </ul>
+            {expanded ? (
+              <ul className="grid border-t border-white/10 sm:grid-cols-2">
+                {group.map((row) => (
+                  <ResultLine key={row.pick_id} row={row} />
+                ))}
+              </ul>
+            ) : null}
           </div>
         );
       })}
@@ -165,18 +180,23 @@ function ResultLine({ row }: { row: LedgerRow }) {
   const won = row.result === "win";
   const lost = row.result === "loss";
   const label = won ? "Win" : lost ? "Loss" : row.result === "push" ? "Push" : "Open";
+  const bits = splitDetail(row.detail);
   return (
-    <li className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2.5">
-      <span aria-label={label} className={`flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold ${won ? "bg-green-500 text-black" : lost ? "bg-red-500 text-white" : "bg-white/10 text-mute"}`}>
+    <li title={row.detail || undefined} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 border-t border-white/10 px-4 py-1.5 first:border-t-0 sm:odd:border-r sm:[&:nth-child(2)]:border-t-0">
+      <span aria-label={label} className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${won ? "bg-green-500 text-black" : lost ? "bg-red-500 text-white" : "bg-white/10 text-mute"}`}>
         {won ? "✓" : lost ? "✕" : "–"}
       </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm text-paper">{row.sentence}</span>
-        {row.detail ? <span className="mt-0.5 block truncate text-xs text-mute">{row.detail}</span> : null}
-      </span>
-      <span className={`font-mono text-xs ${toneClass(row.units)}`}>{row.units == null ? "" : signed(row.units)}</span>
+      <span className="min-w-0 truncate text-sm text-paper">{row.sentence}</span>
+      <span className="font-mono text-[11px] text-mute">{bits.outcome}</span>
+      <span className={`w-12 text-right font-mono text-xs ${toneClass(row.units)}`}>{row.units == null ? "" : signed(row.units)}</span>
     </li>
   );
+}
+
+function splitDetail(detail?: string | null) {
+  const parts = (detail || "").split(" · ").map((part) => part.trim()).filter(Boolean);
+  const outcome = parts.find((part) => part.startsWith("Final ") || part.startsWith("Actual ")) ?? "";
+  return { outcome: outcome.replace(/^Final |^Actual /, "") };
 }
 
 function Tile({ label, value, hint, tone }: { label: string; value: string; hint: string; tone?: "win" | "loss" }) {

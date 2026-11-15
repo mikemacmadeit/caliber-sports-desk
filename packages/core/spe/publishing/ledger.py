@@ -179,16 +179,11 @@ def slate_dates(db) -> list[str]:
 
 
 def ledger_day(db, date: str, league: str | None = None) -> dict[str, Any]:
-    """Desk spreads, prop calls, and every anytime touchdown named for the day."""
+    """Read the day's saved card. Grading uses stats already on file."""
     from spe.desk.best_bets import build_best_bets
     from spe.desk.day_results import apply_recorded_results
     from spe.props.game_picks import load_desk_props
 
-    record_frozen_desk_picks(db)
-    from spe.publishing.boxes import ingest as ingest_boxes
-
-    ingest_boxes(db)
-    settle(db)
     card = build_best_bets(league=league or "all", date=date)
     props = load_desk_props(db, league or "all", date)
     spreads = card.get("spreads") or []

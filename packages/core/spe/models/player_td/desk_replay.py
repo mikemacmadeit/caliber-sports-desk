@@ -181,8 +181,9 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
         key = (game.league_id, canonical_team(game.home_team_id, aliases), canonical_team(game.away_team_id, aliases))
         unique[key] = game
     games = list(unique.values())
-    from spe.desk.day_results import refresh_live_touchdowns
-    refresh_live_touchdowns(db, games)
+    if not cached_only:
+        from spe.desk.day_results import refresh_live_touchdowns
+        refresh_live_touchdowns(db, games)
     players = {} if cached_only else {p.player_id: p for p in db.scalars(select(Player))}
     histories, models = {}, {}
     rows, unavailable = [], []
