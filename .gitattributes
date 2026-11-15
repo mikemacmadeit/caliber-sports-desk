@@ -1,0 +1,2 @@
+# Model identity is pinned to exact artifact bytes across Windows and Linux.
+deploy/runtime-data/parquet/models/nfl_desk_combined_v11_candidate.json -text
