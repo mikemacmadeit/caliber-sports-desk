@@ -144,3 +144,21 @@ def test_saved_card_withholds_a_new_absence_without_altering_saved_pick_or_start
     assert db.get(BoardSnapshot,key).payload['rows'][0]['player_id']=='candidate'
     game.status='in_progress';db.flush()
     assert saved_day_card(db,'2026-11-15','nfl',now=moment+timedelta(hours=2))['rows'][0]['player_id']=='candidate'
+
+
+def test_background_slate_update_refreshes_league_tabs_without_recomputing_picks(db):
+    from spe.db.models import BoardSnapshot
+    from spe.models.player_td.desk_replay import _store_day_card, day_card_key
+    nfl={'game_id':'nfl:one','league_id':'nfl','player_id':'new','result':'pending','retrospective':False,
+        'decision_results':{'most_likely':{'result':'pending'}}}
+    college={'game_id':'fbs:one','league_id':'fbs','player_id':'college','result':'scored','retrospective':False,
+        'decision_results':{'most_likely':{'result':'scored'}}}
+    _store_day_card(db,{'date':'2026-11-15','league':'nfl','rows':[{**nfl,'player_id':'old'}]})
+    db.flush()
+    _store_day_card(db,{'date':'2026-11-15','league':'all','rows':[nfl,college],'unavailable_games':[]})
+    db.flush()
+    saved=db.get(BoardSnapshot,day_card_key('2026-11-15','nfl')).payload
+    assert saved['rows']==[nfl] and saved['games']==1
+    assert saved['decision_record']['most_likely']['pending']==1
+    saved=db.get(BoardSnapshot,day_card_key('2026-11-15','fbs')).payload
+    assert saved['rows']==[college] and saved['wins']==1

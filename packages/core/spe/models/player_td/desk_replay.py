@@ -175,7 +175,7 @@ def _refresh_card_grades(db, card) -> None:
 
 
 def _store_day_card(db, payload) -> None:
-    if not payload.get("rows"):
+    if not payload.get("rows") and not payload.get('unavailable_games'):
         return
     key = day_card_key(payload.get("date"), payload.get("league"))
     kept = {
@@ -191,6 +191,33 @@ def _store_day_card(db, payload) -> None:
         db.add(BoardSnapshot(key=key, payload=kept, updated_at=now))
     else:
         saved.payload, saved.updated_at = kept, now
+    if payload.get('league') == 'all':
+        # A background refresh computes the slate once. Its league tabs must
+        # receive the same run, rather than retaining older cached selections.
+        unavailable = payload.get('unavailable_games') or []
+        game_leagues = {g.game_id:g.league_id for g in db.scalars(select(Game).where(
+            Game.game_id.in_([r['game_id'] for r in unavailable] or ['__none__'])))}
+        for league in ('nfl','fbs'):
+            rows = [r for r in payload['rows'] if r.get('league_id')==league]
+            missing = [r for r in unavailable if game_leagues.get(r['game_id'])==league]
+            _store_day_card(db, {**payload, 'league':league, 'rows':rows, 'unavailable_games':missing,
+                'games':len(rows)+len(missing), 'decision_record':_decision_record(rows),
+                'wins':sum(r.get('result')=='scored' for r in rows),
+                'losses':sum(r.get('result')=='blank' for r in rows)})
+
+
+def _decision_record(rows):
+    result = {}
+    for lane in ('most_likely', 'value_candidate'):
+        recorded = [r['decision_results'][lane] for r in rows if r.get('retrospective') is False and lane in r.get('decision_results', {})]
+        result[lane] = {'saved_pregame':len(recorded),
+            'wins':sum(r['result']=='scored' for r in recorded),
+            'losses':sum(r['result']=='blank' for r in recorded),
+            'pending':sum(r['result'] not in ('scored','blank') for r in recorded),
+            'priced_bets':sum(bool(r.get('bet_qualified')) for r in recorded),
+            'hypothetical_unit_profit':sum(r['hypothetical_unit_profit'] for r in recorded if r.get('hypothetical_unit_profit') is not None)
+                if lane=='value_candidate' and any(r.get('hypothetical_unit_profit') is not None for r in recorded) else None}
+    return result
 
 
 def select_replay_candidate(rows):
@@ -582,16 +609,7 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
                      **({'decision_results':decision_results} if decision_results else {}),
                      "selection_readiness": readiness(chosen, as_utc(chosen.get('forecast',{}).get('data_cutoff')) or cutoff),
                      "final_score": f"{game.away_score}–{game.home_score}" if game.status == "final" and game.away_score is not None and game.home_score is not None else None})
-    decision_record = {}
-    for lane in ('most_likely', 'value_candidate'):
-        recorded = [r['decision_results'][lane] for r in rows if r.get('retrospective') is False and lane in r.get('decision_results', {})]
-        decision_record[lane] = {'saved_pregame':len(recorded),
-            'wins':sum(r['result']=='scored' for r in recorded),
-            'losses':sum(r['result']=='blank' for r in recorded),
-            'pending':sum(r['result'] not in ('scored','blank') for r in recorded),
-            'priced_bets':sum(bool(r.get('bet_qualified')) for r in recorded),
-            'hypothetical_unit_profit':sum(r['hypothetical_unit_profit'] for r in recorded if r.get('hypothetical_unit_profit') is not None)
-                if lane=='value_candidate' and any(r.get('hypothetical_unit_profit') is not None for r in recorded) else None}
+    decision_record = _decision_record(rows)
     payload = {"date": date, "league": league, "rows": rows, "unavailable_games": unavailable,
             "decision_record": decision_record,
             "selection_version": "highest_chance_scorer_v2" if revised else SELECTION_VERSION,
