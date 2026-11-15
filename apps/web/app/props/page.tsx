@@ -154,7 +154,7 @@ async function DeskSection({ league, date }: { league: string; date: string }) {
   try {
     const desk = await apiGet<{ calls?: PropDeskCall[]; locked?: boolean }>(
       `/v1/props/desk?league=${league}&date=${date}`,
-      12000,
+      30000,
     );
     deskCalls = desk.calls ?? [];
     deskLocked = Boolean(desk.locked);

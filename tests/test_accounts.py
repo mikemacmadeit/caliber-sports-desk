@@ -181,7 +181,7 @@ def test_a_subscriber_still_sees_the_name():
     assert redact("/v1/props", payload, subscribed=True)["rows"][0]["player_name"] == "Secret Player"
 
 
-def test_a_future_prop_desk_call_stays_hidden():
+def test_a_future_prop_desk_call_stays_on_the_card():
     out = redact(
         "/v1/props/desk",
         {
@@ -192,9 +192,7 @@ def test_a_future_prop_desk_call_stays_hidden():
         },
         subscribed=False,
     )
-    assert out["locked"] is True
-    assert [call["player_name"] for call in out["calls"]] == ["Started Back"]
-    assert "Secret Receiver" not in json.dumps(out["calls"])
+    assert [call["player_name"] for call in out["calls"]] == ["Secret Receiver", "Started Back"]
 
 
 def test_future_ticket_legs_are_removed():

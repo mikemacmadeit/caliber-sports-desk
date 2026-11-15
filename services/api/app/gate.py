@@ -108,8 +108,6 @@ def redact(path: str, payload: dict[str, Any], *, subscribed: bool) -> dict[str,
         return data
     if path.startswith("/v1/parlays"):
         return _lock_parlays(data)
-    if path.startswith("/v1/props/desk") and isinstance(data.get("calls"), list):
-        return _lock_prop_desk(data)
     if path.startswith("/v1/props/picks") and isinstance(data.get("picks"), list):
         data["picks"] = [_lock_pick(row) if isinstance(row, dict) and not started(row) else row for row in data["picks"]]
         if isinstance(data.get("day"), list):
@@ -232,21 +230,6 @@ def _lock_pick(row: dict[str, Any]) -> dict[str, Any]:
         "loud": False,
         "price_ahead": False,
     }
-
-
-def _lock_prop_desk(payload: dict[str, Any]) -> dict[str, Any]:
-    visible: list[Any] = []
-    hidden = 0
-    for call in payload.get("calls") or []:
-        if isinstance(call, dict) and started(call):
-            visible.append(call)
-        else:
-            hidden += 1
-    payload["calls"] = visible
-    if hidden:
-        payload["locked"] = True
-        payload["locked_count"] = hidden
-    return payload
 
 
 def _lock_parlays(payload: dict[str, Any]) -> dict[str, Any]:
