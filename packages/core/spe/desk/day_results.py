@@ -164,12 +164,60 @@ def _fill_counting_stats(
                 session.add(stat)
             stat.actual = actual
             stat.observed_at = now
-            # A live touchdown is not the official final box. Replay grading ignores this source.
+            # A live touchdown can show green. It is not the official final box.
             if market == TOUCHDOWN and not finished:
                 stat.source = "espn.live"
             else:
                 stat.source = "espn.summary" if finished else "espn.summary.live"
     session.flush()
+
+
+def refresh_live_touchdowns(session: Session, games: list[Game]) -> None:
+    """Write live touchdowns for saved picks before the card is graded."""
+    started = [
+        game for game in games
+        if str(game.status or "").lower() not in {"final", "post", "canceled", "cancelled"}
+    ]
+    if not started:
+        return
+    from sqlalchemy import or_
+
+    from spe.db.models import BoardSnapshot
+
+    filters = []
+    for game in started:
+        gid = game.game_id
+        filters.append(BoardSnapshot.key.in_([f"scorer-desk-v1:{gid}", f"guarded-desk-v1:{gid}"]))
+        filters.append(BoardSnapshot.key.like(f"retrained-desk-v1:{gid}:%"))
+    snaps = session.scalars(select(BoardSnapshot).where(or_(*filters))).all()
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for snap in snaps:
+        payload = snap.payload or {}
+        saved = payload.get("row") or {}
+        game_id = str(saved.get("game_id") or payload.get("game_id") or "")
+        decision = saved.get("decision") or {}
+        names = [
+            (saved.get("player_id"), saved.get("player_name")),
+            ((decision.get("most_likely") or {}).get("player_id"), (decision.get("most_likely") or {}).get("name")),
+            ((decision.get("value_candidate") or {}).get("player_id"), (decision.get("value_candidate") or {}).get("name")),
+        ]
+        for player_id, name in names:
+            if not game_id or not player_id:
+                continue
+            key = (game_id, str(player_id))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({
+                "game_id": game_id,
+                "player_id": str(player_id),
+                "player_name": str(name or ""),
+                "market_id": TOUCHDOWN,
+                "side": "yes",
+            })
+    if rows:
+        apply_recorded_results(session, [], rows)
 
 
 def _live_touchdowns(

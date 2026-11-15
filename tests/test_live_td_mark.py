@@ -87,6 +87,35 @@ def _box(scorers: dict[tuple[str, str], int]) -> dict:
     }
 
 
+def test_a_live_touchdown_grades_green_before_the_final(db):
+    from spe.db.models import PublishedStat
+    from spe.models.player_td.desk_replay import grade
+
+    _seed(db)
+    game = db.get(Game, "nfl:2026_10_NE_DET")
+    db.add(PublishedStat(
+        key="nfl:2026_10_NE_DET|nfl:6963|anytime_td",
+        game_id="nfl:2026_10_NE_DET",
+        player_id="nfl:6963",
+        market_id="anytime_td",
+        actual=1,
+        source="espn.live",
+        observed_at=NOW,
+    ))
+    db.add(PublishedStat(
+        key="nfl:2026_10_NE_DET|nfl:9139|anytime_td",
+        game_id="nfl:2026_10_NE_DET",
+        player_id="nfl:9139",
+        market_id="anytime_td",
+        actual=0,
+        source="espn.live",
+        observed_at=NOW,
+    ))
+    db.flush()
+    assert grade(db, game, "nfl:6963") == "scored"
+    assert grade(db, game, "nfl:9139") == "pending"
+
+
 def test_a_live_touchdown_is_green_and_a_blank_teammate_stays_open(db):
     _seed(db)
     rows = [

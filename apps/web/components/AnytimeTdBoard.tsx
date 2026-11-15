@@ -292,9 +292,10 @@ function PriceDecision({ row }: { row: PropRow }) {
   const value = d.value_candidate;
   const settled = row.decision_results?.value_candidate?.result;
   return <section aria-label="Scorer and price decision" className="mt-4 border-t border-paper/15 pt-4 text-sm">
-      {value && value.player_id !== row.player_id ? <div className={`rounded-lg p-3 ${settled === 'scored' ? 'border border-green-500 bg-green-950/40' : settled === 'blank' ? 'border border-red-500 bg-red-950/40' : 'bg-black/15'}`}>
+      {value && value.player_id !== row.player_id ? <div className={`relative rounded-lg p-3 ${settled === 'scored' ? 'border border-green-500 bg-green-950/40' : settled === 'blank' ? 'border border-red-500 bg-red-950/40' : 'bg-black/15'}`}>
+        {settled === 'scored' || settled === 'blank' ? <span aria-label={settled === 'scored' ? 'Win' : 'Loss'} className={`absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-xl font-bold ${settled === 'scored' ? 'bg-green-500 text-black' : 'bg-red-500 text-white'}`}>{settled === 'scored' ? '\u2713' : '\u2715'}</span> : null}
         <p className="text-xs font-semibold uppercase tracking-wide text-gold">{value.american == null ? "Matchup alternative" : "Better-priced alternative"}</p>
-        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><p className="font-display text-2xl">{value.name}</p><p className="text-xs text-mute">{pct(value.probability, 0)} chance · <span className="font-mono text-paper">{american(value.american)}</span> saved odds</p></div>
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pr-8"><p className="font-display text-2xl">{value.name}</p><p className="text-xs text-mute">{pct(value.probability, 0)} chance · <span className="font-mono text-paper">{american(value.american)}</span> saved odds</p></div>
         <DecisionResult result={settled} />
         {value.customer ? <PickHighlights copy={value.customer} candidate={value} opponent={value.team === row.team ? row.opponent : row.team} /> : <p className="mt-2 text-xs text-mute">Detailed reasoning was not saved with this pick.</p>}
         {value.customer?.caution?.includes("before kickoff") || value.cautions?.some(c => /injury designation|playing status/i.test(c)) ? <p className="mt-2 text-xs text-amber-200">Check playing status before kickoff.</p> : null}

@@ -61,10 +61,12 @@ def load_replay_model(date, league):
 
 
 def grade(db, game, player):
-    """Only a confirmed final plus a valid player box can produce a red/green grade."""
-    if game.status != "final":
-        return "pending"
+    """A touchdown already on the live box shows green. A miss waits until the final."""
     official = db.get(PublishedStat, f"{game.game_id}|{player}|anytime_td")
+    if str(game.status or "") != "final":
+        if official and (official.actual or 0) > 0 and str(official.source or "").startswith("espn."):
+            return "scored"
+        return "pending"
     if official and official.source.startswith("espn.summary"):
         return "scored" if official.actual > 0 else "blank"
     stats = db.scalars(select(PlayerGameStat).where(
@@ -179,6 +181,8 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
         key = (game.league_id, canonical_team(game.home_team_id, aliases), canonical_team(game.away_team_id, aliases))
         unique[key] = game
     games = list(unique.values())
+    from spe.desk.day_results import refresh_live_touchdowns
+    refresh_live_touchdowns(db, games)
     players = {} if cached_only else {p.player_id: p for p in db.scalars(select(Player))}
     histories, models = {}, {}
     rows, unavailable = [], []
