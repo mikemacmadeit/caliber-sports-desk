@@ -1,7 +1,12 @@
 import Link from "next/link";
-import { LedgerRecord } from "@/components/LedgerRecord";
+import savedSaturday from "@/lib/ledger/2026-11-14.json";
+import { LedgerRecord, type LedgerCard } from "@/components/LedgerRecord";
 import { PageHeader } from "@/components/PageHeader";
 import { dayParts, slateToday } from "@/lib/days";
+
+const SAVED: Record<string, LedgerCard & { rows: { league_id: string }[] }> = {
+  "2026-11-14": savedSaturday,
+};
 
 export default async function TrackRecordPage({
   searchParams,
@@ -13,6 +18,7 @@ export default async function TrackRecordPage({
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(params.date || "") ? params.date! : previousDay(slateToday());
   const month = /^\d{4}-\d{2}$/.test(params.month || "") ? params.month! : selected.slice(0, 7);
   const when = dayParts(selected);
+  const card = await loadCard(selected, league);
 
   return (
     <div className="space-y-8">
@@ -33,6 +39,7 @@ export default async function TrackRecordPage({
         selected={selected}
         league={league}
         title={`${when.weekday} · ${when.monthDay}`}
+        card={card}
       />
     </div>
   );
@@ -42,6 +49,25 @@ function leagueHref(league: string, date: string, month: string) {
   const params = new URLSearchParams({ date, month });
   if (league !== "all") params.set("league", league);
   return `/track-record?${params}`;
+}
+
+async function loadCard(date: string, league: string): Promise<LedgerCard | null> {
+  const saved = SAVED[date];
+  if (saved) {
+    const rows = league === "all" ? saved.rows : (saved.rows ?? []).filter((row) => row.league_id === league);
+    return { ...saved, rows };
+  }
+  const api = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  try {
+    const res = await fetch(`${api}/v1/published/day?date=${date}&league=${league}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as LedgerCard;
+  } catch {
+    return null;
+  }
 }
 
 function previousDay(iso: string) {

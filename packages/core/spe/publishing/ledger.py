@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 from sqlalchemy import event
@@ -178,8 +179,31 @@ def slate_dates(db) -> list[str]:
     return sorted(found)
 
 
+def _packaged_day(date: str, league: str | None) -> dict[str, Any] | None:
+    """A finished day that is already written down. Opening it does not rebuild the card."""
+    path = Path(__file__).resolve().parent / "frozen" / f"{date}.json"
+    if not path.is_file():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    wanted = league or "all"
+    rows = list(payload.get("rows") or [])
+    if wanted != "all":
+        rows = [row for row in rows if row.get("league_id") == wanted]
+    return {
+        "date": date,
+        "timezone": payload.get("timezone") or "America/Chicago",
+        "league": wanted,
+        "rows": rows,
+        "dates": list(payload.get("dates") or []),
+        "summary": _ledger_summary(rows),
+    }
+
+
 def ledger_day(db, date: str, league: str | None = None) -> dict[str, Any]:
-    """Read the day's saved card. Grading uses stats already on file."""
+    """Read the day's saved card. A finished day stays as it was written."""
+    saved = _packaged_day(date, league)
+    if saved is not None:
+        return saved
     from spe.desk.best_bets import build_best_bets
     from spe.desk.day_results import apply_recorded_results
     from spe.props.game_picks import load_desk_props
