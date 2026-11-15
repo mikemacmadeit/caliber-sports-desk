@@ -16,6 +16,13 @@ export function evPct(ev: number | null | undefined): string {
 
 const SLATE_TZ = "America/Chicago";
 
+/** Node and browsers disagree on the space before AM/PM. One space keeps hydration stable. */
+function formatChicago(d: Date, options: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat("en-US", { ...options, timeZone: SLATE_TZ })
+    .format(d)
+    .replace(/[\u202f\u00a0]/g, " ");
+}
+
 /** API datetimes are UTC. A stamp with no zone is still UTC, not local. */
 function parseUtc(iso: string): Date {
   const normalized = iso.includes("T") ? iso : iso.replace(" ", "T");
@@ -26,8 +33,8 @@ function parseUtc(iso: string): Date {
 export function kickoffParts(iso: string): { day: string; time: string } {
   const d = parseUtc(iso);
   return {
-    day: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: SLATE_TZ }),
-    time: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: SLATE_TZ }),
+    day: formatChicago(d, { weekday: "short", month: "short", day: "numeric" }),
+    time: formatChicago(d, { hour: "numeric", minute: "2-digit", hourCycle: "h12" }),
   };
 }
 
@@ -42,16 +49,15 @@ export function kickoffDate(iso: string): string {
 }
 
 export function kickoff(iso: string): string {
-  const d = parseUtc(iso);
-  return d.toLocaleString("en-US", {
+  const body = formatChicago(parseUtc(iso), {
     weekday: "short",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZone: SLATE_TZ,
-    timeZoneName: "short",
+    hourCycle: "h12",
   });
+  return `${body} CT`;
 }
 
 export function cToF(c: number | null | undefined): string {

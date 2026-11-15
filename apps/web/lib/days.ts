@@ -25,9 +25,9 @@ export function dayParts(iso: string): { weekday: string; monthDay: string; day:
   const dt = new Date(Date.UTC(y, m - 1, d, 18));
   const zone = "America/Chicago";
   return {
-    weekday: dt.toLocaleDateString("en-US", { weekday: "short", timeZone: zone }),
-    monthDay: dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: zone }),
-    day: dt.toLocaleDateString("en-US", { day: "numeric", timeZone: zone }),
+    weekday: dt.toLocaleDateString("en-US", { weekday: "short", timeZone: zone }).replace(/[\u202f\u00a0]/g, " "),
+    monthDay: dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: zone }).replace(/[\u202f\u00a0]/g, " "),
+    day: dt.toLocaleDateString("en-US", { day: "numeric", timeZone: zone }).replace(/[\u202f\u00a0]/g, " "),
   };
 }
 

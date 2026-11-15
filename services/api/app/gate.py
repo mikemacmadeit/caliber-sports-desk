@@ -212,7 +212,7 @@ def _prop_stub(row: dict[str, Any]) -> dict[str, Any]:
         "side": "",
         "line": None,
         "bookmaker": None,
-        "forecast": {"p_estimate": None, "availability_status": "unknown"},
+        "forecast": {"p_estimate": None, "availability_status": "unknown", "reason_codes": []},
     }
 
 

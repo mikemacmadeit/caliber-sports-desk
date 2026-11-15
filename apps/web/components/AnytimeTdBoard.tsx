@@ -297,7 +297,7 @@ function PriceDecision({ row }: { row: PropRow }) {
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><p className="font-display text-2xl">{value.name}</p><p className="text-xs text-mute">{pct(value.probability, 0)} chance · <span className="font-mono text-paper">{american(value.american)}</span> saved odds</p></div>
         <DecisionResult result={settled} />
         {value.customer ? <PickHighlights copy={value.customer} candidate={value} opponent={value.team === row.team ? row.opponent : row.team} /> : <p className="mt-2 text-xs text-mute">Detailed reasoning was not saved with this pick.</p>}
-        {value.customer?.caution.includes("before kickoff") || value.cautions?.some(c => /injury designation|playing status/i.test(c)) ? <p className="mt-2 text-xs text-amber-200">Check playing status before kickoff.</p> : null}
+        {value.customer?.caution?.includes("before kickoff") || value.cautions?.some(c => /injury designation|playing status/i.test(c)) ? <p className="mt-2 text-xs text-amber-200">Check playing status before kickoff.</p> : null}
         <PriceNote candidate={value} />
       </div> : <p className="text-xs text-mute">{d.alternative_status === "withheld_availability" ? "Alternative withheld while playing status is checked." : "No separate alternative meets our football criteria."}</p>}
   </section>;
@@ -309,7 +309,7 @@ function PlayerComparison({ row }: { row: PropRow }) {
   return <details className="text-sm"><summary className="cursor-pointer font-semibold text-gold">Compare other players</summary>
       <div className="overflow-x-auto"><table className="w-full text-left text-xs"><caption className="sr-only">Scoring chances and saved odds for other players</caption>
         <thead className="text-mute"><tr><th scope="col" className="py-2">Player</th><th scope="col">Chance to score</th><th scope="col">Saved odds</th><th scope="col">Football case</th></tr></thead>
-        <tbody>{d.alternatives.map(p => <tr key={p.player_id} className="border-t border-paper/10"><th scope="row" className="py-2 pr-2 font-normal">{p.name}</th><td>{pct(p.probability, 0)}</td><td>{american(p.american)}</td><td>{p.research_rank?.advantages.map(a => ({opponent_scoring_area_weakness:'Opponent weakness',quarterback_redzone_role:'QB red-zone connection',growing_role:'Growing role',concentrated_scoring_role:'Scoring-area role',game_script_role:'Game-script role'}[a] || a)).join('; ') || 'No distinct advantage established'}</td></tr>)}</tbody>
+        <tbody>{d.alternatives.map(p => <tr key={p.player_id} className="border-t border-paper/10"><th scope="row" className="py-2 pr-2 font-normal">{p.name}</th><td>{pct(p.probability, 0)}</td><td>{american(p.american)}</td><td>{(p.research_rank?.advantages ?? []).map(a => ({opponent_scoring_area_weakness:'Opponent weakness',quarterback_redzone_role:'QB red-zone connection',growing_role:'Growing role',concentrated_scoring_role:'Scoring-area role',game_script_role:'Game-script role'}[a] || a)).join('; ') || 'No distinct advantage established'}</td></tr>)}</tbody>
       </table></div>
       <p className="text-xs text-mute">Main and alternative scorers have separate hit records. Only a fresh qualifying price can count toward hypothetical betting returns.</p>
       </details>;
