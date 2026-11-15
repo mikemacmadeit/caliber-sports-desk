@@ -2,6 +2,7 @@ import { AtsBoard, type AtsRow } from "@/components/AtsBoard";
 import { DayStrip } from "@/components/DayStrip";
 import { LeagueToggle } from "@/components/LeagueToggle";
 import { PageHeader } from "@/components/PageHeader";
+import savedBoard from "@/lib/ats/board.json";
 import { apiGet } from "@/lib/api";
 import { slateToday, type SlateDays } from "@/lib/days";
 import { kickoffDate } from "@/lib/format";
@@ -34,7 +35,8 @@ export default async function AtsPage({
   const boardView = view === "open" || view === "final" ? view : "all";
   const boardResult = result === "correct" || result === "miss" || result === "push" ? result : undefined;
   const boardBook = book === "ml" || book === "spread" ? book : undefined;
-  const dayRows = data.rows.filter((row) => kickoffDate(row.kickoff_utc) === selected);
+  const source = data.rows.length ? data.rows : (savedBoard.rows as AtsRow[]);
+  const dayRows = source.filter((row) => kickoffDate(row.kickoff_utc) === selected);
   const filters = {
     sort,
     side,

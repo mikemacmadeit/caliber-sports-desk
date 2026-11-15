@@ -150,6 +150,8 @@ def refresh_board(session: Session, path: Path | None = None) -> dict[str, Any]:
 
     previous = read_board(path)
     payload = predict_upcoming_ats(session, include_simulation=False)
+    if not (payload.get("rows") or []) and previous and (previous.get("rows") or []):
+        return previous
     payload = keep_finished_spreads(previous, payload)
     write_board(payload, path)
     return payload
