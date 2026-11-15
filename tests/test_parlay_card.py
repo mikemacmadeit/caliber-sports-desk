@@ -102,7 +102,7 @@ def test_soft_alternate_loses_to_the_line_near_the_projection():
     assert all(leg["p"] <= 0.66 for leg in ticket["legs"])
 
 
-def test_mix_uses_three_markets_and_skips_a_copy_of_the_pair():
+def test_mix_takes_the_three_best_prices():
     rows = [
         _row(outcome_id="rec", game_id="g1", player_id="p1", market_id="receptions", side="over", line=4.5, book_price=120, forecast={"p_estimate": 0.64}),
         _row(outcome_id="td", game_id="g2", player_id="p2", market_id="anytime_td", forecast={"p_estimate": 0.60}),
@@ -111,9 +111,51 @@ def test_mix_uses_three_markets_and_skips_a_copy_of_the_pair():
     ]
     card = build_parlay_card(rows)
     mix = next(ticket for ticket in card["tickets"] if ticket["kind"] == "mix")
-    assert {leg["market_id"] for leg in mix["legs"]} == {"receptions", "anytime_td", "rushing_yards"}
+    assert {leg["outcome_id"] for leg in mix["legs"]} == {"rec", "yards", "td"}
     pair = next(ticket for ticket in card["tickets"] if ticket["kind"] == "best_chance")
     assert {leg["outcome_id"] for leg in pair["legs"]} != {leg["outcome_id"] for leg in mix["legs"]}
+
+
+def test_mix_prints_when_the_best_legs_share_a_market():
+    rows = [
+        _row(outcome_id="a", game_id="g1", player_id="p1", market_id="receptions", side="over", line=4.5, book_price=120, forecast={"p_estimate": 0.64}),
+        _row(outcome_id="b", game_id="g2", player_id="p2", market_id="receptions", side="over", line=5.5, book_price=110, forecast={"p_estimate": 0.60}),
+        _row(outcome_id="c", game_id="g3", player_id="p3", market_id="rushing_yards", side="over", line=60.5, forecast={"p_estimate": 0.55}),
+    ]
+    mix = next(ticket for ticket in build_parlay_card(rows)["tickets"] if ticket["kind"] == "mix")
+    assert len(mix["legs"]) == 3
+    assert {leg["market_id"] for leg in mix["legs"]} == {"receptions", "rushing_yards"}
+
+
+def test_a_stronger_same_market_pair_beats_a_mixed_one():
+    rows = [
+        _row(outcome_id="a", game_id="g1", player_id="p1", market_id="receptions", side="over", line=4.5, book_price=120, forecast={"p_estimate": 0.64}),
+        _row(outcome_id="b", game_id="g2", player_id="p2", market_id="receptions", side="over", line=5.5, book_price=110, forecast={"p_estimate": 0.62}),
+        _row(outcome_id="c", game_id="g3", player_id="p3", market_id="rushing_yards", side="over", line=40.5, forecast={"p_estimate": 0.51}),
+    ]
+    pair = next(ticket for ticket in build_parlay_card(rows)["tickets"] if ticket["kind"] == "best_chance")
+    assert {leg["outcome_id"] for leg in pair["legs"]} == {"a", "b"}
+
+
+def test_the_bigger_price_gap_beats_the_chance_closest_to_even():
+    rows = [
+        _row(outcome_id="even", game_id="g1", player_id="even", player_name="Even", forecast={"p_estimate": 0.58}),
+        _row(
+            outcome_id="gap",
+            game_id="g1",
+            player_id="gap",
+            player_name="Gap",
+            market_id="receptions",
+            side="over",
+            line=4.5,
+            book_price=130,
+            forecast={"p_estimate": 0.64},
+        ),
+        _row(outcome_id="other", game_id="g2", player_id="p2", market_id="rushing_yards", side="over", line=40.5, forecast={"p_estimate": 0.55}),
+    ]
+    ticket = next(item for item in build_parlay_card(rows)["tickets"] if item["kind"] == "best_chance")
+    assert any(leg["outcome_id"] == "gap" for leg in ticket["legs"])
+    assert all(leg["outcome_id"] != "even" for leg in ticket["legs"])
 
 
 def test_long_shot_uses_plus_money():
@@ -156,7 +198,7 @@ def test_a_chance_far_above_the_price_stays_off():
     assert all(leg["outcome_id"] != "wild" for leg in legs)
 
 
-def test_skill_player_beats_a_quarterback_rush_on_the_same_game():
+def test_the_better_price_beats_a_skill_player_at_the_same_number():
     rows = [
         _row(
             outcome_id="qb",
@@ -166,7 +208,7 @@ def test_skill_player_beats_a_quarterback_rush_on_the_same_game():
             market_id="rushing_yards",
             side="over",
             line=15.5,
-            forecast={"p_estimate": 0.58},
+            forecast={"p_estimate": 0.64},
         ),
         _row(
             outcome_id="wr",
@@ -181,8 +223,8 @@ def test_skill_player_beats_a_quarterback_rush_on_the_same_game():
         _row(outcome_id="other", game_id="g2", player_id="p2", market_id="receptions", side="over", line=4.5, forecast={"p_estimate": 0.55}),
     ]
     ticket = next(item for item in build_parlay_card(rows)["tickets"] if item["kind"] == "best_chance")
-    assert any(leg["outcome_id"] == "wr" for leg in ticket["legs"])
-    assert all(leg["outcome_id"] != "qb" for leg in ticket["legs"])
+    assert any(leg["outcome_id"] == "qb" for leg in ticket["legs"])
+    assert all(leg["outcome_id"] != "wr" for leg in ticket["legs"])
 
 
 def test_half_catch_stays_off_the_card():
@@ -358,6 +400,22 @@ def test_spread_tickets_use_the_model_side_and_skip_a_started_game():
     assert [leg["team"] for leg in three["legs"]] == ["DET", "CLE", "NYG"]
     assert all("Kansas City" not in leg["player_name"] for ticket in card["tickets"] for leg in ticket["legs"])
     assert all("Cincinnati" not in leg["player_name"] for ticket in card["tickets"] for leg in ticket["legs"])
+
+
+def test_the_two_team_spread_ticket_takes_the_highest_cover_chances():
+    now = datetime(2026, 11, 8, 16, 0, tzinfo=UTC)
+    spreads = [
+        _spread("nfl:2026_09_EARLY_WEAK", "2026-11-08T18:00:00+00:00", "Early Dogs", "Home One", chance=0.51),
+        _spread("nfl:2026_09_MID_GOOD", "2026-11-08T18:05:00+00:00", "Mid Dogs", "Home Two", chance=0.60),
+        _spread("nfl:2026_09_LATE_BEST", "2026-11-08T21:25:00+00:00", "Late Dogs", "Home Three", chance=0.62),
+        _spread("nfl:2026_09_NEXT_A", "2026-11-08T21:30:00+00:00", "Next Dogs", "Home Four", chance=0.53),
+        _spread("nfl:2026_09_NEXT_B", "2026-11-08T21:35:00+00:00", "Last Dogs", "Home Five", chance=0.52),
+    ]
+    card = build_parlay_card([], spreads=spreads, now=now)
+    two = next(item for item in card["tickets"] if item["kind"] == "spread")
+    three = next(item for item in card["tickets"] if item["kind"] == "spread_three")
+    assert [leg["player_name"] for leg in two["legs"]] == ["Mid Dogs", "Late Dogs"]
+    assert {leg["player_name"] for leg in three["legs"]} == {"Early Dogs", "Next Dogs", "Last Dogs"}
 
 
 def test_posted_card_keeps_started_games_and_the_last_price():

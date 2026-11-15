@@ -25,7 +25,6 @@ LONG_MIN_P = 0.30
 LOTTERY_MIN_P = 0.18
 LOTTERY_MAX_P = 0.42
 LOTTERY_MIN_PRICE = 300
-TARGET_P = 0.58
 # A model chance more than this many times the price is too far from the number to print.
 MAX_PRICE_GAP = 2.75
 TD_MIN_P = 0.18
@@ -66,7 +65,7 @@ def build_parlay_card(
                 ticket_id="best-chance",
                 kind="best_chance",
                 title="Best chance",
-                summary="Two games and two markets. Each chance sits next to the number.",
+                summary="Two games. The pair whose chances multiply the highest. Each leg is the best price in its game.",
             )
         )
         used_players.update(str(row["player_id"]) for row in pair)
@@ -81,7 +80,7 @@ def build_parlay_card(
                 ticket_id="mix",
                 kind="mix",
                 title="Mix",
-                summary="Three markets, three games. The chance they all hit is the product of the legs.",
+                summary="Three games. The chance they all hit is the product of the legs.",
             )
         )
         used_players.update(str(row["player_id"]) for row in mix)
@@ -229,11 +228,12 @@ def _trivial_floor(row: dict[str, Any]) -> bool:
 def _best_pair(legs: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
     pool = _one_per_game(legs)
     best: list[dict[str, Any]] | None = None
-    best_key: tuple[int, float] | None = None
+    best_key: tuple[float, int] | None = None
     for i, left in enumerate(pool):
         for right in pool[i + 1 :]:
-            same_market = 1 if left["market_id"] == right["market_id"] else 0
-            key = (same_market, -(_p(left) * _p(right)))
+            product = _p(left) * _p(right)
+            same_market = 0 if left["market_id"] != right["market_id"] else 1
+            key = (-product, same_market)
             if best_key is None or key < best_key:
                 best_key = key
                 best = [left, right]
@@ -241,33 +241,12 @@ def _best_pair(legs: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
 
 
 def _mix(legs: list[dict[str, Any]], *, avoid_players: set[str]) -> list[dict[str, Any]] | None:
-    by_market: dict[str, list[dict[str, Any]]] = {}
-    for row in legs:
-        if str(row["player_id"]) in avoid_players:
-            continue
-        by_market.setdefault(str(row["market_id"]), []).append(row)
-    markets = sorted(by_market, key=lambda market: -max(_p(row) for row in by_market[market]))
-    chosen: list[dict[str, Any]] = []
-    used_games: set[str] = set()
-    used_players: set[str] = set(avoid_players)
-    for market in markets:
-        if len(chosen) >= 3:
-            break
-        options = [
-            row
-            for row in by_market[market]
-            if str(row["game_id"]) not in used_games and str(row["player_id"]) not in used_players
-        ]
-        if not options:
-            continue
-        options.sort(key=_standard_rank)
-        pick = options[0]
-        chosen.append(pick)
-        used_games.add(str(pick["game_id"]))
-        used_players.add(str(pick["player_id"]))
-    if len(chosen) < 3 or len({str(row["market_id"]) for row in chosen}) < 3:
+    """The three best prices from three games. Two markets still make a ticket."""
+    pool = [row for row in legs if str(row["player_id"]) not in avoid_players]
+    ranked = sorted(_one_per_game(pool), key=_standard_rank)
+    if len(ranked) < 3:
         return None
-    return chosen
+    return ranked[:3]
 
 
 def _long_ticket(
@@ -285,43 +264,21 @@ def _long_ticket(
 
 
 def _diverse_plus(pool: list[dict[str, Any]], avoid_players: set[str]) -> list[dict[str, Any]] | None:
-    """Up to three plus-money legs, different games, at least two markets."""
+    """Up to three plus-money legs from different games, best price first."""
     available = [row for row in pool if str(row["player_id"]) not in avoid_players]
-    by_market: dict[str, list[dict[str, Any]]] = {}
-    for row in available:
-        by_market.setdefault(str(row["market_id"]), []).append(row)
-    for group in by_market.values():
-        group.sort(key=lambda row: (-int(row["book_price"]), -_p(row)))
-    order = sorted(
-        by_market,
-        key=lambda market: (0 if market == "anytime_td" else 1, -int(by_market[market][0]["book_price"])),
-    )
+    available.sort(key=_standard_rank)
     chosen: list[dict[str, Any]] = []
     used_games: set[str] = set()
     used_players: set[str] = set()
-
-    def take(row: dict[str, Any]) -> None:
+    for row in available:
+        if len(chosen) >= 3:
+            break
+        if str(row["game_id"]) in used_games or str(row["player_id"]) in used_players:
+            continue
         chosen.append(row)
         used_games.add(str(row["game_id"]))
         used_players.add(str(row["player_id"]))
-
-    for market in order:
-        if len(chosen) >= 3:
-            break
-        for row in by_market[market]:
-            if str(row["game_id"]) in used_games or str(row["player_id"]) in used_players:
-                continue
-            take(row)
-            break
-    if len({str(row["market_id"]) for row in chosen}) >= 2:
-        rest = sorted(available, key=lambda row: (-int(row["book_price"]), -_p(row)))
-        for row in rest:
-            if len(chosen) >= 3:
-                break
-            if str(row["game_id"]) in used_games or str(row["player_id"]) in used_players:
-                continue
-            take(row)
-    if len(chosen) < 2 or len({str(row["market_id"]) for row in chosen}) < 2:
+    if len(chosen) < 2:
         return None
     return chosen
 
@@ -410,10 +367,10 @@ def _price_still_posted(row: dict[str, Any], now: datetime) -> bool:
 
 def _spread_tickets(rows: list[dict[str, Any]], *, now: datetime, posted: bool = False) -> list[dict[str, Any]]:
     legs = [leg for leg in (_spread_leg(row, now, posted=posted) for row in rows) if leg is not None]
-    legs.sort(key=lambda row: str(row.get("kickoff_utc") or ""))
+    legs.sort(key=lambda row: (-_p(row), str(row.get("kickoff_utc") or "")))
     summary = (
-        "The model's side against the number. The chance is that side's cover chance. "
-        "It is a research lean, not a play, and it does not rank one game as stronger than another."
+        "The model's side against the number. The highest cover chances are on the two-team ticket. "
+        "It is a research lean, not a play."
     )
     tickets: list[dict[str, Any]] = []
     if len(legs) >= 2:
@@ -635,12 +592,23 @@ def _p(row: dict[str, Any]) -> float:
     return float((row.get("forecast") or {}).get("p_estimate") or 0.0)
 
 
-def _standard_rank(row: dict[str, Any]) -> tuple[float, float, float, float, str]:
+def _standard_rank(row: dict[str, Any]) -> tuple[float, float, str]:
+    """Smaller is better. The gap between the chance and the price comes first."""
     haircut = float((row.get("forecast") or {}).get("ev_after_haircut") or 0.0)
-    position = str(row.get("position") or "").upper()
-    skill = 0.0 if position in SKILL_POSITIONS or not position else 1.0
-    under = 1.0 if str(row.get("side") or "") == "under" else 0.0
-    return (skill, under, abs(_p(row) - TARGET_P), -haircut, str(row.get("outcome_id") or ""))
+    return (-_edge(row), -haircut, str(row.get("outcome_id") or ""))
+
+
+def _edge(row: dict[str, Any]) -> float:
+    price = row.get("book_price")
+    if price is None:
+        return -1.0
+    try:
+        implied = american_to_implied(int(price))
+    except (TypeError, ValueError):
+        return -1.0
+    if implied <= 0:
+        return -1.0
+    return _p(row) - implied
 
 
 def _decimal_to_american(decimal: float) -> int:
