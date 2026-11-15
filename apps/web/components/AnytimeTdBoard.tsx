@@ -133,7 +133,7 @@ export function AnytimeTdBoard({
         <div className="border-b border-white/10 pb-2">
           <h2 className="font-display text-4xl uppercase leading-none tracking-wide">Anytime touchdown picks</h2>
           <p className="mt-2 max-w-xl text-sm text-mute">
-              Our most likely scorer, plus a better-priced alternative when there is a strong football case. Green means a touchdown; red means no touchdown.
+              A main pick and an alternate for each game. Both use our football analysis; the odds are checked separately. Green means a touchdown; red means no touchdown.
           </p>
         </div>
         {error ? <p role="alert" className="text-heat">The replay could not refresh. Any cards shown are from the last successful load.</p> : null}
@@ -308,13 +308,13 @@ function PriceDecision({ row }: { row: PropRow }) {
   return <section aria-label="Scorer and price decision" className="mt-4 border-t border-paper/15 pt-4 text-sm">
       {value && value.player_id !== row.player_id ? <div className={`relative rounded-lg p-3 ${settled === 'scored' ? 'border border-green-500 bg-green-950/40' : settled === 'blank' ? 'border border-red-500 bg-red-950/40' : 'bg-black/15'}`}>
         {settled === 'scored' || settled === 'blank' ? <span aria-label={settled === 'scored' ? 'Win' : 'Loss'} className={`absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-xl font-bold ${settled === 'scored' ? 'bg-green-500 text-black' : 'bg-red-500 text-white'}`}>{settled === 'scored' ? '\u2713' : '\u2715'}</span> : null}
-        <p className="text-xs font-semibold uppercase tracking-wide text-gold">{value.american == null ? "Matchup alternative" : "Better-priced alternative"}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gold">Alternate pick</p>
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pr-8"><p className="font-display text-2xl">{value.name}</p><p className="text-xs text-mute">{pct(value.probability, 0)} chance · <span className="font-mono text-paper">{american(value.american)}</span> saved odds</p></div>
         <DecisionResult result={settled} />
         {value.customer ? <PickHighlights copy={value.customer} candidate={value} opponent={value.team === row.team ? row.opponent : row.team} /> : <p className="mt-2 text-xs text-mute">Detailed reasoning was not saved with this pick.</p>}
         {value.customer?.caution?.includes("before kickoff") || value.cautions?.some(c => /injury designation|playing status/i.test(c)) ? <p className="mt-2 text-xs text-amber-200">Check playing status before kickoff.</p> : null}
         <PriceNote candidate={value} />
-      </div> : <p className="text-xs text-mute">{d.alternative_status === "withheld_availability" ? "Alternative withheld while playing status is checked." : "No separate alternative meets our football criteria."}</p>}
+      </div> : <p className="text-xs text-mute">{d.alternative_status === "withheld_availability" || d.alternative_status === "availability_update_pending" ? "Alternate is being updated after a playing-status change." : "A second eligible scorer is not available yet."}</p>}
   </section>;
 }
 

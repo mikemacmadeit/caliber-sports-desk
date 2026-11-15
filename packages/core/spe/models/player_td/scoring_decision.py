@@ -7,7 +7,7 @@ quota or hard team-total cutoff. An unsupported main price is marked clearly.
 from spe.models.player_td.scorer_eligibility import exclusions
 from spe.models.player_td.scorer_value import quote_value, reference_quote
 
-VERSION = 'scoring_case_v4'
+VERSION = 'scoring_case_v5'
 
 
 def evaluate(row):
@@ -78,10 +78,23 @@ def choose(rows):
         and (not reference_quote(r) or not leader_quote or reference_quote(r)['decimal']>leader_quote['decimal'])]
     selected = leader
     price_pick = max(supported, key=lambda r:(cases[r['player_id']]['research_rank']['score'], r['forecast']['p_estimate'], r['player_id'])) if supported else None
+    alternative_basis = 'research_and_price'
+    if price_pick is None:
+        remaining = [r for r in eligible if r['player_id'] != leader['player_id']]
+        research = [r for r in remaining if cases[r['player_id']]['research_rank']['supported']]
+        if research:
+            price_pick = max(research, key=lambda r:(cases[r['player_id']]['research_rank']['score'], r['forecast']['p_estimate'], r['player_id']))
+            alternative_basis = 'football_research'
+        elif remaining:
+            price_pick = max(remaining, key=lambda r:(r['forecast']['p_estimate'], r['player_id']))
+            alternative_basis = 'next_scoring_chance'
     case = cases[selected['player_id']]
     value = dict(cases[price_pick['player_id']]) if price_pick else None
     if value:
-        value['research_selected']=True
+        value['research_selected']=alternative_basis != 'next_scoring_chance'
+        value['alternative_basis']=alternative_basis
+        if alternative_basis == 'next_scoring_chance':
+            value['cautions'].append('Next-highest eligible scoring estimate; a distinct matchup advantage has not been established')
         from spe.models.player_td.customer_explanation import build
         value['customer'] = build({**price_pick,'explanation_role':'value_alternative',
             'decision':{'version':VERSION,'selected':value,'most_likely':cases[leader['player_id']],
@@ -93,11 +106,12 @@ def choose(rows):
         'most_likely':cases[leader['player_id']], 'value_candidate':value, 'selected':case,
         'eligible_candidates':len(eligible), 'price_supported_candidates':sum(c['price_supported'] for c in cases.values()),
         'alternative_status':('qualified' if value['price_supported'] else 'research_only') if value else 'no_supported_alternative',
-        'alternative_note':('The alternative is selected by its scoring role, quarterback usage and opponent fit. Its price is checked separately; expired odds do not erase its football case.' if value else
-            'No distinct alternative has sufficient current work plus a specific scoring-role or matchup advantage.'),
+        'alternative_note':(('The alternate has the next-highest eligible scoring estimate. A distinct matchup advantage has not been established; its price is assessed separately.' if alternative_basis == 'next_scoring_chance' else
+            'The alternate is selected by its scoring role, quarterback usage and opponent fit. Its price is checked separately.') if value else
+            'Only one eligible scorer is available; a second name requires a player who passes the playing-status checks.'),
         'excluded_candidates':[{'player_id':r.get('player_id'),'name':r.get('player_name'),'reasons':exclusions(r)} for r in rows if exclusions(r)],
         'alternatives':sorted(cases.values(),key=lambda c:(-c['probability'],c['player_id']))[:8],
-        'policy':'Highest model scoring chance first. A distinct research alternative is ranked by scoring-area opportunity, opponent fit, quarterback role and recent workload. Only a fresh qualifying quote is counted as a value bet.',
+        'policy':'Highest model scoring chance first. A distinct alternate is selected whenever two eligible players exist: prefer a supported better-priced research case, then a supported football case at any price, then the next-highest scoring estimate. Only a fresh qualifying quote is counted as a value bet.',
         'validation_note':'Research estimates; price support is not demonstrated profitability. Original pregame forecasts are preserved separately.'}
     return {**selected, 'replay_selection':'scoring_case', 'selection_version':VERSION,
         'selection_reason':reason, 'selection_warnings':case['cautions'], 'decision':decision,

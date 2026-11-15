@@ -74,7 +74,7 @@ def build(row):
     leader=decision.get('most_likely') or {}
     lower_chance=bool(leader and leader.get('player_id')!=row.get('player_id'))
     is_alternative=row.get('explanation_role')=='value_alternative'
-    label='Better-priced alternative' if is_alternative else 'Most likely scorer' if decision else 'Scorer pick'
+    label='Alternate pick' if is_alternative else 'Most likely scorer' if decision else 'Scorer pick'
     chance=f"We estimate a {p:.0%} chance of a touchdown." if _number(p) else 'A scoring estimate is unavailable.'
     caution=(f"Even at that estimate, he is more likely to finish without a touchdown." if _number(p) and p<.5 else 'A strong workload does not guarantee a touchdown.')
     if lower_chance and is_alternative:
@@ -119,7 +119,7 @@ def build(row):
             text+=f"His saved {_odds(alternative['american'])} price needs {alternative['break_even']:.0%} to break even. "
         text+=('Our price comparison favors '+name+'. It does not mean he is more likely to score.' if value_pick and alternative['probability']>p else
             'The choice reflects both the estimated scoring chance and the available price.' if value_pick else 'The scorer choice follows the estimated chance of a touchdown.')
-        if is_alternative and selected.get('research_rank'):
+        if is_alternative and selected.get('research_selected') and selected.get('research_rank'):
             labels={'opponent_scoring_area_weakness':'an opponent weakness in his scoring area',
                 'quarterback_redzone_role':'a leading red-zone role with the expected quarterback',
                 'growing_role':'a growing share of recent work','concentrated_scoring_role':'a concentrated share of work close to the end zone',
@@ -132,6 +132,8 @@ def build(row):
             if own_qb.get('usable') and peer_qb.get('usable') and own_qb['player_id']==peer_qb['player_id']:
                 text+=f" With {own_qb.get('name','the expected quarterback')}, the same {own_qb['games']}-game sample contains {own_qb['player_redzone_targets']:.0f} red-zone targets for {name} and {peer_qb['player_redzone_targets']:.0f} for {alternative['name']}."
         comparison={'heading':f"Why {name} over {alternative['name']}?",'text':text}
+    if is_alternative and selected.get('alternative_basis') == 'next_scoring_chance':
+        caution+=' This is the next-highest eligible scoring estimate; we have not established a special matchup advantage.'
     from spe.models.player_td.matchup_research import paragraphs
     return {'version':'customer_td_v1','label':label,'chance':chance,
         'why':' '.join(role),'matchup':matchup,'caution':caution,'price':price_text,

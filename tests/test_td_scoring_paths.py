@@ -89,15 +89,18 @@ def test_missing_college_charting_does_not_invent_a_stress_test():
     assert pick['decision']['value_candidate'] is None
 
 
-def test_price_without_current_role_or_scoring_evidence_cannot_be_an_alternative():
+def test_missing_research_uses_scoring_rank_without_inventing_an_advantage():
     leader=priced('leader',.65,-250)
     cheap=priced('cheap',.45,500,.4)
     cheap['desk_analysis']['features']['recent_measured_touches']=0
-    assert choose([leader,cheap])['decision']['value_candidate'] is None
+    fallback=choose([leader,cheap])['decision']['value_candidate']
+    assert fallback['name']=='cheap' and not fallback['research_selected']
+    assert fallback['alternative_basis']=='next_scoring_chance'
     cheap['desk_analysis']['features']['recent_measured_touches']=6
     cheap['desk_analysis']['combination']['scoring_paths']['paths']=[]
     pick=choose([leader,cheap])
-    assert pick['decision']['value_candidate'] is None
+    assert pick['decision']['value_candidate']['name']=='cheap'
+    assert 'not established a special matchup' in pick['decision']['value_candidate']['customer']['caution']
     assert not next(c for c in pick['decision']['alternatives'] if c['name']=='cheap')['football_case']['supported']
 
 
@@ -108,10 +111,35 @@ def test_alternative_is_distinct_more_affordable_and_has_its_own_football_explan
     pick=choose([leader,expensive,value])
     alternative=pick['decision']['value_candidate']
     assert alternative['name']=='value' and alternative['football_case']['supported']
-    assert alternative['customer']['label']=='Better-priced alternative'
+    assert alternative['customer']['label']=='Alternate pick'
     assert alternative['customer']['why'] and alternative['customer']['matchup']
     assert 'lower' not in alternative['customer']['label']
     assert choose([leader])['decision']['value_candidate'] is None
+
+
+def test_alternate_remains_available_when_its_price_is_more_expensive():
+    main=priced('main',.65,150)
+    alternate=priced('alternate',.5,-200)
+    pick=choose([main,alternate])
+    assert pick['player_id']=='main'
+    other=pick['decision']['value_candidate']
+    assert other['name']=='alternate' and other['alternative_basis']=='football_research'
+    assert not other['bet_qualified']
+    assert other['customer']['label']=='Alternate pick'
+
+
+def test_college_alternate_uses_model_rank_and_never_an_inactive_or_backup_qb():
+    rows=[priced('main',.7,None),priced('second',.5,None),priced('out',.6,300),priced('backup',.9,400)]
+    for row in rows:
+        row['league_id']='fbs'
+        row['desk_analysis']['combination'].pop('scoring_paths')
+    rows[2]['desk_analysis']['current_context']['availability']={'status':'out'}
+    rows[3]['position']='QB'
+    rows[3]['desk_analysis']['current_context']['depth']={'rank':2}
+    pick=choose(rows)
+    assert pick['player_name']=='main'
+    alt=pick['decision']['value_candidate']
+    assert alt['name']=='second' and not alt['bet_qualified'] and not alt['research_selected']
 
 
 def test_london_is_a_more_likely_scorer_while_dotson_can_be_a_separate_value_case():
