@@ -137,6 +137,10 @@ def refresh_nflverse_desk(session, *, year=None, now=None, force=False):
         return {"rows": count, "unresolved": unresolved}
 
     attempt("desk_pbp", pbp)
+    if results['desk_pbp'].get('rows'):
+        from spe.ingest.shared_inputs import publish_gameflow
+        attempt('gameflow_inputs', lambda: publish_gameflow(session,
+            settings.parquet_dir.parent/'cache/nflverse'/f'play_by_play_{year}.parquet', now=now))
     attempt("snap_counts", snaps)
     for dataset, ingest in (("roster_weekly", ingest_roster_frame), ("depth_charts", ingest_depth_frame)):
         def refresh_list(dataset=dataset, ingest=ingest):

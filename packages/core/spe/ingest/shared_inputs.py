@@ -12,8 +12,32 @@ from spe.db.base import as_utc
 from spe.db.models import InputArtifact
 
 FILES = ("fbs_free_opportunities.json", "fbs_situations.json", "fbs_rosters.json",
-         "fbs.json", "nfl.json", "recent_complete_boxes.json")
+         "fbs.json", "nfl.json", "recent_complete_boxes.json", "nfl_gameflow.json")
 MAX_BYTES = 128 * 1024 * 1024
+
+
+def publish_gameflow(db, source, *, now=None):
+    """Share only simulation columns, not the large full-provider download."""
+    import pandas as pd
+    from spe.simulate.desk_gameflow_inputs import COLUMNS
+    observed = as_utc(now) or datetime.now(UTC)
+    frame = pd.read_parquet(source, columns=COLUMNS)
+    if frame.empty:
+        raise ValueError('No game-flow plays to publish')
+    root = settings.parquet_dir / 'desk_evidence'
+    root.mkdir(parents=True, exist_ok=True)
+    path = root/'nfl_gameflow.json'
+    payload = {'observed_at':observed.isoformat(), 'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
+               'records':json.loads(frame.to_json(orient='records'))}
+    with tempfile.NamedTemporaryFile(dir=root, suffix='.tmp', delete=False) as output:
+        output.write(json.dumps(payload, allow_nan=False).encode())
+        temp = output.name
+    try:
+        os.replace(temp, path)
+        return publish_inputs(db, ('nfl_gameflow.json',), now=observed)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
 
 
 def publish_inputs(db, names=FILES, now=None):

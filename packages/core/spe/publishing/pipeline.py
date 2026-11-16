@@ -233,9 +233,10 @@ def refresh_touchdown_cards(db):
         card = replay_day(db, day, "all", checkpoint=True, deadline=deadline, input_versions=versions)
         counts[day] = {"picks": len(card.get("rows") or []),
                        "unavailable": len(card.get("unavailable_games") or []),
+                       "simulation_unavailable": sum(((r.get('desk_analysis') or {}).get('simulation') or {}).get('status') == 'unavailable' for r in card.get('rows', [])),
                        "complete": card.get("refresh_complete", True)}
         db.commit()
-    return {"status": "degraded" if any(v["unavailable"] or not v["complete"] for v in counts.values()) else "ok",
+    return {"status": "degraded" if any(v["unavailable"] or v['simulation_unavailable'] or not v["complete"] for v in counts.values()) else "ok",
             "dates": counts, "input_versions": versions}
 
 

@@ -194,3 +194,20 @@ def test_coordinate_directory_failure_does_not_block_existing_weather(db, monkey
         raise AdapterError('Rate limited')
     monkeypatch.setattr('spe.ingest.open_meteo_history.CfbdAdapter.fetch', fail)
     assert _venue_records(None, refresh=True) is None
+
+
+def test_gameflow_source_reaches_other_worker(db, tmp_path, monkeypatch):
+    import pandas as pd
+    from spe.ingest.shared_inputs import publish_gameflow, hydrate_inputs
+    from spe.simulate.desk_gameflow_inputs import _source, COLUMNS
+    source = tmp_path/'plays.parquet'
+    row = {c:None for c in COLUMNS}
+    row.update(game_id='g', play_id=1, game_date='2026-11-01', posteam='A', defteam='B', rush_attempt=1)
+    pd.DataFrame([row]).to_parquet(source)
+    publish_gameflow(db, source, now=NOW); db.commit()
+    monkeypatch.setattr(settings, 'parquet_dir', tmp_path/'other_worker')
+    hydrate_inputs(db)
+    path = settings.parquet_dir/'desk_evidence/nfl_gameflow.json'
+    frame, checksum = _source(str(path), path.stat().st_mtime_ns)
+    assert list(frame.game_id) == ['g'] and frame.iloc[0].rush_attempt == 1
+    assert path.stat().st_mtime == pytest.approx(NOW.timestamp())

@@ -41,6 +41,9 @@ def apply(candidates, model, game, cutoff, config):
                     'away':game.away_team_id.removeprefix('nfl:'), 'kickoff':as_utc(game.kickoff_utc).isoformat()}
         season = as_utc(cutoff).year - int(as_utc(cutoff).month < 7)
         source = settings.parquet_dir.resolve().parent / 'cache/nflverse' / f'play_by_play_{season}.parquet'
+        shared = settings.parquet_dir / 'desk_evidence/nfl_gameflow.json'
+        if shared.exists():
+            source = shared
         inputs = build_inputs(metadata, rows, cutoff, source)
         # Same engine and fixed parameters as the two experiments. Controls are
         # covered by tests; only gameflow supplies the published point estimate.

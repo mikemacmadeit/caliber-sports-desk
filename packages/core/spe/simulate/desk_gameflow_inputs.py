@@ -20,12 +20,18 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
 
 
-@lru_cache(maxsize=2)
-def _source(path, modified):
-    columns = ['game_id', 'game_date', 'play_id', 'posteam', 'defteam', 'fixed_drive',
+COLUMNS = ['game_id', 'game_date', 'play_id', 'posteam', 'defteam', 'fixed_drive',
                'play_type', 'rush_attempt', 'pass_attempt', 'qb_kneel', 'qb_spike',
                'score_differential', 'rusher_player_id', 'receiver_player_id']
-    frame = pd.read_parquet(path, columns=columns).drop_duplicates(['game_id', 'play_id'])
+
+
+@lru_cache(maxsize=2)
+def _source(path, modified):
+    if Path(path).suffix == '.json':
+        frame = pd.DataFrame(json.loads(Path(path).read_text())['records'])[COLUMNS]
+    else:
+        frame = pd.read_parquet(path, columns=COLUMNS)
+    frame = frame.drop_duplicates(['game_id', 'play_id'])
     return frame, hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
