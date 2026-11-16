@@ -85,7 +85,17 @@ def init_db() -> None:
     get_engine()
     if settings.app_env in {"prod", "production"}:
         from sqlalchemy import text
-        with get_engine().connect() as conn:
+        from sqlalchemy.exc import OperationalError
+        import time
+        for attempt in range(5):
+            try:
+                connection = get_engine().connect()
+                break
+            except OperationalError:
+                if attempt == 4:
+                    raise
+                time.sleep(1)
+        with connection as conn:
             try:
                 revision = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
             except Exception as exc:
