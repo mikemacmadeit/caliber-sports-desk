@@ -250,11 +250,21 @@ def ledger_year(db, year: int, league: str | None = None) -> dict[str, Any]:
 
 
 def _ledger_days(db, dates, league):
-    """Same verified records as ledger_day, fetched together for the whole range.
+    """Same verified records as ledger_day, with bounded intermediate card memory.
 
     Display-only packaged archives are deliberately absent from performance totals.
     There is no cross-request cache: official corrections apply on the next read.
     """
+    dates = sorted(set(dates))
+    result = {}
+    # Detailed TD cards include substantial evidence. A whole year's raw cards
+    # must not be resident for every simultaneous track-record request.
+    for start in range(0, len(dates), 14):
+        result.update(_ledger_range(db, dates[start:start + 14], league))
+    return result
+
+
+def _ledger_range(db, dates, league):
     from copy import deepcopy
     from sqlalchemy import select
     from spe.db.models import BoardSnapshot
@@ -262,9 +272,6 @@ def _ledger_days(db, dates, league):
         day_card_key, _refresh_card_grades, _withhold_current_absences,
     )
 
-    dates = sorted(set(dates))
-    if not dates:
-        return {}
     start, _ = _day_bounds(dates[0])
     _, end = _day_bounds(dates[-1])
     published = defaultdict(list)

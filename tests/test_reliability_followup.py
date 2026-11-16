@@ -62,7 +62,7 @@ def test_record_range_matches_every_daily_card_and_has_bounded_queries(db):
         finally:
             event.remove(db.get_bind(), "before_cursor_execute", counted)
         assert actual == expected
-        assert len(queries) <= 5, len(queries)
+        assert len(queries) <= 15, len(queries)
         for month in ("2025-12", "2026-01"):
             expected_units = {}
             for day, rows in expected.items():

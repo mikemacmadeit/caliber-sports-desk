@@ -71,7 +71,7 @@ claim or a large-concurrency capacity certification.
 Second reliability pass
 - Reuse the caller's database session for ATS/prop snapshot reads, batch the four
   prop markets and avoid reading the same market again just to check availability.
-- Month/year records fetch each source once for the date range. Official TD grades,
+- Month/year records fetch each source once per bounded batch of dates. Official TD grades,
   corrections, alternates, verified-publication exclusions and original prices use
   the same rules as the daily record. No cross-request result cache is introduced.
   ATS cohort/cutoff/price exclusions also run in SQL before loading full predictions.
