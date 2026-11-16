@@ -22,7 +22,7 @@ services:
     dockerContext: .
     autoDeployTrigger: checksPass
     healthCheckPath: /health
-    preDeployCommand: python -m alembic -c infra/alembic.ini upgrade head
+    preDeployCommand: python -m spe.db.release
     envVars:
       - key: APP_ENV
         value: prod

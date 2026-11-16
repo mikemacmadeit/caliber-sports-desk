@@ -115,7 +115,15 @@ def _venue_records(venue_records: list[dict[str, Any]] | None, *, refresh: bool)
     cache = _cache_path()
     if cache.exists() and not refresh:
         return json.loads(cache.read_text(encoding="utf-8"))
-    fetched = CfbdAdapter().fetch("venues")
+    from spe.adapters.base import AdapterError
+    try:
+        fetched = CfbdAdapter().fetch("venues")
+    except AdapterError:
+        # Optional coordinate enrichment must not block free NWS forecasts at
+        # already located stadiums. Unlocated venues remain explicitly missing.
+        import logging
+        logging.getLogger(__name__).warning('Venue directory unavailable; retaining existing coordinates')
+        return json.loads(cache.read_text(encoding='utf-8')) if cache.exists() else None
     cache.write_text(json.dumps(fetched.records), encoding="utf-8")
     return fetched.records
 

@@ -84,7 +84,8 @@ def test_today_route_rebuilds_old_empty_board_with_real_scorer(db, monkeypatch):
             time.sleep(.05)
         assert result['refresh_status']=='ready'
         assert result['total']==1
-        assert result['rows'][0]['model'].startswith('desk_opportunity_v2-nfl-')
+        # The shipped combined baseline supersedes the standalone opportunity fit.
+        assert result['rows'][0]['model'].startswith('desk_combined_v2-nfl-')
         assert result['market_counts']['anytime_td']==1
         assert db.query(DeskDecision).count()==1
         cached=db.get(BoardSnapshot,'props:anytime_td|nfl|'+day)

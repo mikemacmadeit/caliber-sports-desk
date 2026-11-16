@@ -184,3 +184,13 @@ def test_deployed_artifacts_resolve_both_leagues(monkeypatch):
         if requested:
             artifact = load_combined_model(league, research_candidate=not requested.get('use_validated_model'), version=requested['version'])
             assert artifact and artifact['artifact_sha256'] == requested['artifact_sha256']
+
+
+def test_coordinate_directory_failure_does_not_block_existing_weather(db, monkeypatch):
+    from spe.adapters.base import AdapterError
+    from spe.ingest.open_meteo_history import _venue_records
+    monkeypatch.setattr(settings, 'cfbd_api_key', 'test-key')
+    def fail(*a, **kw):
+        raise AdapterError('Rate limited')
+    monkeypatch.setattr('spe.ingest.open_meteo_history.CfbdAdapter.fetch', fail)
+    assert _venue_records(None, refresh=True) is None
