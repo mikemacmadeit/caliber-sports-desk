@@ -2,10 +2,10 @@ import Link from "next/link";
 import { DayStrip, EmptyDay } from "@/components/DayStrip";
 import { LeagueToggle } from "@/components/LeagueToggle";
 import { PageHeader } from "@/components/PageHeader";
+import { PropBoard } from "@/components/PropBoard";
 import { PropDeskPanel } from "@/components/PropDeskPanel";
-import { PropExplorer } from "@/components/PropExplorer";
 import { TodayPropPicks } from "@/components/TodayPropPicks";
-import { apiGet, type PropRow } from "@/lib/api";
+import { apiGet } from "@/lib/api";
 import { dayParts, type SlateDays, withQuery } from "@/lib/days";
 
 const MARKETS = [
@@ -31,19 +31,8 @@ export default async function PropsPage({
   }
 
   const selected = dateParam || days?.today || new Date().toISOString().slice(0, 10);
-  let data: { rows: PropRow[] } | null = null;
-  let propsError: string | null = null;
-  try {
-    data = await apiGet<{ rows: PropRow[] }>(
-      `/v1/props?market=${market}&league=${league}&date=${selected}`,
-      15000,
-    );
-  } catch (e) {
-    propsError = e instanceof Error ? e.message : "props unavailable";
-  }
-
   const next = days?.dates.find((d) => d > selected) ?? null;
-  const rows = (data?.rows ?? []).map(boardRow);
+  const onSlate = !days || days.dates.includes(selected);
 
   return (
     <div className="space-y-8">
@@ -76,15 +65,13 @@ export default async function PropsPage({
           extra={{ market }}
         />
       ) : null}
-      {(daysError || propsError) && (
+      {daysError ? (
         <div className="plate border border-gold/30 px-6 py-4 text-sm text-mute">
-          {daysError ? <p>Schedule load failed: {daysError}</p> : null}
-          {propsError ? <p>Props load failed: {propsError}</p> : null}
+          <p>Schedule load failed: {daysError}</p>
           <p className="mt-1">Refresh after the API is back — this page no longer hard-crashes on a timeout.</p>
         </div>
-      )}
+      ) : null}
       <PropDeskPanel league={league} date={selected} />
-      <DayTally rows={rows} />
       <TodayPropPicks league={league} date={selected} market={market} hideWhenEmpty />
       <div className="flex flex-wrap gap-2">
         {MARKETS.map((m) => (
@@ -103,113 +90,25 @@ export default async function PropsPage({
           </Link>
         ))}
       </div>
-      {rows.length === 0 ? (
-        days?.dates.includes(selected) ? (
-          <div className="plate px-6 py-8">
-            <p className="font-display text-4xl uppercase leading-none">
-              {propsError ? "Props unavailable" : "No prices for this day"}
-            </p>
-            <p className="mt-3 max-w-xl text-sm text-mute">
-              {propsError
-                ? "The desk could not load this market right now. Try again in a moment."
-                : "The games are on the board. This market has no locked number for them yet."}
-            </p>
-            <Link
-              href={withQuery("/", { league, date: days && selected === days.today ? undefined : selected })}
-              className="mt-4 inline-block font-display text-2xl uppercase tracking-wide text-gold"
-            >
-              Open the slate →
-            </Link>
-          </div>
-        ) : (
-          <EmptyDay
-            selected={selected}
-            today={days?.today || selected}
-            next={next}
-            href={
-              next
-                ? withQuery("/props", {
-                    league,
-                    market,
-                    date: days && next === days.today ? undefined : next,
-                  })
-                : null
-            }
-          />
-        )
+      {onSlate ? (
+        <PropBoard league={league} date={selected} market={market} />
       ) : (
-        <PropExplorer rows={rows} mode="flat" />
+        <EmptyDay
+          selected={selected}
+          today={days?.today || selected}
+          next={next}
+          href={
+            next
+              ? withQuery("/props", {
+                  league,
+                  market,
+                  date: days && next === days.today ? undefined : next,
+                })
+              : null
+          }
+        />
       )}
     </div>
   );
 }
 
-/** The table only reads these fields. The rest of each research row stays off the page. */
-function boardRow(row: PropRow): PropRow {
-  const forecast = row.forecast;
-  return {
-    outcome_id: row.outcome_id,
-    game_id: row.game_id,
-    league_id: row.league_id,
-    market_id: row.market_id,
-    player_id: row.player_id,
-    player_name: row.player_name,
-    position: row.position,
-    team: row.team,
-    team_mark: row.team_mark,
-    opponent: row.opponent,
-    away_abbr: row.away_abbr,
-    home_abbr: row.home_abbr,
-    away_mark: row.away_mark,
-    home_mark: row.home_mark,
-    kickoff_utc: row.kickoff_utc,
-    side: row.side,
-    line: row.line,
-    pick: row.pick,
-    model_lean: row.model_lean,
-    bookmaker: row.bookmaker,
-    book_price: row.book_price,
-    source_timestamp: row.source_timestamp,
-    price_freshness: row.price_freshness,
-    result: row.result,
-    actual: row.actual,
-    projection: row.projection,
-    projection_games: row.projection_games,
-    projection_unit: row.projection_unit,
-    data_tier: row.data_tier,
-    research_signal: row.research_signal,
-    forecast: {
-      prediction_as_of: forecast.prediction_as_of,
-      model_version: forecast.model_version,
-      data_cutoff: forecast.data_cutoff,
-      markets: forecast.markets,
-      p_estimate: forecast.p_estimate,
-      confidence_interval: forecast.confidence_interval,
-      book_price: forecast.book_price,
-      source_timestamp: forecast.source_timestamp,
-      price_freshness: forecast.price_freshness,
-      availability_status: forecast.availability_status,
-      reason_codes: forecast.reason_codes,
-      disclaimer: forecast.disclaimer,
-      ev: forecast.ev,
-      ev_after_haircut: forecast.ev_after_haircut,
-      recommendation_status: forecast.recommendation_status,
-      data_tier: forecast.data_tier,
-      research_only: forecast.research_only,
-    },
-  };
-}
-
-function DayTally({ rows }: { rows: PropRow[] }) {
-  if (!rows.length) return null;
-  const sides = rows.filter(
-    (row) => row.model_lean === true || (row.model_lean == null && row.side !== "under" && row.side !== "no"),
-  );
-  const wins = sides.filter((row) => row.result === "win").length;
-  const losses = sides.filter((row) => row.result === "loss").length;
-  const pushes = sides.filter((row) => row.result === "push").length;
-  const pending = sides.length - wins - losses - pushes - sides.filter((row) => row.result === "void").length;
-  const parts = [`${wins} wins`, `${losses} losses`, `${pending} pending`];
-  if (pushes) parts.push(`${pushes} pushes`);
-  return <p className="text-sm text-mute">Today · {parts.join(" · ")}</p>;
-}

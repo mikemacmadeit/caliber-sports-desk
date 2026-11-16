@@ -45,7 +45,15 @@ export default async function DataQualityPage() {
         note?: string;
       };
     };
-  }>("/v1/model-health");
+  }>("/v1/model-health").catch(() => null);
+  if (!data) {
+    return (
+      <div className="space-y-8">
+        <PageHeader kicker="Gates stay closed until the proof" title="Model health" lede="The health report is temporarily unavailable." />
+        <p className="text-sm text-mute">Refresh in a moment. The desk, the spreads, and the props are on their own pages.</p>
+      </div>
+    );
+  }
   const coverage = await apiGet<{
     catalog: Array<{ asset: string; availability: string; provider: string; notes: string; leagues: string[] }>;
     counts: Record<string, number>;
@@ -75,7 +83,15 @@ export default async function DataQualityPage() {
         missing?: string[];
       }>;
     };
-  }>("/v1/coverage");
+  }>("/v1/coverage").catch(() => null);
+  if (!coverage) {
+    return (
+      <div className="space-y-8">
+        <PageHeader kicker="Gates stay closed until the proof" title="Model health" lede={data.gate} />
+        <p className="text-sm text-mute">The coverage report is temporarily unavailable.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">
