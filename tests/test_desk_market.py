@@ -102,3 +102,25 @@ def test_repeated_archive_refresh_preserves_first_observation(db):
     assert store_archive(db,{'g':later})==0
     row=db.query(ClosingLine).filter_by(game_id='g',market_id='total',source='espn_summary_market').one()
     assert row.home_line==50 and as_utc(row.observed_at)==NOW
+
+
+def test_live_market_refresh_keeps_cutoff_history_and_rejects_postkickoff(db):
+    from spe.models.player_td.desk_market import store_archive, store_pregame_quote
+    from spe.db.models import Game, RawSnapshot
+    seed(db)
+    db.get(Game, 'g').kickoff_utc = NOW + timedelta(hours=2)
+    old = {'home_handicap': -7, 'total': 50, 'observed_at': (NOW-timedelta(days=2)).isoformat()}
+    store_archive(db, {'g': old})
+    assert not context_for_game(db, 'g', NOW)['usable']
+    first = {**old, 'observed_at': NOW.isoformat()}
+    assert store_pregame_quote(db, 'g', first, captured_at=NOW)
+    later = NOW + timedelta(hours=1)
+    second = {**first, 'total': 54, 'observed_at': later.isoformat()}
+    assert store_pregame_quote(db, 'g', second, captured_at=later)
+    assert context_for_game(db, 'g', NOW)['total'] == 50
+    assert context_for_game(db, 'g', later)['total'] == 54
+    assert context_for_game(db, 'g', later)['home_implied_points'] == 30.5
+    assert not store_pregame_quote(db, 'g', second, captured_at=NOW)
+    assert not store_pregame_quote(db, 'g', second, captured_at=NOW+timedelta(hours=3))
+    assert db.query(RawSnapshot).count() == 2
+    assert db.query(ClosingLine).filter_by(game_id='g', market_id='total').one().home_line == 50

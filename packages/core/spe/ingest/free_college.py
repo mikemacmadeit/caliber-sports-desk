@@ -75,7 +75,9 @@ def summarize(frame, games, members, player_ids, aliases, observed_at):
     team_stats, player_stats = {}, {}
     unmatched_games = set()
     conflicts = 0
-    for row in df.to_dict("records"):
+    # Do not materialize a second season-sized list of Python dictionaries.
+    for values in df.itertuples(index=False, name=None):
+        row = dict(zip(df.columns, values))
         gid = external_id(row["game_id"])
         game = games.get(gid)
         if game is None:
@@ -136,15 +138,19 @@ def summarize(frame, games, members, player_ids, aliases, observed_at):
 def refresh_free_college(db, *, years=(2023,2024,2025,2026), refresh=False):
     aliases=canonical_team_map(db.query(Team).all())
     candidates=defaultdict(list)
-    for g in db.query(Game).filter(Game.league_id=="fbs",Game.status=="final",Game.data_tier.notin_(("demo","alias"))):
+    start = datetime(min(years), 7, 1, tzinfo=UTC)
+    end = datetime(max(years)+1, 7, 1, tzinfo=UTC)
+    for g in db.query(Game).filter(Game.league_id=="fbs",Game.status=="final",Game.data_tier.notin_(("demo","alias")),
+            Game.kickoff_utc >= start, Game.kickoff_utc < end):
         candidates[g.game_id.split(":")[-1]].append(g)
     games={gid:{"game_id":sorted(gs,key=lambda g:g.game_id.startswith('espn:'),reverse=True)[0].game_id,
         "home":canonical_team(gs[0].home_team_id,aliases),"away":canonical_team(gs[0].away_team_id,aliases),
         "kickoff_utc":as_utc(gs[0].kickoff_utc).isoformat()} for gid,gs in candidates.items()}
     members={(r.game_id.split(":")[-1],r.player_id,canonical_team(r.team_id,aliases))
-        for r in db.query(PlayerGameStat).join(Game).filter(Game.league_id=="fbs",Game.status=="final",
-            PlayerGameStat.quality_status.notin_(("invalid","quarantined"))) if r.team_id}
-    known={p.player_id for p in db.query(Player)}
+        for r in db.query(PlayerGameStat.game_id, PlayerGameStat.player_id, PlayerGameStat.team_id).join(Game).filter(
+            Game.league_id=="fbs",Game.status=="final",Game.kickoff_utc >= start, Game.kickoff_utc < end,
+            PlayerGameStat.quality_status.notin_(("invalid","quarantined"))).yield_per(1000) if r.team_id}
+    known={p.player_id for p in db.query(Player.player_id)}
     player_ids={p.removeprefix('fbs:'):p for p in known if p.startswith('fbs:')}
     for r in db.query(ProviderIdMap).filter(ProviderIdMap.provider=='espn',ProviderIdMap.entity_type=='player'):
         if r.canonical_id in known and r.confidence>=.99:

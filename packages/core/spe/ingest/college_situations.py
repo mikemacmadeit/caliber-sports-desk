@@ -58,17 +58,24 @@ def summarize(frame, games, aliases):
     return result
 
 
-def refresh_college_situations(db):
+def refresh_college_situations(db, *, years=None):
     path=settings.parquet_dir/'desk_evidence/fbs_free_opportunities.json'
     source=json.loads(path.read_text())
     games={(r['game_id'].split(':')[-1],r['team_id']):r for r in source['opportunity_games']}
     aliases=canonical_team_map(db.query(Team).all())
-    rows=[]
+    output=settings.parquet_dir/'desk_evidence/fbs_situations.json'
+    previous=json.loads(output.read_text()) if output.exists() else {}
+    from spe.db.base import as_utc
+    def season(row):
+        kickoff=as_utc(row['kickoff_utc'])
+        return kickoff.year-int(kickoff.month<7)
+    rows=[r for r in previous.get('teams',[]) if years is not None and season(r) not in years]
     for entry in source['sources']:
         name=entry['source'].rsplit('/',1)[-1]
+        if years is not None and not any(name == f'play_by_play_{year}.parquet' for year in years):
+            continue
         frame=pd.read_parquet(settings.parquet_dir.parent/'cache/sportsdataverse'/name,columns=COLUMNS)
         rows.extend(summarize(frame,games,aliases))
-    output=settings.parquet_dir/'desk_evidence/fbs_situations.json'
     body={'teams':rows,'sources':source['sources'],'note':'Historical score-state tendencies, not future play calls or individual line grades.'}
     tmp=output.with_suffix('.tmp');tmp.write_text(json.dumps(body,allow_nan=False));tmp.replace(output)
     return {'team_games':len(rows),'source':'cached SportsDataverse PBP','new_network_requests':0}

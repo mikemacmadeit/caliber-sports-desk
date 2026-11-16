@@ -6,7 +6,7 @@ Validated Play stays off: every new recommendation is no-bet and research-only.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -40,6 +40,7 @@ RESEARCH_TIER = "research"
 
 def publish_model_forecasts(session: Session, now: datetime | None = None) -> dict[str, Any]:
     now = now or datetime.now(UTC)
+    from spe.config import settings
     summary: dict[str, Any] = {
         "status": "ok",
         "written": 0,
@@ -55,6 +56,8 @@ def publish_model_forecasts(session: Session, now: datetime | None = None) -> di
         session.query(Game)
         .filter(
             Game.data_tier == "upcoming",
+            Game.kickoff_utc > now,
+            Game.kickoff_utc <= now + timedelta(hours=settings.odds_upcoming_hours),
             Game.status.in_(("scheduled", "preview", "pregame")),
             Game.league_id.in_(("nfl", "fbs")),
         )

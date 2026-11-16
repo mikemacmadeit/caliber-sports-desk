@@ -51,7 +51,7 @@ def refresh_free_desk_inputs(db, now=None):
         year = now.year - int(now.month < 7)
         def college():
             sources = refresh_free_college(db, years=(year,), refresh=True)
-            situations = refresh_college_situations(db)
+            situations = refresh_college_situations(db, years=(year,))
             derived = refresh_local_evidence(force=True, db=db)
             return {"sources": sources, "situations": situations, "derived": derived}
         attempt("college", college, ("fbs_free_opportunities.json", "fbs_situations.json", "fbs.json", "nfl.json"))

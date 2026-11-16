@@ -32,6 +32,8 @@ services:
           property: connectionString
       - key: PARQUET_DIR
         value: /data/parquet
+      - key: DB_POOL_SIZE
+        value: "6"
       - key: WEB_ORIGIN
         sync: false
       - key: AUTH_PROXY_SECRET

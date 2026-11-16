@@ -1,14 +1,36 @@
 """Normalize sportsbook handicaps and totals, retaining source and timing."""
 import math
+from datetime import UTC, datetime
 from statistics import median
 
 from sqlalchemy import select
 
 from spe.db.base import as_utc
-from spe.db.models import ClosingLine, Game, OddsTick, Outcome
+from spe.db.models import ClosingLine, Game, OddsTick, Outcome, RawSnapshot
 
 MARKET_FEATURES = ["market_team_spread", "market_game_total", "market_spread_known", "market_total_known"]
 MIN_TEAM_IMPLIED_POINTS = 21.0
+PREGAME_MARKET_ENDPOINT = "td_pregame_market"
+
+
+def store_pregame_quote(db, game_id, context, *, captured_at=None):
+    """Append an observed pregame line without overwriting historical prices."""
+    captured = as_utc(captured_at) or datetime.now(UTC)
+    observed = as_utc(context.get("observed_at"))
+    game = db.get(Game, game_id)
+    if game is None or observed is None or not observed <= captured < as_utc(game.kickoff_utc):
+        return False
+    spread, total = context.get("home_handicap"), context.get("total")
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (spread, total)):
+        return False
+    if not 0 < total < 150 or abs(spread) >= total:
+        return False
+    row = RawSnapshot(provider="espn", endpoint=PREGAME_MARKET_ENDPOINT,
+        provider_record_id=game_id, payload=context, observed_at=observed,
+        ingested_at=captured, license_name="ESPN public endpoint; terms apply", credit_cost=0)
+    db.add(row)
+    db.flush()
+    return True
 
 
 def summary_market(payload, event_id, observed):
@@ -75,6 +97,15 @@ def market_features(context, is_home, include_total=True):
 
 def context_for_game(db, game_id, cutoff, *, replay=False):
     values = {"point_spread": [], "total": []}
+    quote = db.scalars(select(RawSnapshot).where(RawSnapshot.provider == "espn",
+        RawSnapshot.endpoint == PREGAME_MARKET_ENDPOINT, RawSnapshot.provider_record_id == game_id,
+        RawSnapshot.observed_at <= cutoff, RawSnapshot.ingested_at <= cutoff)
+        .order_by(RawSnapshot.observed_at.desc()).limit(1)).first()
+    if quote:
+        for market, field in (("point_spread", "home_handicap"), ("total", "total")):
+            value = quote.payload.get(field)
+            if isinstance(value, (int, float)) and math.isfinite(value):
+                values[market].append((as_utc(quote.observed_at), value, "espn_summary_market", False))
     for row in db.scalars(select(ClosingLine).where(ClosingLine.game_id == game_id,
             ClosingLine.market_id.in_(("point_spread", "total")),
             ClosingLine.quality_status.notin_(("invalid", "quarantined")))):

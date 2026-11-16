@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 
 from spe.config import settings
-from spe.db.models import BoardSnapshot, ClosingLine, Game, PublishedStat
+from spe.db.models import BoardSnapshot, ClosingLine, Game, PublishedStat, RawSnapshot
 from spe.identity.match import normalize_name
 from spe.ingest.espn_box import _fetch_summary
 from spe.ingest.espn_scoreboard import upsert_scoreboard_events
@@ -55,7 +55,7 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
                 selected[(row["game_id"], choice["player_id"])] = {
                     **row, "player_id": choice["player_id"], "player_name": choice["name"]}
     from spe.ingest.espn_box import _espn_event_id
-    from spe.models.player_td.desk_market import store_archive, summary_market
+    from spe.models.player_td.desk_market import store_archive, store_pregame_quote, summary_market, PREGAME_MARKET_ENDPOINT
     now = datetime.now(UTC)
     start = datetime.fromisoformat(date).replace(tzinfo=ZONE)
     games = db.scalars(select(Game).where(Game.kickoff_utc >= start.astimezone(UTC),
@@ -80,7 +80,10 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
                 fresh = db.scalars(select(ClosingLine).where(ClosingLine.game_id == gid,
                     ClosingLine.source == "espn_summary_market", ClosingLine.market_id == "total",
                     ClosingLine.observed_at >= now-timedelta(hours=1))).first()
-                if not fresh:
+                fresh_quote = db.scalars(select(RawSnapshot).where(RawSnapshot.provider == "espn",
+                    RawSnapshot.endpoint == PREGAME_MARKET_ENDPOINT, RawSnapshot.provider_record_id == gid,
+                    RawSnapshot.observed_at >= now-timedelta(hours=1)).limit(1)).first()
+                if not fresh and not fresh_quote:
                     tasks.append((lg,str(event["id"]),gid))
     def get_box(task):
         try:
@@ -98,10 +101,12 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
     identities = espn_player_ids(db, {pid for _, pid in selected})
     for (_, event_id, gid), payload in boxes:
         game = db.get(Game,gid)
-        if game and as_utc(game.kickoff_utc) > now:
-            context = summary_market(payload,event_id,now)
+        received_at = datetime.now(UTC)
+        if game and as_utc(game.kickoff_utc) > received_at:
+            context = summary_market(payload,event_id,received_at)
             if context:
                 store_archive(db,{gid:context})
+                store_pregame_quote(db,gid,context)
             continue
         completed = any(c.get("status", {}).get("type", {}).get("completed")
                         for c in (payload or {}).get("header", {}).get("competitions", []))

@@ -141,6 +141,13 @@ def ingest_final_box_scores(
     for game in games:
         if game_id and game.game_id != game_id:
             continue
+        catalog = _catalog(session, game.game_id)
+        have = {
+            player_id
+            for (player_id,) in session.query(PlayerGameStat.player_id).filter(PlayerGameStat.game_id == game.game_id)
+        }
+        if not any(player_id not in have for player_id, _ in catalog):
+            continue
         event_id = _espn_event_id(session, game)
         if not event_id:
             summary["no_event"] += 1
@@ -153,11 +160,6 @@ def ingest_final_box_scores(
             summary["status"] = "degraded"
             continue
         summary["games"] += 1
-        catalog = _catalog(session, game.game_id)
-        have = {
-            player_id
-            for (player_id,) in session.query(PlayerGameStat.player_id).filter(PlayerGameStat.game_id == game.game_id)
-        }
         from spe.identity.results import espn_player_ids, match_result
         from spe.publishing.boxes import parse
         identities = espn_player_ids(session, {pid for pid, _ in catalog})

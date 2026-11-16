@@ -33,6 +33,25 @@ def test_situations_exclude_dead_plays_and_use_pregame_side_of_each_play():
     assert result['primary_passer']=='99' and result['passer_coverage']==1
 
 
+def test_current_season_refresh_retains_prior_situations_without_old_parquets(db, tmp_path, monkeypatch):
+    from spe.config import settings
+    from spe.ingest.college_situations import refresh_college_situations
+    monkeypatch.setattr(settings, 'parquet_dir', tmp_path/'parquet')
+    evidence=settings.parquet_dir/'desk_evidence'; evidence.mkdir(parents=True)
+    cache=tmp_path/'cache'/'sportsdataverse'; cache.mkdir(parents=True)
+    prior={'game_id':'old', 'team_id':'fbs:10', 'kickoff_utc':'2025-11-01T18:00:00Z'}
+    game={'game_id':'espn:fbs:1','team_id':'fbs:10','opponent_id':'fbs:20',
+          'kickoff_utc':'2026-11-01T18:00:00Z','observed_at':NOW.isoformat()}
+    (evidence/'fbs_situations.json').write_text(json.dumps({'teams':[prior]}))
+    (evidence/'fbs_free_opportunities.json').write_text(json.dumps({'opportunity_games':[game],
+        'sources':[{'source':f'https://source/play_by_play_{y}.parquet'} for y in (2025,2026)]}))
+    pd.DataFrame([play()]).to_parquet(cache/'play_by_play_2026.parquet')
+    refresh_college_situations(db, years=(2026,))
+    result=json.loads((evidence/'fbs_situations.json').read_text())
+    assert prior in result['teams']
+    assert {r['game_id'] for r in result['teams']} == {'old','espn:fbs:1'}
+
+
 def test_situation_features_reject_future_games_observations_and_tiny_samples():
     rows=[{'team_id':'t','opponent_id':'o','kickoff_utc':f'2026-11-{d:02}T18:00:00Z',
            'observed_at':NOW.isoformat(),'primary_passer':str(d),'primary_passer_share':1,'passer_coverage':1,
