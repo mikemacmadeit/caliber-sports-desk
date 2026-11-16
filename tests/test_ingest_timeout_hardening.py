@@ -56,6 +56,7 @@ def test_research_serves_file_without_db_session(finder_file: Path, monkeypatch:
     monkeypatch.setattr("spe.db.session.init_db", lambda: None)
 
     from app.main import app
+    monkeypatch.setattr('app.main._viewer_is_subscribed', lambda request: True)
 
     client = TestClient(app)
     res = client.get("/v1/anytime-td/research?league=fbs")
@@ -89,6 +90,8 @@ def test_locked_database_maps_to_503(tmp_path: Path, monkeypatch: pytest.MonkeyP
     seed.close()
 
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db.as_posix()}")
+    from spe.config import settings
+    monkeypatch.setattr(settings, 'database_url', f"sqlite:///{db.as_posix()}")
     import spe.db.session as sessmod
 
     sessmod._engine = None

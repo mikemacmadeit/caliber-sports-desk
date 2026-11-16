@@ -12,7 +12,12 @@ from spe.models.ats.research_bundle import CLEAN_PROSPECTIVE_COHORT, load_ats_re
 from spe.models.ats.spread_contract import CURRENT_SPREAD_CONTRACT, to_home_handicap
 
 
-def test_research_bundle_does_not_apply_calibrator_to_a_different_feature_list():
+def test_research_bundle_does_not_apply_calibrator_to_a_different_feature_list(tmp_path, monkeypatch):
+    import shutil
+    from spe.config import settings
+    source = Path(__file__).resolve().parents[1] / 'deploy/runtime-data/parquet/models/ats'
+    shutil.copytree(source, tmp_path/'models/ats')
+    monkeypatch.setattr(settings, 'parquet_dir', tmp_path)
     art, bundle = load_ats_research_bundle("nfl")
     assert art is not None
     assert "home_qb_out" in art.feature_cols

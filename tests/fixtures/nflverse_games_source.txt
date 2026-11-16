@@ -1,0 +1,6 @@
+The gzip fixture preserves the original raw games.csv bytes used by the ATS audit.
+Source: https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv
+SHA-256 of uncompressed bytes:
+356d6fec0e179aa473fcbe748182630ae7fd103681e0295fc9398efbcc627db5
+This fixed snapshot makes the spread-sign contract tests independent of network
+updates and untracked developer caches. It is not used to make future picks.

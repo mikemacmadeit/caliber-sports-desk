@@ -321,7 +321,9 @@ def test_ambiguous_name_stays_unlinked(db: Session):
     assert unlinked == 1
 
 
-def test_plan_blocked_injuries_never_healthy(db: Session):
+def test_plan_blocked_injuries_never_healthy(db: Session, monkeypatch):
+    from spe.config import settings
+    monkeypatch.setattr(settings, 'api_sports_key', 'test-only-no-network')
     now = datetime.now(UTC)
     _seed_base(db)
     db.add(League(league_id="fbs", sport_id="football", name="FBS", classification="fbs"))

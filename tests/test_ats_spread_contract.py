@@ -6,6 +6,8 @@ These tests start from raw L (expected home margin), not pre-normalized handicap
 from __future__ import annotations
 
 import hashlib
+import gzip
+import io
 from pathlib import Path
 
 import pandas as pd
@@ -21,16 +23,15 @@ from spe.models.ats.spread_contract import (
 )
 
 
-RAW_CSV = Path("data/research/ats_audit/nflverse_games_raw.csv")
+RAW_CSV = Path(__file__).parent / "fixtures" / "nflverse_games_raw.csv.gz"
 EXPECTED_SHA256 = "356d6fec0e179aa473fcbe748182630ae7fd103681e0295fc9398efbcc627db5"
 
 
 @pytest.fixture(scope="module")
 def raw_games() -> pd.DataFrame:
-    assert RAW_CSV.exists(), "Run scripts/ats_spread_contract_probe.py first to download raw CSV"
-    data = RAW_CSV.read_bytes()
+    data = gzip.decompress(RAW_CSV.read_bytes())
     assert hashlib.sha256(data).hexdigest() == EXPECTED_SHA256
-    return pd.read_csv(RAW_CSV)
+    return pd.read_csv(io.BytesIO(data))
 
 
 def test_source_hash_and_docs_contract(raw_games: pd.DataFrame):
