@@ -11,7 +11,12 @@ from spe.db.session import session_factory, get_engine, init_db
 
 JOBS = {
     "production_odds": 900,
+    "production_pregame_availability": 900,
+    "production_ats": 900,
+    "production_spreads": 900,
+    "production_free_college": 8 * 3600,
     "production_publish": 900,
+    "production_touchdowns": 900,
     "production_inputs": 2400,
     "production_weather": 10800,
     "production_nflverse": 8 * 3600,
@@ -24,7 +29,7 @@ def lane_lock(lane):
     # Session-level advisory locks remain held across commits and release on crash.
     if get_engine().dialect.name == "postgresql":
         with get_engine().connect() as conn:
-            key = {"odds": 81301, "inputs": 81302, "settlement": 81303}[lane]
+            key = {"odds": 81301, "inputs": 81302, "settlement": 81303, "touchdowns": 81304}[lane]
             locked = conn.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": key}).scalar()
             try:
                 yield bool(locked)
@@ -37,30 +42,41 @@ def lane_lock(lane):
 
         lock_path = settings.parquet_dir.parent / f"production-{lane}.lock"
         lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with lock_path.open("w") as file:
+        try:
+            # Opening with "w" truncates the file and raises PermissionError on
+            # Windows while another job already holds it. That crashed the lane
+            # instead of reporting it busy.
+            file = open(lock_path, "a+b")
+        except OSError:
+            yield False
+            return
+        acquired = False
+        try:
             try:
                 if os.name == "nt":
                     import msvcrt
 
-                    file.write("0")
-                    file.flush()
+                    if file.seek(0, os.SEEK_END) < 1:
+                        file.write(b"0")
+                        file.flush()
                     file.seek(0)
                     msvcrt.locking(file.fileno(), msvcrt.LK_NBLCK, 1)
                 else:
                     import fcntl
 
-                    fcntl.flock(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
             except OSError:
-                yield False
-            else:
-                try:
-                    yield True
-                finally:
-                    if os.name == "nt":
-                        file.seek(0)
-                        msvcrt.locking(file.fileno(), msvcrt.LK_UNLCK, 1)
-                    else:
-                        fcntl.flock(file, fcntl.LOCK_UN)
+                acquired = False
+            yield acquired
+        finally:
+            if acquired:
+                if os.name == "nt":
+                    file.seek(0)
+                    msvcrt.locking(file.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+            file.close()
 
 
 def run_step(name, fn):
@@ -71,10 +87,28 @@ def run_step(name, fn):
             JobRun(run_id=run_id, job_name=name, started_at=started, status="running", summary={})
         )
         db.commit()
+    import logging
+    import threading
+    stop = threading.Event()
+    def heartbeat():
+        while not stop.wait(30):
+            try:
+                with session_factory() as session:
+                    record = session.get(JobRun, run_id)
+                    if record and record.status == "running":
+                        record.summary = {**(record.summary or {}), "heartbeat_at": datetime.now(UTC).isoformat()}
+                        session.commit()
+            except Exception:
+                logging.getLogger(__name__).warning("Job heartbeat unavailable: %s", name)
+    pulse = threading.Thread(target=heartbeat, daemon=True)
+    pulse.start()
     try:
         with session_factory() as db:
             summary = fn(db) or {}
             db.commit()
+        stop.set()
+        pulse.join(timeout=3)
+        summary = {**summary, "duration_seconds": round((datetime.now(UTC)-started).total_seconds(), 3), "heartbeat_at": datetime.now(UTC).isoformat()}
         bad = summary.get("status") in {
             "needs_key",
             "error",
@@ -82,6 +116,8 @@ def run_step(name, fn):
             "budget_stop",
             "plan_blocked",
             "degraded",
+            "unavailable",
+            "requires_export_job",
         }
         with session_factory() as db:
             record = db.get(JobRun, run_id)
@@ -95,11 +131,21 @@ def run_step(name, fn):
     except Exception as exc:
         with session_factory() as db:
             record = db.get(JobRun, run_id)
-            record.status = "failed"
+            if record.status != "degraded":
+                record.status = "failed"
             record.finished_at = datetime.now(UTC)
             record.error = type(exc).__name__
+            import traceback
+            from pathlib import Path
+            frames = [f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}" for frame in traceback.extract_tb(exc.__traceback__)[-8:]]
+            record.summary = {**(record.summary or {}), "failure_frames": frames,
+                "duration_seconds": round((datetime.now(UTC)-started).total_seconds(), 3)}
             db.commit()
+        logging.getLogger(__name__).error("Job %s failed: %s (run %s) at %s", name, type(exc).__name__, run_id, frames)
         raise
+    finally:
+        stop.set()
+        pulse.join(timeout=3)
 
 
 def publish_slate(db, date):
@@ -142,58 +188,129 @@ def warm_and_publish(db):
 
 def inputs(db):
     from spe.ingest.espn_availability import ingest_espn_availability
-    from spe.ingest.nflverse_historical import ingest_nfl_history
+    from spe.ingest.nfl_availability import refresh_nfl_availability
     from spe.ingest.api_sports_injuries import ingest_api_sports_injuries
+    from spe.config import settings
 
     moment = datetime.now(UTC)
     year = moment.year - (1 if moment.month <= 2 else 0)
-    nfl = ingest_nfl_history(
-        db, seasons=[year], include_pbp=False, refresh=True, injuries_only=True
-    )
-    availability = ingest_espn_availability(db)
-    fbs = ingest_api_sports_injuries(db, league_id="fbs", season=year)
-    blocked = any(
-        r.get("status") in {"needs_key", "plan_blocked", "failed", "error"}
-        for r in (nfl, availability, fbs)
-    )
+    def attempt(fn):
+        try:
+            with db.begin_nested():
+                return fn()
+        except Exception as exc:
+            return {"status": "unavailable", "error": type(exc).__name__}
+
+    nfl = attempt(lambda: refresh_nfl_availability(db))
+    availability = attempt(lambda: ingest_espn_availability(db))
+    # This optional paid endpoint must not make successful free-source ingestion fail.
+    # Missing coverage stays explicit and never turns into a healthy-player designation.
+    fbs = attempt(lambda: ingest_api_sports_injuries(db, league_id="fbs", season=year))
+    bad = {"needs_key", "plan_blocked", "failed", "error", "unavailable", "degraded"}
+    blocked = any(r.get("status") in bad for r in (nfl, availability))
     return {
         "status": "degraded" if blocked else "ok",
         "nfl": nfl,
         "availability": availability,
         "fbs": fbs,
+        "warnings": ["Optional FBS injury coverage is unavailable; player status remains unverified."] if fbs.get("status") in bad else [],
     }
+
+
+def refresh_touchdown_cards(db):
+    """Scheduled model + simulation run; replay_day retains every started selection."""
+    from app.queries import games_for_slate, kickoff_day
+    from spe.models.player_td.desk_replay import replay_day
+    from spe.ingest.shared_inputs import hydrate_inputs
+    import time
+    versions = hydrate_inputs(db)
+    deadline = time.monotonic() + 210
+    now = datetime.now(UTC)
+    dates = sorted({kickoff_day(g.kickoff_utc) for g in games_for_slate(db, None, "all")
+                    if now < as_utc(g.kickoff_utc) <= now + timedelta(hours=48)})
+    counts = {}
+    for day in dates:
+        card = replay_day(db, day, "all", checkpoint=True, deadline=deadline, input_versions=versions)
+        counts[day] = {"picks": len(card.get("rows") or []),
+                       "unavailable": len(card.get("unavailable_games") or []),
+                       "complete": card.get("refresh_complete", True)}
+        db.commit()
+    return {"status": "degraded" if any(v["unavailable"] or not v["complete"] for v in counts.values()) else "ok",
+            "dates": counts, "input_versions": versions}
+
+
+def refresh_saved_results(db):
+    from spe.db.models import Game
+    from app.queries import kickoff_day
+    from spe.models.player_td.desk_replay_results import refresh_results
+    from spe.props.game_picks import saved_desk_props
+    from spe.desk.day_results import apply_recorded_results
+    from spe.ingest.espn_box import _fetch_summary
+    now = datetime.now(UTC)
+    # Current scoreboard reads are bounded to three slate days, not the whole season.
+    from zoneinfo import ZoneInfo
+    today = now.astimezone(ZoneInfo("America/Chicago")).date()
+    dates = [(today-timedelta(days=n)).isoformat() for n in (2, 1, 0)]
+    results = []
+    for day in dates:
+        try:
+            result = refresh_results(db, day)
+            rows = saved_desk_props(db, "all", day) or []
+            apply_recorded_results(db, [], rows, fetch=_fetch_summary)
+            db.commit()
+            results.append(result)
+        except Exception as exc:
+            db.rollback()
+            results.append({"date": day, "status": "degraded", "error": type(exc).__name__})
+    return results
 
 
 def settlement(db):
     from spe.ingest.espn_scoreboard import ingest_football_scoreboard
     from spe.ingest.espn_box import ingest_final_box_scores
-    from spe.publishing.ledger import settle
+    from spe.publishing.ledger import settle, record_frozen_desk_picks
     from spe.publishing.boxes import ingest as ingest_published_boxes
     from spe.shadow.ats import settle_ats_predictions
     from spe.shadow.settle import settle_shadow_predictions
 
-    scores = ingest_football_scoreboard(db, datetime.now(UTC).year)
+    saved_results = refresh_saved_results(db)
+    scores = {"games": sum(r.get("scoreboard_games", 0) for r in saved_results), "scope": "last_three_slate_days"}
     boxes = [ingest_final_box_scores(db, league_id=lg) for lg in ("nfl", "fbs")]
     db.flush()
     published_boxes = ingest_published_boxes(db)
+    record_frozen_desk_picks(db)
     result = settle(db)
-    if published_boxes["status"] == "degraded":
+    if published_boxes["status"] == "degraded" or any(r.get("status") == "degraded" for r in [*saved_results, *boxes]):
         result["status"] = "degraded"
     return {
         **result,
         "scores": scores,
         "boxes": boxes,
         "published_boxes": published_boxes,
+        "saved_results": saved_results,
         "ats": settle_ats_predictions(db),
         "shadow": settle_shadow_predictions(db),
     }
 
 
 def production_cycle(lane):
+    if lane not in {"odds", "inputs", "settlement", "touchdowns"}:
+        raise ValueError("Unknown production lane")
     init_db()
     with lane_lock(lane) as acquired:
         if not acquired:
             return {"status": "already_running", "lane": lane}
+        names = {
+            "odds": ["production_pregame_availability", "production_odds", "production_spreads", "production_publish", "production_ats"],
+            "inputs": ["production_inputs", "production_weather", "production_nflverse", "production_free_college"],
+            "settlement": ["production_settlement"],
+            "touchdowns": ["production_touchdowns"],
+        }[lane]
+        # Holding the lane lock proves any previous running record lost its worker.
+        with session_factory() as db:
+            db.query(JobRun).filter(JobRun.job_name.in_(names), JobRun.status == "running").update(
+                {"status": "interrupted", "finished_at": datetime.now(UTC), "error": "WorkerInterrupted"}, synchronize_session=False)
+            db.commit()
         if lane == "odds":
             from spe.ingest.odds_live import ingest_odds_live
             from spe.ingest.odds_spreads import ingest_odds_spreads
@@ -237,6 +354,8 @@ def production_cycle(lane):
             if errors:
                 raise RuntimeError("; ".join(errors))
             return {"status": "ok"}
+        if lane == "touchdowns":
+            return run_step("production_touchdowns", refresh_touchdown_cards)
         return run_step("production_settlement", settlement)
 
 
@@ -257,13 +376,20 @@ def health(db, now=None):
             if last_ok and last_ok.finished_at
             else None
         )
-        ok = age is not None and age <= ceiling and row.status in {"ok", "running"}
+        running_age = (now - (as_utc((row.summary or {}).get("heartbeat_at")) or as_utc(row.started_at))).total_seconds() if row and row.status == "running" else None
+        ok = age is not None and age <= ceiling and row.status in {"ok", "running"} and (running_age is None or running_age < 120)
         jobs.append(
             {
                 "job": name,
                 "ok": ok,
                 "status": row.status if row else "never_run",
                 "seconds_since_success": age,
+                "max_age_seconds": ceiling,
+                "heartbeat_age_seconds": running_age,
+                "duration_seconds": (row.summary or {}).get("duration_seconds") if row else None,
+                "last_error": row.error if row else None,
+                "last_finished_at": as_utc(row.finished_at).isoformat() if row and row.finished_at else None,
+                "warnings": (row.summary or {}).get("warnings", []) if row else [],
             }
         )
     alerts = [f"{j['job']}: {j['status']} or overdue" for j in jobs if not j["ok"]]
@@ -273,12 +399,13 @@ def health(db, now=None):
 
     near = (
         db.query(Game.game_id, func.max(OddsTick.observed_at))
-        .join(Outcome, Outcome.game_id == Game.game_id)
+        .outerjoin(Outcome, Outcome.game_id == Game.game_id)
         .outerjoin(OddsTick, OddsTick.outcome_id == Outcome.outcome_id)
         .filter(
             Game.kickoff_utc > now,
             Game.kickoff_utc <= now + timedelta(hours=2),
             Game.status.in_(("scheduled", "pre", "upcoming")),
+            Game.data_tier.notin_(("demo", "alias")),
         )
         .group_by(Game.game_id)
         .all()
@@ -294,4 +421,43 @@ def health(db, now=None):
             f"Near-kickoff price verification overdue for {len(stale_games)} tracked games"
         )
 
-    return {"ok": not alerts, "jobs": jobs, "alerts": alerts, "checked_at": now.isoformat()}
+    from spe.db.models import BoardSnapshot
+    from app.queries import kickoff_day
+    dates = {kickoff_day(now), kickoff_day(now+timedelta(hours=2))}
+    cards = db.query(BoardSnapshot).filter(BoardSnapshot.key.in_(
+        [f"atd-desk-card-v1:{day}:{league}" for day in dates for league in ("all", "nfl", "fbs")])).all()
+    covered = {r.get("game_id") for card in cards for r in (card.payload or {}).get("rows", [])}
+    explained = {r.get("game_id") for card in cards for r in (card.payload or {}).get("unavailable_games", [])}
+    unexplained = sorted(gid for gid, _ in near if gid not in covered | explained)
+    if unexplained:
+        alerts.append(f"TD card coverage missing without explanation for {len(unexplained)} near-kickoff games")
+    from spe.db.models import InputArtifact
+    college_soon = db.query(Game.game_id).filter(Game.league_id == 'fbs',
+        Game.kickoff_utc > now, Game.kickoff_utc <= now+timedelta(hours=48),
+        Game.data_tier.notin_(('demo', 'alias')), Game.status.notin_(('final', 'post', 'canceled', 'cancelled'))).first() is not None
+    artifact_health = []
+    for name in ('fbs.json', 'fbs_rosters.json', 'recent_complete_boxes.json'):
+        record = db.query(InputArtifact.updated_at, InputArtifact.byte_count).filter(InputArtifact.key == name).first()
+        age = (now-as_utc(record.updated_at)).total_seconds() if record else None
+        usable = bool(record and record.byte_count > 2 and age is not None and 0 <= age <= 8*3600)
+        artifact_health.append({'input':name, 'required':college_soon, 'ok':usable,
+            'seconds_since_refresh':age, 'max_age_seconds':8*3600})
+        if college_soon and not usable:
+            alerts.append(f'Shared college input missing or overdue: {name}')
+    return {"ok": not alerts, "jobs": jobs, "alerts": alerts, "checked_at": now.isoformat(),
+            "shared_inputs": artifact_health,
+            "coverage": {"near_kickoff_games": len(near), "games_with_fresh_odds": len(near)-len(stale_games),
+                         "games_missing_fresh_odds": stale_games, "games_missing_td_explanation": unexplained}}
+
+
+def job_status(db, name, now=None):
+    now = as_utc(now) or datetime.now(UTC)
+    row = db.query(JobRun).filter_by(job_name=name).order_by(JobRun.started_at.desc()).first()
+    if row is None:
+        return "not_started"
+    stamp = as_utc((row.summary or {}).get("heartbeat_at")) or as_utc(row.finished_at) or as_utc(row.started_at)
+    if row.status == "running":
+        return "running" if (now-stamp).total_seconds() < 120 else "stalled"
+    if row.status not in {"ok"}:
+        return "failed"
+    return "ready" if (now-stamp).total_seconds() <= JOBS.get(name, 900) else "stale"

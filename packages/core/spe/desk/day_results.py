@@ -1,8 +1,8 @@
 """Grade the day's shown picks from the recorded game and box score.
 
 A box that fails to load stays pending. A listed player who has no line for a
-counting stat recorded a zero. A player who never appears did not play, so that
-counting prop is void rather than a made-up zero.
+counting stat recorded a zero. An unlisted player has unconfirmed participation. Only a documented inactive
+is void; an incomplete box never proves a player did not play.
 """
 
 from __future__ import annotations
@@ -26,7 +26,8 @@ TOUCHDOWN = "anytime_td"
 OFFICIAL_BOX = "espn.summary.final"
 # A confirmed zero stays on this source so the page does not download the box again.
 COUNTED_BOX = "espn.summary.counted"
-ABSENT_BOX = "espn.summary.absent"
+ABSENT_BOX = "espn.summary.confirmed_inactive"
+UNKNOWN_BOX = "espn.summary.participation_unconfirmed"
 _CHECKED: set[str] = set()
 
 
@@ -44,7 +45,10 @@ def apply_recorded_results(
         game.game_id: game
         for game in session.scalars(select(Game).where(Game.game_id.in_(game_ids)))
     }
-    _fill_counting_stats(session, games, prices, fetch=fetch)
+    from spe.config import settings
+    # Network ingestion belongs to scheduled workers in production.
+    if fetch is not None or settings.app_env not in {"prod", "production"}:
+        _fill_counting_stats(session, games, prices, fetch=fetch)
     for row in spreads:
         _grade_spread(row, games.get(row.get("game_id")))
     stats = {
@@ -65,11 +69,15 @@ def apply_recorded_results(
             row["result"] = "void"
             row["actual"] = None
             continue
+        if stat is not None and stat.source in {UNKNOWN_BOX, "espn.summary.absent"}:
+            row["result"], row["actual"] = "pending", None
+            continue
         actual = None if stat is None else stat.actual
         if actual is None or status not in {"final", "post", "in_progress"}:
             row["result"] = "pending"
             continue
         row["actual"] = actual
+        row["live_result"] = "scored" if status == "in_progress" and row.get("market_id") == TOUCHDOWN and actual > 0 else None
         row["result"] = _settled_result(str(row.get("side") or "over"), row.get("line"), float(actual), str(row.get("market_id")), status)
 
 
@@ -93,10 +101,10 @@ def _grade_spread(row: dict[str, Any], game: Game | None) -> None:
 
 
 def _settled_result(side: str, line: float | None, actual: float, market_id: str, status: str) -> str:
-    """Final games grade normally. A live line grades only when the stat can no longer reverse."""
-    if market_id == TOUCHDOWN and status not in {"final", "post"}:
-        # A touchdown already scored cannot be taken back. A zero can still change.
-        return "win" if actual > 0 else "pending"
+    """Only final games settle. Reviews and stat corrections can reverse live figures."""
+    if status not in {"final", "post"}:
+        # The card can show live progress without counting it as an official win.
+        return "pending"
     if status in {"final", "post"}:
         return _grade(side, line, actual, market_id)
     if line is None:
@@ -139,7 +147,10 @@ def _fill_counting_stats(
         game, event_id = item
         if not event_id:
             return game.game_id, None
-        payload = loader(game.league_id, event_id)
+        try:
+            payload = loader(game.league_id, event_id)
+        except Exception:
+            return game.game_id, None
         return game.game_id, payload if isinstance(payload, dict) else None
 
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -155,19 +166,25 @@ def _fill_counting_stats(
             _CHECKED.add(game_id)
         if not people:
             continue
-        by_espn = {str(person.get("espn_id")): person for person in people if person.get("espn_id")}
-        by_name = {normalize_name(str(person.get("name") or "")): person for person in people}
+        from spe.identity.results import espn_player_ids, match_result
         refreshing = [
             item for item in [*missing, *live_touchdowns]
             if item[0] == game_id
         ]
         # autoflush is off, so a second line for the same player is invisible to
         # session.get until the write. Adding it again takes the whole board down.
+        identities = espn_player_ids(session, {r[1] for r in refreshing})
+        from spe.db.models import InjuryEvent
+        from spe.models.player_td.availability_status import resolved_reports, INACTIVE
+        reports = session.scalars(select(InjuryEvent).where(InjuryEvent.game_id == game_id,
+            InjuryEvent.reported_at <= now, InjuryEvent.observed_at <= now,
+            InjuryEvent.quality_status.notin_(("invalid", "quarantined")))).all()
+        absent = {pid for pid, report in resolved_reports(reports).items() if report["status"] in INACTIVE}
         staged: dict[str, PublishedStat] = {}
         for _game_id, player_id, name, market, key in refreshing:
-            person = by_espn.get(str(player_id).split(":")[-1]) or by_name.get(normalize_name(name))
-            if person is None and finished and market in COUNTING:
-                _mark_absent(session, staged, key, game_id, player_id, market, now)
+            person = match_result(people, player_id, name, identities)
+            if person is None and finished and market in COUNTING and not any(normalize_name(p.get("name", "")) == normalize_name(name) for p in people):
+                _mark_absent(session, staged, key, game_id, player_id, market, now, confirmed=player_id in absent)
                 continue
             markets = None if person is None else (person.get("markets") or {})
             actual = box_actual(markets, market, final=finished)
@@ -351,8 +368,9 @@ def _mark_absent(
     player_id: str,
     market: str,
     now: datetime,
+    *, confirmed: bool = False,
 ) -> None:
-    """A finished box that never lists the player is a void, not a counting zero."""
+    """Missing participation stays unresolved unless an explicit inactive is recorded."""
     stat = staged.get(key)
     if stat is None:
         stat = session.get(PublishedStat, key)
@@ -362,7 +380,7 @@ def _mark_absent(
     staged[key] = stat
     stat.actual = 0
     stat.observed_at = now
-    stat.source = ABSENT_BOX
+    stat.source = ABSENT_BOX if confirmed else UNKNOWN_BOX
 
 
 def _apply_summary(game: Game, payload: dict[str, Any]) -> bool:

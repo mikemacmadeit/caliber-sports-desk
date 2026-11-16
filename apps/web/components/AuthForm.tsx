@@ -43,6 +43,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <input
           className="field-input mt-2"
           type="email"
+          maxLength={320}
           autoComplete="email"
           required
           value={email}
@@ -54,6 +55,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <input
           className="field-input mt-2"
           type="password"
+          maxLength={200}
           autoComplete={signup ? "new-password" : "current-password"}
           required
           minLength={8}
@@ -61,7 +63,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           onChange={(event) => setPassword(event.target.value)}
         />
       </label>
-      {error ? <p className="text-sm text-heat">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-heat">{error}</p> : null}
       <button
         type="submit"
         disabled={pending}
@@ -82,6 +84,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             New here?{" "}
             <Link href="/signup" className="text-gold">
               Create an account
+            </Link>
+            <span className="mx-2 text-white/25">/</span>
+            <Link href="/forgot" className="text-gold">
+              Forgot password
             </Link>
           </>
         )}

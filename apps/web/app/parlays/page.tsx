@@ -18,11 +18,15 @@ export default async function ParlaysPage({
   searchParams: Promise<{ league?: string; date?: string }>;
 }) {
   const { league = "all", date: dateParam } = await searchParams;
-  const days = await load<SlateDays>(`/v1/days?league=${league}`, 20000);
+  const selectedGuess = dateParam || slateToday();
+  const [days, guessed] = await Promise.all([
+    load<SlateDays>(`/v1/days?league=${league}`, 8000),
+    load<ParlayCard>(`/v1/parlays/card?league=${league}&date=${selectedGuess}`, 8000),
+  ]);
   const today = days.data?.today ?? slateToday();
   const selected = dateParam || today;
   const next = days.data?.dates.find((d) => d > selected) ?? null;
-  const card = await load<ParlayCard>(`/v1/parlays/card?league=${league}&date=${selected}`, 120000);
+  const card = selected === selectedGuess ? guessed : await load<ParlayCard>(`/v1/parlays/card?league=${league}&date=${selected}`, 8000);
   const when = selected === today ? `Today · ${dayParts(selected).monthDay}` : `${dayParts(selected).weekday} · ${dayParts(selected).monthDay}`;
   const tickets = card.data?.tickets ?? [];
   const lead = tickets[0];

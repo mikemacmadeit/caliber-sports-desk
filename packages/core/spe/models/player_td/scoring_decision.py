@@ -85,9 +85,16 @@ def choose(rows):
         if research:
             price_pick = max(research, key=lambda r:(cases[r['player_id']]['research_rank']['score'], r['forecast']['p_estimate'], r['player_id']))
             alternative_basis = 'football_research'
-        elif remaining:
-            price_pick = max(remaining, key=lambda r:(r['forecast']['p_estimate'], r['player_id']))
-            alternative_basis = 'next_scoring_chance'
+        else:
+            scoring_role = [r for r in remaining if cases[r['player_id']]['football_case']['supported']]
+            if scoring_role:
+                price_pick = max(scoring_role, key=lambda r:(
+                    cases[r['player_id']]['research_rank']['scoring_area_opportunities'],
+                    r['forecast']['p_estimate'], r['player_id']))
+                alternative_basis = 'football_research'
+            elif remaining:
+                price_pick = max(remaining, key=lambda r:(r['forecast']['p_estimate'], r['player_id']))
+                alternative_basis = 'next_scoring_chance'
     case = cases[selected['player_id']]
     value = dict(cases[price_pick['player_id']]) if price_pick else None
     if value:
@@ -111,7 +118,7 @@ def choose(rows):
             'Only one eligible scorer is available; a second name requires a player who passes the playing-status checks.'),
         'excluded_candidates':[{'player_id':r.get('player_id'),'name':r.get('player_name'),'reasons':exclusions(r)} for r in rows if exclusions(r)],
         'alternatives':sorted(cases.values(),key=lambda c:(-c['probability'],c['player_id']))[:8],
-        'policy':'Highest model scoring chance first. A distinct alternate is selected whenever two eligible players exist: prefer a supported better-priced research case, then a supported football case at any price, then the next-highest scoring estimate. Only a fresh qualifying quote is counted as a value bet.',
+        'policy':'Highest model scoring chance first. A distinct alternate is selected whenever two eligible players exist: prefer a supported better-priced research case, then a player with a measured scoring-area role, then the next-highest scoring estimate. Ordinary touches do not make an alternate when another player has goal-line or red-zone work. Only a fresh qualifying quote is counted as a value bet.',
         'validation_note':'Research estimates; price support is not demonstrated profitability. Original pregame forecasts are preserved separately.'}
     return {**selected, 'replay_selection':'scoring_case', 'selection_version':VERSION,
         'selection_reason':reason, 'selection_warnings':case['cautions'], 'decision':decision,

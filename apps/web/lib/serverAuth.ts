@@ -1,3 +1,5 @@
+import { createHmac } from "crypto";
+import { headers as incomingHeaders } from "next/headers";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -37,12 +39,28 @@ export function clearSession(response: NextResponse) {
   return response;
 }
 
+export async function authHeaders(request?: Request): Promise<Headers> {
+  const source = request?.headers ?? await incomingHeaders();
+  const result = new Headers({ "Content-Type": "application/json" });
+  // Netlify overwrites this edge header. Never sign arbitrary X-Forwarded-For input.
+  const ip = source.get("x-nf-client-connection-ip");
+  const secret = process.env.AUTH_PROXY_SECRET;
+  if (ip && secret) {
+    const stamp = Math.floor(Date.now() / 1000).toString();
+    result.set("x-caliber-client-ip", ip);
+    result.set("x-caliber-client-time", stamp);
+    result.set("x-caliber-client-signature", createHmac("sha256", secret).update(`${stamp}:${ip}`).digest("hex"));
+  }
+  return result;
+}
+
 export async function apiAuth(path: string, init: RequestInit = {}) {
   const token = await readToken();
-  const headers = new Headers(init.headers);
+  const headers = await authHeaders();
+  new Headers(init.headers).forEach((v, k) => headers.set(k, v));
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(`${API}${path}`, { ...init, headers, cache: "no-store" });
+  return fetch(`${API}${path}`, { ...init, headers, cache: "no-store", signal: AbortSignal.timeout(15000) });
 }
 
 export function detail(data: { detail?: unknown }, fallback: string) {

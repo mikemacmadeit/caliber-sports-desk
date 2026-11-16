@@ -154,11 +154,19 @@ def refresh_board(session: Session, path: Path | None = None) -> dict[str, Any]:
         return previous
     payload = keep_finished_spreads(previous, payload)
     write_board(payload, path)
+    if path is None:
+        archive_days(session, previous or {})
+        archive_days(session, payload)
     return payload
 
 
-def load_board(session: Session, path: Path | None = None) -> dict[str, Any]:
+def load_board(session: Session, path: Path | None = None, *, date: str | None = None) -> dict[str, Any]:
     """Return a saved board. Rebuild in the background once it is older than the TTL."""
+    if date is not None and path is None:
+        from spe.publishing.store import read
+        archived = read(f"ats-day:{date}", session)
+        if archived is not None:
+            return {**archived, "archive_note": "Saved ATS selections. Results update from confirmed scores; the saved side and line stay fixed after kickoff."}
     cached = read_board(path)
     if cached and (cached.get("rows") or []) and is_fresh(cached):
         return cached
@@ -169,6 +177,33 @@ def load_board(session: Session, path: Path | None = None) -> dict[str, Any]:
     if settings.app_env == "prod":
         return {"rows": [], "degraded": True, "reason": "awaiting_worker"}
     return refresh_board(session, path)
+
+
+def archive_days(session, payload, now=None):
+    """Keep daily selections when a later board no longer contains their games."""
+    from collections import defaultdict
+    from spe.db.base import as_utc
+    from spe.publishing.store import read, write
+    from app.queries import kickoff_day
+    now = as_utc(now) or datetime.now(UTC)
+    days = defaultdict(list)
+    for row in payload.get("rows") or []:
+        if row.get("kickoff_utc"):
+            days[kickoff_day(row["kickoff_utc"])].append(row)
+    for day, rows in days.items():
+        key = f"ats-day:{day}"
+        saved = read(key, session) or {}
+        previous = {r["game_id"]: r for r in saved.get("rows", [])}
+        for row in rows:
+            old = previous.get(row["game_id"])
+            if old and as_utc(old["kickoff_utc"]) <= now:
+                continue
+            stamp = as_utc(payload.get("board_cached_at") or payload.get("as_of"))
+            previous[row["game_id"]] = {**row, "saved_at": stamp.isoformat() if stamp else None,
+                "record_status": "saved_pregame" if stamp and stamp < as_utc(row["kickoff_utc"]) else "archived_unverified"}
+        write(key, {**payload, "date": day, "rows": list(previous.values())}, session)
+        # Subsequent archive writes in this transaction must see the current JSON.
+        session.expire_all()
 
 
 def _refresh_in_background(path: Path | None) -> None:
@@ -186,6 +221,7 @@ def _refresh_in_background(path: Path | None) -> None:
             db = session_factory()
             try:
                 refresh_board(db, path)
+                db.commit()
             finally:
                 db.close()
         finally:

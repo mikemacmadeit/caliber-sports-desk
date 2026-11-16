@@ -8,15 +8,18 @@ from sqlalchemy.orm import sessionmaker
 
 from app.billing import apply_stripe_event
 from app.gate import board_query_for, redact
+from app.auth_routes import caller_address
 from spe.accounts.auth import (
     AuthError,
     authenticate,
+    begin_password_reset,
+    finish_password_reset,
     is_subscribed,
     open_session,
     register_user,
     user_for_token,
 )
-from spe.db.models import AccountUser, AuthSession
+from spe.db.models import AccountUser, AuthSession, PasswordReset, BillingEvent, BillingCursor
 
 FUTURE = "2099-01-01T18:00:00+00:00"
 
@@ -25,6 +28,9 @@ def _db():
     engine = create_engine("sqlite://")
     AccountUser.__table__.create(engine)
     AuthSession.__table__.create(engine)
+    PasswordReset.__table__.create(engine)
+    BillingEvent.__table__.create(engine)
+    BillingCursor.__table__.create(engine)
     return sessionmaker(bind=engine)()
 
 
@@ -79,6 +85,7 @@ def test_checkout_event_marks_the_account_active():
         db,
         {
             "type": "checkout.session.completed",
+            "id": "evt_checkout_1", "created": 1,
             "data": {
                 "object": {
                     "client_reference_id": user.user_id,
@@ -147,7 +154,7 @@ def test_future_side_is_removed_and_a_final_stays():
     assert shown["rows"][0]["pick_label"] == "Home to win"
 
 
-def test_a_future_prop_line_stays_on_the_board():
+def test_a_future_prop_line_is_locked():
     out = redact(
         "/v1/props",
         {
@@ -157,14 +164,34 @@ def test_a_future_prop_line_stays_on_the_board():
                     "kickoff_utc": FUTURE,
                     "player_name": "Secret Player",
                     "market_id": "anytime_td",
+                    "book_price": -110,
                     "forecast": {"p_estimate": 0.44},
                 }
             ]
         },
         subscribed=False,
     )
-    assert out["rows"][0]["player_name"] == "Secret Player"
-    assert out["rows"][0].get("locked") is not True
+    assert out["locked"] is True
+    assert out["rows"] == []
+    assert "Secret Player" not in json.dumps(out)
+
+
+def test_a_finished_prop_stays_on_the_board():
+    out = redact(
+        "/v1/props",
+        {
+            "rows": [
+                {
+                    "player_name": "Visible Player",
+                    "kickoff_utc": "2020-01-01T18:00:00+00:00",
+                    "forecast": {"p_estimate": 0.5},
+                }
+            ]
+        },
+        subscribed=False,
+    )
+    assert out["rows"][0]["player_name"] == "Visible Player"
+    assert out.get("locked") is not True
 
 
 def test_a_subscriber_still_sees_the_name():
@@ -181,7 +208,7 @@ def test_a_subscriber_still_sees_the_name():
     assert redact("/v1/props", payload, subscribed=True)["rows"][0]["player_name"] == "Secret Player"
 
 
-def test_a_future_prop_desk_call_stays_on_the_card():
+def test_a_future_prop_desk_call_is_locked():
     out = redact(
         "/v1/props/desk",
         {
@@ -192,10 +219,12 @@ def test_a_future_prop_desk_call_stays_on_the_card():
         },
         subscribed=False,
     )
-    assert [call["player_name"] for call in out["calls"]] == ["Secret Receiver", "Started Back"]
+    assert out["locked"] is True
+    assert [call["player_name"] for call in out["calls"]] == ["Started Back"]
+    assert "Secret Receiver" not in json.dumps(out)
 
 
-def test_a_future_parlay_ticket_stays_on_the_card():
+def test_a_future_parlay_ticket_is_locked():
     out = redact(
         "/v1/parlays/card",
         {
@@ -210,9 +239,32 @@ def test_a_future_parlay_ticket_stays_on_the_card():
         },
         subscribed=False,
     )
-    assert out.get("locked") is not True
-    assert out["tickets"][0]["legs"][0]["player_name"] == "Secret Player"
-    assert out["eligible_legs"] == 4
+    assert out["locked"] is True
+    assert out["tickets"] == []
+    assert out["eligible_legs"] == 0
+    assert "Secret Player" not in json.dumps(out)
+
+
+def test_the_home_desk_hides_a_future_player():
+    out = redact(
+        "/v1/desk",
+        {
+            "rows": [{"player": "Secret Player", "price": -110, "kickoff": FUTURE, "pick": "Over 33.5"}],
+            "games": [{"matchup": "A at B"}],
+            "total": 1,
+            "qualified": 1,
+            "books": ["DraftKings"],
+            "blockers": [{"reason": "thin", "count": 1}],
+            "market_counts": {"receptions": 1},
+        },
+        subscribed=False,
+    )
+    assert out["locked"] is True
+    assert out["rows"] == []
+    assert out["qualified"] == 0
+    assert out["books"] == []
+    assert out["games"][0]["matchup"] == "A at B"
+    assert "Secret Player" not in json.dumps(out)
 
 
 def test_free_board_cannot_sort_by_the_call():
@@ -228,3 +280,27 @@ def test_open_recommendation_loses_the_player():
     )
     assert out["rows"][0]["player"] is None
     assert out["rows"][0]["locked"] is True
+
+
+def test_a_reset_link_replaces_the_password_and_old_sessions():
+    db = _db()
+    user = register_user(db, "fan@example.com", "password1")
+    token = open_session(db, user)
+    db.commit()
+    reset = begin_password_reset(db, "Fan@Example.com")
+    assert reset is not None
+    finish_password_reset(db, reset[1], "password2")
+    db.commit()
+    assert authenticate(db, "fan@example.com", "password2").user_id == user.user_id
+    assert user_for_token(db, token) is None
+    try:
+        finish_password_reset(db, reset[1], "password3")
+        raise AssertionError("a used link should fail")
+    except AuthError as exc:
+        assert exc.status == 400
+    assert begin_password_reset(db, "missing@example.com") is None
+
+
+def test_login_limits_follow_the_person_not_the_proxy():
+    assert caller_address("203.0.113.8, 10.0.0.4", "10.0.0.4") == "203.0.113.8"
+    assert caller_address("198.51.100.4, 203.0.113.8, 10.0.0.4", None) == "203.0.113.8"

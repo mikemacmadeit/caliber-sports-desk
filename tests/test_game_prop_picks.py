@@ -125,7 +125,7 @@ def test_desk_props_leave_a_ninety_percent_line_for_the_next_chance():
     assert picks[0]["player_name"] == "Next"
 
 
-def test_desk_props_take_the_best_prop_in_every_game():
+def test_desk_props_keep_one_call_in_every_game():
     rows = [
         _row(
             market_id="receiving_yards",
@@ -166,6 +166,80 @@ def test_desk_props_take_the_best_prop_in_every_game():
     assert [pick["player_name"] for pick in picks] == ["Dog", "TossUp"]
 
 
+def test_desk_props_do_not_let_a_short_catch_line_win_on_model_certainty():
+    rows = [
+        _row(
+            market_id="receptions",
+            side="under",
+            line=3.5,
+            player_id="short",
+            player_name="Short",
+            outcome_id="short",
+            model_lean=True,
+            forecast={"p_estimate": 0.84},
+        ),
+        _row(
+            market_id="receiving_yards",
+            side="under",
+            line=64.5,
+            player_id="yards",
+            player_name="Yards",
+            outcome_id="yards",
+            model_lean=True,
+            forecast={"p_estimate": 0.70},
+        ),
+    ]
+    picks = select_desk_props(rows)
+    assert len(picks) == 1
+    assert picks[0]["player_name"] == "Yards"
+
+
+def test_desk_props_swap_a_short_catch_line_for_that_players_yardage():
+    rows = [
+        _row(
+            market_id="receptions",
+            side="under",
+            line=3.5,
+            player_id="same",
+            player_name="Same",
+            outcome_id="rec",
+            model_lean=True,
+            forecast={"p_estimate": 0.84},
+        ),
+        _row(
+            market_id="receiving_yards",
+            side="over",
+            line=24.5,
+            player_id="same",
+            player_name="Same",
+            outcome_id="yards",
+            model_lean=True,
+            forecast={"p_estimate": 0.62},
+        ),
+    ]
+    picks = select_desk_props(rows)
+    assert len(picks) == 1
+    assert picks[0]["market_id"] == "receiving_yards"
+    assert picks[0]["line"] == 24.5
+
+
+def test_desk_props_keep_a_short_catch_line_when_it_is_the_game():
+    rows = [
+        _row(
+            market_id="receptions",
+            side="under",
+            line=3.5,
+            player_id="only",
+            player_name="Only",
+            outcome_id="only",
+            model_lean=True,
+            forecast={"p_estimate": 0.8},
+        ),
+    ]
+    picks = select_desk_props(rows)
+    assert [pick["player_name"] for pick in picks] == ["Only"]
+
+
 def test_desk_props_keep_one_call_per_game():
     rows = [
         _row(
@@ -198,3 +272,50 @@ def test_closed_games_are_left_out():
     rows = [_row(game_id="final"), _row(game_id="open")]
     picks = build_game_prop_picks(rows, {"open"})
     assert [pick["game_id"] for pick in picks] == ["open"]
+
+
+def test_one_published_prop_per_game_keeps_the_strongest():
+    rows = [
+        _row(
+            market_id="receiving_yards",
+            side="over",
+            line=33.5,
+            player_id="best",
+            player_name="Best",
+            outcome_id="best",
+            book_price=-110,
+            forecast={"p_estimate": 0.64, "ev_after_haircut": 0.08},
+        ),
+        _row(
+            market_id="receptions",
+            side="over",
+            line=5.5,
+            player_id="mid",
+            player_name="Mid",
+            outcome_id="mid",
+            book_price=-110,
+            forecast={"p_estimate": 0.56, "ev_after_haircut": 0.05},
+        ),
+        _row(
+            market_id="anytime_td",
+            side="yes",
+            player_id="td",
+            player_name="Touchdown",
+            outcome_id="td",
+            book_price=180,
+            forecast={"p_estimate": 0.44, "ev_after_haircut": 0.06},
+        ),
+        _row(
+            game_id="g2",
+            market_id="rushing_yards",
+            side="over",
+            line=10.5,
+            player_id="other",
+            player_name="Other",
+            outcome_id="other",
+            book_price=-110,
+            forecast={"p_estimate": 0.60, "ev_after_haircut": 0.05},
+        ),
+    ]
+    picks = build_game_prop_picks(rows)
+    assert {(pick["game_id"], pick["player_name"]) for pick in picks} == {("g1", "Best"), ("g2", "Other")}

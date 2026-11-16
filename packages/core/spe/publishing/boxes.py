@@ -1,6 +1,7 @@
 """Market-specific results for published picks; incomplete rows stay pending."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from sqlalchemy import or_
 from spe.db.models import PublishedPick, PublishedResult, PublishedStat, Game
 from spe.identity.match import match_name
 from spe.ingest.espn_box import _fetch_summary, _espn_event_id
@@ -34,6 +35,7 @@ def parse(payload):
                     {
                         "name": name,
                         "espn_id": str(athlete.get("id") or ""),
+                        "team": (team.get("team") or {}).get("abbreviation"),
                         "markets": {},
                         "td": 0,
                         "td_complete": True,
@@ -72,14 +74,14 @@ def box_actual(markets: dict | None, market: str, *, final: bool) -> float | Non
     A box that never loaded stays unknown. A player who never appears is not a
     counting zero — he may not have played. A listed player who has no line for
     that counting stat recorded zero. A missing touchdown column stays unknown,
-    because that box is incomplete. A player missing entirely did not score.
+    because that box is incomplete. A missing player does not establish participation.
     """
     if markets is not None and market in markets:
         return float(markets[market])
     if not final:
         return None
     if markets is None:
-        return 0.0 if market == "anytime_td" else None
+        return None
     if market == "anytime_td":
         return None
     return 0.0
@@ -124,7 +126,8 @@ def _put_stat(db, game_id: str, player_id: str, market: str, actual: float, sour
 def ingest(db, fetch=_fetch_summary):
     pending = (
         db.query(PublishedPick)
-        .filter(~PublishedPick.pick_id.in_(db.query(PublishedResult.pick_id)))
+        .filter(or_(~PublishedPick.pick_id.in_(db.query(PublishedResult.pick_id)),
+                    PublishedPick.kickoff_utc >= datetime.now(UTC) - timedelta(days=7)))
         .all()
     )
     games = {r.game_id for r in pending}
@@ -134,7 +137,10 @@ def ingest(db, fetch=_fetch_summary):
         if not game or game.status != "final":
             continue
         event_id = _espn_event_id(db, game)
-        payload = fetch(game.league_id, event_id) if event_id else None
+        try:
+            payload = fetch(game.league_id, event_id) if event_id else None
+        except Exception:
+            payload = None
         if not payload:
             failed += 1
             continue
@@ -144,10 +150,12 @@ def ingest(db, fetch=_fetch_summary):
         if not people:
             failed += 1
             continue
+        from spe.identity.results import espn_player_ids, match_result
+        identities = espn_player_ids(db, {pid for pid, _ in catalog})
         found: dict[str, dict] = {}
-        for row in people:
-            player_id = _matched_player(row, catalog)
-            if not player_id:
+        for player_id, name in catalog:
+            row = match_result(people, player_id, name, identities)
+            if row is None:
                 continue
             found[player_id] = row["markets"]
             for market, value in row["markets"].items():

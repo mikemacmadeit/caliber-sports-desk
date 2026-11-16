@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AtdScoreRow, AtdTake } from "@/components/AnytimeTdScorecard";
+import { browserGet, peekBrowserCache } from "@/lib/browserApi";
 import { kickoffDate, kickoffMs, kickoffParts, pct } from "@/lib/format";
 
 const FAMILY_RANK: Record<string, number> = {
@@ -12,6 +13,36 @@ const FAMILY_RANK: Record<string, number> = {
 };
 
 type Filter = "all" | "win" | "loss";
+type ScorePayload = { atd_scorecard?: { rows?: AtdScoreRow[]; open_and_settled_takes?: AtdTake[] } };
+
+const RECORD_PATH = "/v1/shadow/track-record";
+
+/** The season record is large. It loads after the saved picks are already on screen. */
+export function AnytimeTdRecordPanel({ league = "all" }: { league?: string }) {
+  const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const cached = peekBrowserCache<ScorePayload>(RECORD_PATH);
+  const [card, setCard] = useState(cached?.atd_scorecard ?? null);
+
+  useEffect(() => {
+    if (!open) return;
+    setFailed(false);
+    const warm = peekBrowserCache<ScorePayload>(RECORD_PATH);
+    if (warm?.atd_scorecard) setCard(warm.atd_scorecard);
+    const ctrl = new AbortController();
+    browserGet<ScorePayload>(RECORD_PATH, ctrl.signal)
+      .then((payload) => {
+        if (!ctrl.signal.aborted) setCard(payload.atd_scorecard ?? null);
+      })
+      .catch(() => {
+        if (!ctrl.signal.aborted) setFailed(true);
+      });
+    return () => ctrl.abort();
+  }, [open, retry]);
+
+  return <details onToggle={event => setOpen(event.currentTarget.open)}><summary className="cursor-pointer text-gold">Original season record</summary>{failed ? <p role="alert">Record unavailable. <button onClick={() => setRetry(n => n + 1)}>Retry</button></p> : open && !card ? <p role="status">Loading record…</p> : null}{open && card ? <AnytimeTdRecord rows={card.rows || []} takes={card.open_and_settled_takes || []} league={league} /> : null}</details>;
+}
 
 export function AnytimeTdRecord({
   rows,

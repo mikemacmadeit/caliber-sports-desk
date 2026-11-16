@@ -149,12 +149,22 @@ def refresh_free_college(db, *, years=(2023,2024,2025,2026), refresh=False):
     for r in db.query(ProviderIdMap).filter(ProviderIdMap.provider=='espn',ProviderIdMap.entity_type=='player'):
         if r.canonical_id in known and r.confidence>=.99:
             player_ids[r.external_id]=r.canonical_id
-    result={"opportunity_games":[],"players":[],"sources":[],"reports":{}}
+    path=settings.parquet_dir/'desk_evidence'/'fbs_free_opportunities.json'
+    prior=json.loads(path.read_text()) if path.exists() else {}
+    def previous_season(row):
+        kick=as_utc(row['kickoff_utc'])
+        return kick.year-int(kick.month<7) not in years
+    result={"opportunity_games":[r for r in prior.get('opportunity_games',[]) if previous_season(r)],
+            "players":[r for r in prior.get('players',[]) if previous_season(r)],
+            "sources":[r for r in prior.get('sources',[]) if not any(str(y) in str(r.get('source','')) for y in years)],
+            "reports":{k:v for k,v in prior.get('reports',{}).items() if int(k) not in years}}
     for year in years:
         current=datetime.now(UTC)
         season=current.year-int(current.month<7)
         frame,source=load_asset(year,refresh=refresh and year>=season)
         payload,report=summarize(frame,games,members,player_ids,aliases,source['observed_at'])
+        if not payload['opportunity_games'] or not payload['players']:
+            raise ValueError("No matched college opportunities; retain previous evidence")
         for key in ('opportunity_games','players'):result[key].extend(payload[key])
         result['sources'].append(source);result['reports'][str(year)]=report
     path=settings.parquet_dir/'desk_evidence'/'fbs_free_opportunities.json'

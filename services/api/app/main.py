@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, TimeoutError as DatabaseTimeout
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -57,10 +57,14 @@ from app.queries import (
 )
 from app.schemas import ParlayEvaluate, SimulationCreate
 
+_public_docs = settings.app_env not in {"prod", "production"}
 app = FastAPI(
     title="Caliber API",
     version="0.1.0",
     description="Odds-aware calibrated probability engine for NFL and FBS. Research forecasts only.",
+    docs_url="/docs" if _public_docs else None,
+    redoc_url="/redoc" if _public_docs else None,
+    openapi_url="/openapi.json" if _public_docs else None,
 )
 
 _cors_origins = []
@@ -68,7 +72,7 @@ for part in str(settings.web_origin or "").split(","):
     origin = part.strip()
     if origin and origin not in _cors_origins:
         _cors_origins.append(origin)
-for origin in ("http://localhost:3000", "http://127.0.0.1:3000"):
+for origin in (("http://localhost:3000", "http://127.0.0.1:3000") if _public_docs else ()):
     if origin not in _cors_origins:
         _cors_origins.append(origin)
 
@@ -80,12 +84,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth_router)
+from app.watchlist import router as watchlist_router
+app.include_router(watchlist_router)
 
 
 def _viewer_is_subscribed(request: Request) -> bool:
     # The local desk is the operator's own board. Production still requires a subscription.
     if settings.app_env == "dev":
         return True
+    from app.access import token_from_request
+    if not token_from_request(request):
+        return False
     from spe.db.session import session_factory
 
     from app.access import request_is_subscribed
@@ -105,7 +114,8 @@ async def hide_calls_until_kickoff(request: Request, call_next):
     path = request.url.path
     needs_sub = subscription_required(request.method, path)
     redact_body = request.method == "GET" and should_redact(path)
-    subscribed = _viewer_is_subscribed(request) if needs_sub or redact_body else False
+    from starlette.concurrency import run_in_threadpool
+    subscribed = await run_in_threadpool(_viewer_is_subscribed, request) if needs_sub or redact_body else False
     if needs_sub and not subscribed:
         return JSONResponse({"detail": "subscription_required", "price_usd": "19.99"}, status_code=402)
     response = await call_next(request)
@@ -127,15 +137,21 @@ async def hide_calls_until_kickoff(request: Request, call_next):
     return JSONResponse(redact(path, payload, subscribed=False), status_code=response.status_code)
 
 
+@app.middleware("http")
+async def private_api_responses(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/v1/"):
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["Vary"] = ", ".join(filter(None, [response.headers.get("Vary"), "Cookie", "Authorization"]))
+    return response
+
+
 @app.on_event("startup")
 def startup() -> None:
-    try:
-        init_db()
-    except OperationalError:
-        # A long ingest can hold SQLite. Keep serving; the research tables appear on the next open.
-        return
+    init_db()
 
 
+@app.exception_handler(DatabaseTimeout)
 @app.exception_handler(OperationalError)
 async def sqlite_operational_error_handler(request, exc: OperationalError):  # type: ignore[no-untyped-def]
     """Map SQLite lock waits to 503 instead of an opaque 500 after the web aborts."""
@@ -153,7 +169,8 @@ async def sqlite_operational_error_handler(request, exc: OperationalError):  # t
         )
     # The driver text includes the database host. Callers only need to retry.
     return JSONResponse(
-        status_code=500,
+        status_code=503,
+        headers={"Retry-After": "5"},
         content={"detail": "database_error", "message": "The database is unavailable. Retry shortly."},
     )
 
@@ -180,8 +197,16 @@ def _research_reviews(session: Session):
 
 
 @app.get("/health")
-def health() -> dict[str, Any]:
-    return {"ok": True, "service": "caliber-api", "env": settings.app_env}
+def health():
+    """Cheap database readiness for routing. /ready separately monitors feed freshness."""
+    from sqlalchemy import text
+    from spe.db.session import get_engine
+    try:
+        with get_engine().connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"ok": True, "service": "caliber-api", "env": settings.app_env}
+    except Exception:
+        return JSONResponse({"ok": False, "service": "caliber-api"}, status_code=503)
 
 
 @app.get("/v1/slate")
@@ -215,8 +240,19 @@ def slate(
     }
 
 
+def _lab_open(request: Request, session: Session) -> None:
+    if settings.app_env == "dev":
+        return
+    from app.access import request_is_subscribed
+
+    if request_is_subscribed(request, session):
+        return
+    raise HTTPException(403, "subscription_required")
+
+
 @app.get("/v1/coverage")
-def coverage(session: Session = Depends(db_session)) -> dict[str, Any]:
+def coverage(request: Request, session: Session = Depends(db_session)) -> dict[str, Any]:
+    _lab_open(request, session)
     from spe.ingest.coverage import coverage_report
 
     payload = coverage_report(session)
@@ -405,14 +441,30 @@ def anytime_td_calls(
 
 
 @app.get("/v1/anytime-td/replay")
-def combined_replay(date: calendar_date, league: str = Query(default="all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
+def combined_replay(date: calendar_date, league: str = Query(default="all", pattern="^(all|nfl|fbs)$"),
+                    session: Session = Depends(db_session), detail: str = Query("card", pattern="^(card|full)$"), game_id: str | None = None):
+    from spe.models.player_td.presentation import card_payload
     from spe.models.player_td.desk_replay import replay_day, saved_day_card
     from spe.models.player_td.desk_replay_results import ensure_live_touchdowns, ensure_results
     from spe.models.player_td.scorer_refresh import ensure_refresh
     day = date.isoformat()
     from app.queries import attach_game_marks
     from sqlalchemy.exc import IntegrityError
+    def present(payload):
+        if game_id:
+            payload = {**payload, "rows": [r for r in payload.get("rows", []) if r.get("game_id") == game_id],
+                "unavailable_games": [r for r in payload.get("unavailable_games", []) if r.get("game_id") == game_id]}
+        return card_payload(payload) if detail == "card" else payload
     saved = saved_day_card(session, day, league)
+    if settings.app_env in {"prod", "production"}:
+        # Public requests never launch model/data workers or rebuild past selections.
+        result = saved or {"date": day, "league": league, "rows": [], "unavailable_games": [],
+                           "note": "This day's card has not been published yet."}
+        attach_game_marks(session, result.get("rows") or [])
+        from spe.publishing.pipeline import job_status
+        result["refresh_status"] = job_status(session, "production_touchdowns")
+        result["results_refresh_status"] = job_status(session, "production_settlement")
+        return present(result)
     if saved and saved.get("rows"):
         attach_game_marks(session, saved.get("rows") or [])
         session.commit()
@@ -421,7 +473,7 @@ def combined_replay(date: calendar_date, league: str = Query(default="all", patt
                        for r in saved['rows'])
         saved["refresh_status"] = ensure_refresh(day) if upcoming or saved.get('unavailable_games') else "ready"
         saved["results_refresh_status"] = ensure_live_touchdowns(day)
-        return saved
+        return present(saved)
     for attempt in range(2):
         try:
             result = replay_day(session, day, league, cached_only=True)
@@ -436,7 +488,7 @@ def combined_replay(date: calendar_date, league: str = Query(default="all", patt
                 raise
     result["refresh_status"] = ensure_refresh(day)
     result["results_refresh_status"] = ensure_results(day)
-    return result
+    return present(result)
 
 
 @app.get("/v1/anytime-td/called")
@@ -544,8 +596,6 @@ def prop_picks(league: str = Query(default="all"), date: str | None = None,
     games = games_for_slate(session, selected, league)
     rows = load_slate_props(session, league, selected)
     degraded = bool(games) and any(read_entry(market, league, selected) is None for market in WARM_MARKETS)
-    record_frozen_desk_picks(session)
-    settle(session)
     return {"date": selected, "league": league, "games_on_slate": len(games), "degraded": degraded,
             "picks": current_picks(session, rows),
             "day": day_picks(session, league, selected),
@@ -560,9 +610,14 @@ def published_history(league: str | None = None, market: str | None = None,
     from spe.publishing.ledger import history, ats_history, record_frozen_desk_picks, settle
     if market == "point_spread":
         return ats_history(session, league, offset, limit)
-    record_frozen_desk_picks(session)
-    settle(session)
     return history(session, league, market, offset, limit)
+
+
+@app.get("/v1/published/calendar")
+def published_calendar(month: str = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+                       league: str = Query("all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
+    from spe.publishing.ledger import ledger_calendar
+    return ledger_calendar(session, month, league)
 
 
 @app.get("/v1/published/day")
@@ -577,6 +632,13 @@ def published_day(
     payload["dates"] = slate_dates(session)
     payload["disclaimer"] = disclaimer()
     return payload
+
+
+@app.get("/v1/published/year")
+def published_year(year: int = Query(ge=2020, le=2100),
+                   league: str = Query("all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
+    from spe.publishing.ledger import ledger_year
+    return ledger_year(session, year, league)
 
 
 @app.get("/v1/desk")
@@ -683,67 +745,22 @@ def anytime_td_research(
             payload = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             payload = None
-    needs_rebuild = (
-        payload is None
-        or payload.get("fbs_primary_model") != "m5_c_recent"
-        or (payload.get("fbs_serving") or {}).get("serving", {}).get("locked_version") != LOCKED_VERSION
-        or payload.get("fbs_scope_version") != SCOPE_VERSION
-        or refresh
-    )
-    # FBS filter must not serve a pre-C_recent cache.
-    if league == "fbs" and needs_rebuild:
-        needs_rebuild = True
-    elif league == "fbs" and payload is not None and payload.get("fbs_primary_model") != "m5_c_recent":
-        needs_rebuild = True
-
-    if needs_rebuild:
-        session = session_factory()
-        try:
-            from spe.db.session import set_busy_timeout
-
-            set_busy_timeout(session, 120_000)
-            payload = build_finder_payload(session, refresh_fbs_c_recent=True)
-            session.rollback()
-        except OperationalError:
-            session.rollback()
-            raise
-        finally:
-            session.close()
-        payload["payload_source"] = "database_build_c_recent"
-    else:
-        assert payload is not None
-        payload["payload_source"] = "file"
-
+    # A public read never downloads data or rebuilds a model. Scheduled workers own that work.
+    current = bool(payload and payload.get("fbs_primary_model") == "m5_c_recent"
+        and (payload.get("fbs_serving") or {}).get("serving", {}).get("locked_version") == LOCKED_VERSION
+        and payload.get("fbs_scope_version") == SCOPE_VERSION)
+    if payload is None:
+        payload = {"status": "unavailable", "games": [], "n_games": 0}
+    payload["payload_source"] = "file" if path.exists() else "unavailable"
+    payload["model_current"] = current
+    payload["refresh_status"] = "ready" if current else "stale"
+    if not current:
+        payload["note"] = "Saved research is out of date. It is not a current betting recommendation."
     if league and league != "all":
         games = [g for g in (payload.get("games") or []) if g.get("league_id") == league]
         payload = {**payload, "games": games, "n_games": len(games), "league_filter": league}
-
-    # Drop kicked-off / live / final games from the research board (file can lag scoreboard).
-    from datetime import UTC, datetime
-
-    from spe.db.base import as_utc
-    from spe.db.models import Game
-
-    session = session_factory()
-    try:
-        now = datetime.now(UTC)
-        keep: list[dict[str, Any]] = []
-        for g in payload.get("games") or []:
-            gid = str(g.get("game_id") or "")
-            game = session.get(Game, gid) if gid else None
-            if game is None:
-                keep.append(g)
-                continue
-            status = str(game.status or "").lower()
-            if status in {"final", "canceled", "cancelled", "in_progress"}:
-                continue
-            kick = as_utc(game.kickoff_utc)
-            if kick is not None and kick <= now:
-                continue
-            keep.append(g)
-        payload = {**payload, "games": keep, "n_games": len(keep), "pregame_only": True}
-    finally:
-        session.close()
+    # Never claim database verification for a file-only response.
+    payload["pregame_only"] = False
 
     payload["disclaimer"] = payload.get("disclaimer") or disclaimer()
     payload["play_enabled"] = False
@@ -808,7 +825,14 @@ def player_forecast(
 
 
 @app.post("/v1/simulations")
-def create_simulation(body: SimulationCreate, session: Session = Depends(db_session)) -> dict[str, Any]:
+def create_simulation(body: SimulationCreate, request: Request, session: Session = Depends(db_session)) -> dict[str, Any]:
+    from app.access import user_from_request
+    from spe.accounts.limits import consume
+    viewer = user_from_request(request, session)
+    if viewer is None:
+        raise HTTPException(401, 'Sign in to run a scenario.')
+    if not consume(session.get_bind(), [(f'simulation:user:{viewer.user_id}', 10)], window_seconds=60):
+        raise HTTPException(429, 'Please wait a minute before running another scenario.', headers={'Retry-After':'60'})
     game = session.get(Game, body.game_id)
     if not game:
         raise HTTPException(404, "game not found")
@@ -818,60 +842,15 @@ def create_simulation(body: SimulationCreate, session: Session = Depends(db_sess
         .first()
     )
     if not version:
-        raise HTTPException(500, "no model version for league")
-    from spe.identity.roster import eligible_players_for_game
-
-    # Kickoff roster only. Skip the heavy week-wide eligibility audit for interactive sims.
-    eligible = eligible_players_for_game(
-        session,
-        game,
-        include_inactive_for_props=False,
-        apply_eligibility_audit=False,
-    )
-    roles: list[PlayerRole] = []
-    player_names: dict[str, str] = {}
-    for row in eligible:
-        p = session.get(Player, row.player_id)
-        if not p:
-            continue
-        player_names[p.player_id] = p.name
-        feat = (
-            session.query(FeatureRow)
-            .filter(FeatureRow.player_id == p.player_id, FeatureRow.game_id == game.game_id)
-            .first()
-        )
-        usage = (feat.feature_blob.get("usage") if feat else {}) or {}
-        avail = (feat.feature_blob.get("availability") if feat else {}) or {}
-        roles.append(
-            PlayerRole(
-                player_id=p.player_id,
-                team_id=row.team_id,
-                position_group=p.position_group,
-                availability=float(avail.get("prob", 0.9)),
-                snap_share=float(usage.get("snap_share", 0.5)),
-                td_weight=float(usage.get("td_weight", 0.15)),
-                rec_lambda=float(usage.get("rec_lambda", 3.0 if p.position_group in {"WR", "TE", "RB"} else 0.2)),
-                rec_yards_mu=float(usage.get("rec_yards_mu", 40.0)),
-                rush_yards_mu=float(usage.get("rush_yards_mu", 20.0 if p.position_group == "RB" else 4.0)),
-            )
-        )
-    if not roles:
-        raise HTTPException(400, "no eligible players on the kickoff roster for this game")
-    result = simulate_game(
-        game.league_id,
-        game.home_team_id,
-        game.away_team_id,
-        roles,
-        draw_count=min(body.draw_count, 50_000),
-        seed=body.seed,
-        overrides=body.scenario_overrides,
-    )
+        raise HTTPException(409, "Model information for this league is not available yet.")
+    from app.scenario import run_scenario
+    result, player_names, assumptions = run_scenario(session, game, body)
     run = SimulationRun(
         game_id=game.game_id,
-        as_of=body.as_of or datetime.now(UTC),
+        as_of=datetime.fromisoformat(assumptions["captured_at"]),
         seed=body.seed,
         draw_count=result.draw_count,
-        assumptions={"rules": game.league_id, "engine": "drive_dirichlet_v0"},
+        assumptions={"rules": game.league_id, **assumptions},
         scenario="research" if result.research_only else "official",
         overrides=result.overrides,
         model_version_id=version.model_version_id,
@@ -885,7 +864,7 @@ def create_simulation(body: SimulationCreate, session: Session = Depends(db_sess
         "run_id": run.run_id,
         "status": "complete",
         "research_only": run.research_only,
-        "note": "Overrides never silently change the official pick." if run.research_only else "",
+        "note": "Based on the saved TD model and team scoring expectations. Research only; these simulations do not replace the saved picks or prove their accuracy.",
         "disclaimer": disclaimer(),
     }
 
@@ -1160,7 +1139,8 @@ def evaluate_parlay(body: ParlayEvaluate, session: Session = Depends(db_session)
 
 
 @app.get("/v1/model-health")
-def model_health(session: Session = Depends(db_session)) -> dict[str, Any]:
+def model_health(request: Request, session: Session = Depends(db_session)) -> dict[str, Any]:
+    _lab_open(request, session)
     from spe.models.train import is_reportable_health
 
     rows = [
@@ -1388,6 +1368,7 @@ def best_bets(
 @app.get("/v1/ats")
 def ats_finder(
     request: Request,
+    date: calendar_date | None = None,
     league: str = Query("all"),
     sort: str = Query("kickoff"),
     side: str = Query("all"),
@@ -1400,9 +1381,12 @@ def ats_finder(
     """
     from spe.models.ats.board_cache import load_board
 
-    payload = load_board(session)
+    payload = load_board(session, date=date.isoformat() if date else None)
     sort, side = board_query_for(sort, side, subscribed=_viewer_is_subscribed(request))
-    rows = _with_recorded_results(session, list(payload.get("rows") or []))
+    rows = list(payload.get("rows") or [])
+    if date is not None:
+        rows = [r for r in rows if r.get("kickoff_utc") and kickoff_day(r["kickoff_utc"]) == date.isoformat()]
+    rows = _with_recorded_results(session, rows)
     from app.queries import attach_team_marks
 
     rows = attach_team_marks(session, rows)
@@ -1439,7 +1423,7 @@ def ats_finder(
     else:
         rows.sort(key=lambda r: str(r.get("kickoff_utc") or ""))
     payload["rows"] = rows
-    payload["filters"] = {"league": league, "sort": sort, "side": side}
+    payload["filters"] = {"league": league, "sort": sort, "side": side, "date": date.isoformat() if date else None}
     payload["disclaimer"] = disclaimer()
     return payload
 
@@ -1506,3 +1490,17 @@ def ats_game_research(
     payload["prediction"] = prediction
     payload["disclaimer"] = disclaimer()
     return payload
+
+
+from app.telemetry import install as install_telemetry
+install_telemetry(app)
+
+
+@app.get("/v1/ops/metrics")
+def operational_metrics(request: Request, session: Session = Depends(db_session)):
+    from app.access import user_from_request
+    from app.telemetry import snapshot
+    user = user_from_request(request, session)
+    if user is None or not user.is_admin:
+        raise HTTPException(403, "Administrator access required.")
+    return snapshot()

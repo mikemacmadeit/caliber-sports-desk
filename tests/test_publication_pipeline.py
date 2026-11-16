@@ -465,9 +465,11 @@ def test_a_finished_box_records_an_omitted_stat_as_zero():
 
     assert box_actual({"receiving_yards": 32}, "receiving_yards", final=True) == 32
     assert box_actual({"rushing_yards": 89}, "receiving_yards", final=True) == 0
-    assert box_actual(None, "anytime_td", final=True) == 0
+    assert box_actual(None, "anytime_td", final=True) is None
     assert box_actual({"rushing_yards": 43}, "anytime_td", final=True) is None
     assert box_actual(None, "receptions", final=False) is None
+    assert box_actual(None, "receptions", final=True) is None
+    assert box_actual(None, "receiving_yards", final=True) is None
 
 
 def test_a_day_card_keeps_spreads_props_and_touchdowns():
@@ -523,6 +525,60 @@ def test_a_day_card_keeps_spreads_props_and_touchdowns():
     assert rows[1]["detail"] == "FanDuel · -110 · Actual 6"
     summary = _ledger_summary(rows)
     assert summary["win"] == 2 and summary["loss"] == 1
+
+
+def test_a_game_publishes_one_prop_and_keeps_later_markets_off(db):
+    seed(db)
+    yards = row(
+        market_id="receiving_yards",
+        outcome_id="yards",
+        player_id="best",
+        player_name="Best",
+        line=33.5,
+        book_price=-110,
+        forecast={"p_estimate": 0.64, "ev_after_haircut": 0.08},
+    )
+    catches = row(
+        market_id="receptions",
+        outcome_id="catches",
+        player_id="mid",
+        player_name="Mid",
+        line=5.5,
+        book_price=-102,
+        forecast={"p_estimate": 0.58, "ev_after_haircut": 0.05},
+    )
+    touchdown = row(
+        market_id="anytime_td",
+        outcome_id="td",
+        player_id="td",
+        player_name="Touchdown",
+        side="yes",
+        book_price=205,
+        forecast={"p_estimate": 0.44, "ev_after_haircut": 0.06},
+    )
+    assert publish(db, [yards, catches, touchdown], NOW)["published"] == 1
+    db.commit()
+    saved = db.query(PublishedPick).one()
+    assert saved.snapshot["player_name"] == "Best"
+    assert publish(db, [catches, touchdown], NOW + timedelta(seconds=1))["published"] == 0
+    assert db.query(PublishedPick).count() == 1
+
+
+def test_a_desk_touchdown_does_not_stack_on_a_published_prop(db):
+    seed(db)
+    assert publish(db, [row()], NOW)["published"] == 1
+    db.commit()
+    db.add(
+        DeskDecision(
+            game_id="g",
+            decided_at=NOW - timedelta(minutes=30),
+            payload={"row": _desk_row(), "kickoff_utc": NOW.isoformat(), "game_id": "g"},
+        )
+    )
+    db.commit()
+    assert record_frozen_desk_picks(db)["recorded"] == 0
+    assert db.query(PublishedPick).count() == 1
+    assert db.query(PublishedPick).one().market_id == "rushing_yards"
 
 
 def test_a_pass_before_kickoff_stays_off_the_public_record(db):

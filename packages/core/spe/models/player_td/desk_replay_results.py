@@ -33,7 +33,12 @@ def fetch_day(league, date):
 def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
     from spe.models.player_td.desk_replay import CACHE_PREFIX
     from sqlalchemy import or_
-    snapshots = db.scalars(select(BoardSnapshot).where(or_(BoardSnapshot.key.like(CACHE_PREFIX + "%"), BoardSnapshot.key.like("guarded-desk-v1:%"), BoardSnapshot.key.like("revised-policy-v1:%"), BoardSnapshot.key.like("scorer-replay-v1:%"), BoardSnapshot.key.like("scorer-desk-v1:%"), BoardSnapshot.key.like("retrained-desk-v1:%"), BoardSnapshot.key.like("corrected-inputs-v1:%")))).all()
+    # Filter JSON dates in SQL; do not deserialize every historical card.
+    from zoneinfo import ZoneInfo
+    start = datetime.fromisoformat(date).replace(tzinfo=ZoneInfo("America/Chicago"))
+    end = start + timedelta(days=1)
+    kickoff = BoardSnapshot.payload["row"]["kickoff_utc"].as_string()
+    snapshots = db.scalars(select(BoardSnapshot).where(kickoff >= start.astimezone(UTC).isoformat(), kickoff < end.astimezone(UTC).isoformat(), or_(BoardSnapshot.key.like(CACHE_PREFIX + "%"), BoardSnapshot.key.like("guarded-desk-v1:%"), BoardSnapshot.key.like("revised-policy-v1:%"), BoardSnapshot.key.like("scorer-replay-v1:%"), BoardSnapshot.key.like("scorer-desk-v1:%"), BoardSnapshot.key.like("retrained-desk-v1:%"), BoardSnapshot.key.like("corrected-inputs-v1:%")))).all()
     selected = {}
     from spe.db.base import as_utc
     from spe.models.player_td.desk_replay import ZONE
@@ -47,8 +52,6 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
                 choice = (row.get("decision") or {}).get(lane)
                 if not choice or not choice.get("player_id") or not choice.get("name"):
                     continue
-                if lane == "value_candidate" and not (choice.get("research_selected") or choice.get("price_supported")):
-                    continue
                 selected[(row["game_id"], choice["player_id"])] = {
                     **row, "player_id": choice["player_id"], "player_name": choice["name"]}
     from spe.ingest.espn_box import _espn_event_id
@@ -58,8 +61,13 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
     games = db.scalars(select(Game).where(Game.kickoff_utc >= start.astimezone(UTC),
         Game.kickoff_utc < (start+timedelta(days=1)).astimezone(UTC), Game.data_tier.notin_(("demo", "alias")))).all()
     event_games = {(g.league_id, _espn_event_id(db,g)):g for g in games}
-    leagues = sorted({r["league_id"] for r in selected.values()} | {g.league_id for g in games})
-    boards = {lg: fetch(lg, date) for lg in leagues}
+    leagues = ["nfl", "fbs"]
+    boards, failures = {}, []
+    for lg in leagues:
+        try:
+            boards[lg] = fetch(lg, date)
+        except Exception as exc:
+            failures.append({"league": lg, "stage": "scoreboard", "error": type(exc).__name__})
     tasks = []
     for lg, events in boards.items():
         for event in events:
@@ -75,7 +83,10 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
                 if not fresh:
                     tasks.append((lg,str(event["id"]),gid))
     def get_box(task):
-        return task, summary(task[0], task[1])
+        try:
+            return task, summary(task[0], task[1])
+        except Exception:
+            return task, None
     with ThreadPoolExecutor(max_workers=4) as pool:
         boxes = list(pool.map(get_box, tasks))
     # Finish network reads before taking SQLite's writer lock.
@@ -83,6 +94,8 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
         upsert_scoreboard_events(db, lg, events)
     written = 0
     missing = []
+    from spe.identity.results import espn_player_ids, match_result
+    identities = espn_player_ids(db, {pid for _, pid in selected})
     for (_, event_id, gid), payload in boxes:
         game = db.get(Game,gid)
         if game and as_utc(game.kickoff_utc) > now:
@@ -99,8 +112,8 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
         for (game_id, pid), row in selected.items():
             if game_id != gid:
                 continue
-            matches = [p for p in people if normalize_name(p["name"]) == normalize_name(row["player_name"])]
-            if len(matches) != 1 or "anytime_td" not in matches[0]["markets"]:
+            person = match_result(people, pid, row["player_name"], identities, row.get("team"))
+            if person is None or "anytime_td" not in person["markets"]:
                 missing.append(f"{gid}:{pid}")
                 continue
             key = f"{gid}|{pid}|anytime_td"
@@ -108,12 +121,12 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
             if stat is None:
                 stat = PublishedStat(key=key, game_id=gid, player_id=pid, market_id="anytime_td")
                 db.add(stat)
-            stat.actual = matches[0]["markets"]["anytime_td"]
+            stat.actual = person["markets"]["anytime_td"]
             stat.observed_at = datetime.now(UTC)
             stat.source = f"espn.summary:{event_id}"
             written += 1
     db.flush()
-    return {"date": date, "scoreboard_games": sum(map(len, boards.values())), "graded_players": written, "missing_boxes": missing}
+    return {"status": "degraded" if failures or missing else "ok", "failures": failures, "date": date, "scoreboard_games": sum(map(len, boards.values())), "graded_players": written, "missing_boxes": missing}
 
 
 def ensure_live_touchdowns(date):

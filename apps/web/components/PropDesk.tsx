@@ -32,18 +32,20 @@ export function deskRecord(calls: PropDeskCall[]) {
   const wins = calls.filter((call) => call.result === "win").length;
   const losses = calls.filter((call) => call.result === "loss").length;
   const pushes = calls.filter((call) => call.result === "push").length;
-  const pending = calls.length - wins - losses - pushes;
+  const voids = calls.filter((call) => call.result === "void").length;
+  const pending = calls.length - wins - losses - pushes - voids;
   const graded = wins + losses;
   const rate = graded ? `${Math.round((100 * wins) / graded)}%` : null;
-  return { wins, losses, pushes, pending, graded, rate };
+  return { wins, losses, pushes, voids, pending, graded, rate };
 }
 
 export function DeskRecord({ calls }: { calls: PropDeskCall[] }) {
-  const { wins, losses, pushes, pending, rate } = deskRecord(calls);
+  const { wins, losses, pushes, voids, pending, rate } = deskRecord(calls);
+  const held = [pushes ? `${pushes} pushes` : "", voids ? `${voids} didn't play` : ""].filter(Boolean).join(" · ");
   return (
     <div className="grid gap-3 sm:grid-cols-3" aria-label="Desk pick record">
       <RecordStat label="Wins" value={String(wins)} tone="text-green-300" hint={rate ? `${rate} of graded` : "None graded yet"} />
-      <RecordStat label="Losses" value={String(losses)} tone="text-red-300" hint={pushes ? `${pushes} pushes` : "Wrong once the stat is in"} />
+      <RecordStat label="Losses" value={String(losses)} tone="text-red-300" hint={held || "Wrong once the stat is in"} />
       <RecordStat label="Record" value={`${wins}–${losses}`} hint={pending ? `${pending} still pending` : "Every call graded"} />
     </div>
   );
@@ -60,14 +62,15 @@ function RecordStat({ label, value, hint, tone = "text-paper" }: { label: string
 }
 
 export function PropDesk({ calls }: { calls: PropDeskCall[] }) {
-  const { wins, losses, pushes, pending } = deskRecord(calls);
+  const { wins, losses, pushes, voids, pending } = deskRecord(calls);
   const parts = [`${wins} wins`, `${losses} losses`, `${pending} pending`];
   if (pushes) parts.push(`${pushes} pushes`);
+  if (voids) parts.push(`${voids} didn't play`);
 
   return (
     <div className="space-y-4">
       <p className="max-w-xl text-sm text-mute">
-        The best prop in each game. The strongest chance under 90%. Touchdowns stay on the Anytime TD page.
+        One prop for every game. The strongest chance under 90%. Touchdowns stay on the Anytime TD page.
       </p>
       <p className="text-sm text-mute">Today · {parts.join(" · ")}</p>
       <div className="grid gap-3 md:grid-cols-2">
@@ -86,14 +89,14 @@ function PropDeskCard({ call }: { call: PropDeskCall }) {
   const line = call.line == null ? "" : Number.isInteger(call.line) ? String(call.line) : call.line.toFixed(1);
   const side = call.side === "under" ? "Under" : "Over";
   const label = call.pick || `${side} ${line} ${marketLabel(call.market_id || "").toLowerCase()}`;
-  const actual = call.actual == null ? "" : ` · Actual ${Number.isInteger(call.actual) ? call.actual : call.actual.toFixed(1)}`;
+  const actual = call.result === "void" || call.actual == null ? "" : ` · Actual ${Number.isInteger(call.actual) ? call.actual : call.actual.toFixed(1)}`;
+  const price = american(call.book_price);
   return (
     <Link href={`/games/${call.game_id}`} className={boxClass(mark)}>
-      <GradeBadge mark={mark} />
       <div className="flex gap-4">
         {team ? <TeamMark team={team} abbr={team.abbr} size="md" /> : null}
         <div className="min-w-0 flex-1">
-          <p className={`font-mono text-[10px] uppercase tracking-[0.16em] text-mute ${mark ? "pr-9" : ""}`}>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-mute">
             {marketLabel(call.market_id || "")}
             {call.position ? ` · ${call.position}` : ""}
             {call.team_abbr ? ` · ${call.team_abbr}` : ""}
@@ -107,13 +110,19 @@ function PropDeskCard({ call }: { call: PropDeskCall }) {
             {call.final_score ? ` · ${call.final_score}` : ""}
           </p>
           <p className="mt-3 text-sm text-gold">
-            {call.bookmaker || "Posted price"} · {american(call.book_price)}
+            {call.bookmaker || "Posted price"}
             {call.p == null ? "" : ` · ${pct(call.p, 0)}`}
           </p>
           <p className={resultClass(mark)}>
-            {mark === "win" ? "Correct" : mark === "loss" ? "Wrong" : mark === "push" ? "Push" : statusLabel(call.game_status)}
+            {call.result === "void" ? "Didn't play" : mark === "win" ? "Correct" : mark === "loss" ? "Wrong" : mark === "push" ? "Push" : statusLabel(call.game_status)}
             {actual}
           </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end text-right">
+          <GradeBadge mark={mark} />
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-mute">{side}</p>
+          {line ? <p className="mt-1 font-display text-4xl leading-none tracking-wide">{line}</p> : null}
+          <p className={`mt-1 font-display text-2xl leading-none ${call.book_price != null && call.book_price > 0 ? "text-green-300" : "text-gold"}`}>{price}</p>
         </div>
       </div>
     </Link>
@@ -147,7 +156,7 @@ function GradeBadge({ mark }: { mark: "win" | "loss" | "push" | null }) {
   if (mark !== "win" && mark !== "loss") return null;
   const won = mark === "win";
   return (
-    <span aria-label={won ? "Win" : "Loss"} className={`absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-xl font-bold ${won ? "bg-green-500 text-black" : "bg-red-500 text-white"}`}>
+    <span aria-label={won ? "Win" : "Loss"} className={`mb-2 flex h-7 w-7 items-center justify-center rounded-full text-xl font-bold ${won ? "bg-green-500 text-black" : "bg-red-500 text-white"}`}>
       {won ? "✓" : "✕"}
     </span>
   );

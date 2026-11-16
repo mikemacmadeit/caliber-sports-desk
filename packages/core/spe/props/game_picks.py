@@ -1,4 +1,4 @@
-"""One prop call per game and market, from lines that already have a fresh price.
+"""One prop call per game, from lines that already have a fresh price.
 
 A chance several times the book's number stays off. A soft line in the 80s or 90s
 stays off. Only verified prices with sufficient conservative value qualify.
@@ -31,8 +31,15 @@ COUNT_MIN_P = 0.42
 COUNT_MAX_P = 0.66
 TARGET_P = 0.58
 # A chance above this is a line sitting far from the player's average.
-# Those sides have not held, so the desk takes the strongest chance under it.
+# Those sides have not held. Under the cap, extra certainty the price does
+# not share does not outrank a line closer to the posted number.
 DESK_MAX_P = 0.90
+# A model chance only counts this far above the book's implied chance.
+DESK_PRICE_PULL = 0.12
+# A catch line this short flips on one reception, so it has to be clearly
+# better than a yardage line before it becomes the game's pick.
+DESK_SHORT_RECEPTION = 3.5
+DESK_SHORT_PENALTY = 0.06
 
 
 def attach_team_spreads(
@@ -51,7 +58,7 @@ def attach_team_spreads(
         row["team_spread"] = float(home_line) if team_id == home_team else -float(home_line)
 
 
-DESK_CARD_PREFIX = "prop-desk-card-v1:"
+DESK_CARD_PREFIX = "prop-desk-card-v3:"
 
 
 def desk_card_key(date: str, league: str) -> str:
@@ -130,7 +137,7 @@ def load_desk_props(session, league: str, date: str) -> list[dict[str, Any]]:
 
 
 def select_desk_props(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The best counting prop in each game.
+    """One counting prop per game.
 
     The strongest chance under 90%. A touchdown row stays off.
     """
@@ -144,13 +151,16 @@ def select_desk_props(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         prior = best.get(game_id)
         if prior is None or _desk_rank(row) > _desk_rank(prior):
             best[game_id] = row
-    chosen = list(best.values())
+    chosen = [_same_player_yardage(rows, row) for row in best.values()]
     chosen.sort(key=lambda row: (str(row.get("kickoff_utc") or ""), str(row.get("player_name") or "")))
     return chosen
 
 
 def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None = None, *, now: datetime | None = None) -> list[dict[str, Any]]:
-    """Return the published prop calls. ``game_ids`` limits the slate to games still open."""
+    """Return the published prop calls. One game gets one pick, the best qualifying prop.
+
+    ``game_ids`` limits the slate to games still open.
+    """
     allowed = None if game_ids is None else {str(gid) for gid in game_ids}
     pools: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for row in rows:
@@ -167,9 +177,16 @@ def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None 
         chosen = min(group, key=_line_rank)
         by_market.setdefault((game_id, market_id), []).append(chosen)
 
-    picks: list[dict[str, Any]] = []
-    for (game_id, market_id), group in by_market.items():
+    best_for_game: dict[str, tuple[tuple[float, str], dict[str, Any]]] = {}
+    for (game_id, _market_id), group in by_market.items():
         winner = max(group, key=lambda row: (desk_pick_score(row)["total"], str(row.get("player_name") or "")))
+        rank = (desk_pick_score(winner)["total"], str(winner.get("player_name") or ""))
+        prior = best_for_game.get(game_id)
+        if prior is None or rank > prior[0]:
+            best_for_game[game_id] = (rank, winner)
+
+    picks: list[dict[str, Any]] = []
+    for _game_id, (_rank, winner) in best_for_game.items():
         pick = _public_pick(winner, price_ahead=False, stale=False)
         pick.update(outcome_id=winner.get("outcome_id"), player_id=winner.get("player_id"),
                     bookmaker=winner.get("bookmaker"), qualification=assess(winner, now),
@@ -181,11 +198,51 @@ def build_game_prop_picks(rows: list[dict[str, Any]], game_ids: set[str] | None 
     return picks
 
 
-def _desk_rank(row: dict[str, Any]) -> tuple[int, float]:
+def _short_reception(row: dict[str, Any]) -> bool:
+    line = row.get("line")
+    return str(row.get("market_id") or "") == "receptions" and line is not None and float(line) <= DESK_SHORT_RECEPTION
+
+
+def _same_player_yardage(rows: list[dict[str, Any]], chosen: dict[str, Any]) -> dict[str, Any]:
+    """A catch line of 3.5 or shorter gives way to that player's yardage line."""
+    if not _short_reception(chosen):
+        return chosen
+    player = str(chosen.get("player_id") or "")
+    game = str(chosen.get("game_id") or "")
+    yardage = [
+        row
+        for row in rows
+        if _desk_prop(row)
+        and str(row.get("game_id") or "") == game
+        and str(row.get("player_id") or "") == player
+        and str(row.get("market_id") or "") in {"receiving_yards", "rushing_yards"}
+    ]
+    if not yardage:
+        return chosen
+    return max(yardage, key=_desk_rank)
+
+
+def _desk_rank(row: dict[str, Any]) -> tuple[int, float, float]:
     chance = _p(row)
-    if chance <= DESK_MAX_P:
-        return (1, chance)
-    return (0, -chance)
+    if chance > DESK_MAX_P:
+        return (0, -chance, 0.0)
+    return (1, _desk_support(row), chance)
+
+
+def _desk_support(row: dict[str, Any]) -> float:
+    """How much of the model chance the posted price also supports."""
+    chance = _p(row)
+    implied = american_to_implied(int(row["book_price"]))
+    support = min(chance, implied + DESK_PRICE_PULL)
+    line = row.get("line")
+    short_reception = (
+        str(row.get("market_id") or "") == "receptions"
+        and line is not None
+        and float(line) <= DESK_SHORT_RECEPTION
+    )
+    if short_reception:
+        support -= DESK_SHORT_PENALTY
+    return support
 
 
 def _desk_prop(row: dict[str, Any]) -> bool:

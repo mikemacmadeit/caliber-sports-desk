@@ -49,8 +49,8 @@ export default async function DataQualityPage() {
   if (!data) {
     return (
       <div className="space-y-8">
-        <PageHeader kicker="Gates stay closed until the proof" title="Model health" lede="The health report is temporarily unavailable." />
-        <p className="text-sm text-mute">Refresh in a moment. The desk, the spreads, and the props are on their own pages.</p>
+        <PageHeader kicker="Gates stay closed until the proof" title="Model health" lede="The lab is open to a subscribed account." />
+        <p className="text-sm text-mute">Log in with an active plan, or refresh if the report is only slow.</p>
       </div>
     );
   }

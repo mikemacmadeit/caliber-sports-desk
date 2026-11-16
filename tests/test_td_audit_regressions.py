@@ -116,7 +116,8 @@ def test_anytime_identity_can_be_scored_without_a_legacy_forecast(db):
     from test_publication_pipeline import seed
     from spe.db.models import Player, Market, Outcome
     from app.queries import prop_row
-    seed(db)
+    game = seed(db)
+    game.kickoff_utc = datetime.now(UTC) + timedelta(hours=2)
     db.add(Player(player_id='p', name='New starter', position_group='RB', position='RB'))
     db.add(Market(market_id='anytime_td', sport='football', market_type='player_yesno', period='game', stat='td', grading_rule='yes'))
     db.flush()

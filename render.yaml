@@ -20,7 +20,9 @@ services:
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
+    autoDeployTrigger: checksPass
     healthCheckPath: /health
+    preDeployCommand: python -m alembic -c infra/alembic.ini upgrade head
     envVars:
       - key: APP_ENV
         value: prod
@@ -31,6 +33,8 @@ services:
       - key: PARQUET_DIR
         value: /data/parquet
       - key: WEB_ORIGIN
+        sync: false
+      - key: AUTH_PROXY_SECRET
         sync: false
       - key: ODDS_API_KEY
         sync: false
@@ -45,6 +49,16 @@ services:
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
       - key: STRIPE_PRICE_ID
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
         sync: false
       - key: PYTHONPATH
         value: /app/packages/core:/app/services/api:/app/services/worker

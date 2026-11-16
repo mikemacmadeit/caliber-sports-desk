@@ -10,7 +10,8 @@ from spe.config import settings
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-config.set_main_option("sqlalchemy.url", settings.database_url)
+from spe.db.session import _normalize_database_url
+config.set_main_option("sqlalchemy.url", _normalize_database_url(settings.database_url).replace("%", "%%"))
 target_metadata = Base.metadata
 
 

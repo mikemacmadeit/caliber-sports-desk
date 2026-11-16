@@ -1,12 +1,16 @@
 {
   "name": "caliber",
   "private": true,
-  "description": "Caliber monorepo — NFL and FBS calibrated probability engine",
+  "description": "Caliber monorepo - NFL and FBS calibrated probability engine",
   "workspaces": [
     "apps/web"
   ],
   "scripts": {
     "web": "npm run dev -w web",
-    "web:build": "npm run build -w web"
+    "web:build": "npm run build -w web",
+    "web:typecheck": "tsc --noEmit -p apps/web/tsconfig.json"
+  },
+  "overrides": {
+    "postcss": "8.5.33"
   }
 }

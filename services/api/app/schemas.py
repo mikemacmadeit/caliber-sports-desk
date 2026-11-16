@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, FiniteFloat, field_validator
 
 
 class DisclaimerMixin(BaseModel):
@@ -93,11 +93,18 @@ class PlayerForecast(DisclaimerMixin):
 
 
 class SimulationCreate(BaseModel):
-    game_id: str
+    game_id: str = Field(min_length=1, max_length=160)
     as_of: datetime | None = None
-    scenario_overrides: dict[str, Any] = Field(default_factory=dict)
-    draw_count: int = 10_000
-    seed: int = 42
+    scenario_overrides: dict[str, FiniteFloat] = Field(default_factory=dict)
+    draw_count: int = Field(default=10_000, ge=1000, le=50_000)
+    seed: int = Field(default=42, ge=0, le=2**32-1)
+
+    @field_validator("scenario_overrides")
+    @classmethod
+    def supported_overrides(cls, values):
+        if any(k not in {"home_points", "away_points"} or not 1 <= v <= 75 for k, v in values.items()):
+            raise ValueError("Only home_points and away_points between 1 and 75 are supported")
+        return values
 
 
 class ParlayLeg(BaseModel):

@@ -2,10 +2,20 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from spe.db.base import Base, ProvenanceMixin, new_id, utcnow
+
+
+class InputArtifact(Base):
+    """Versioned, compressed inputs shared by independent ingestion/model workers."""
+    __tablename__ = "input_artifacts"
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    byte_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class Sport(Base):
@@ -974,7 +984,7 @@ class DeskDecision(Base):
 
 
 class PublishedPick(Base):
-    """First qualifying selection per game/market. Never updated after publication."""
+    """First qualifying selection per game. Never updated after publication."""
     __tablename__ = "published_picks"
     pick_id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
     game_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -1019,6 +1029,16 @@ class AccountUser(Base):
     subscription_status: Mapped[str] = mapped_column(String(32), nullable=False, default="none")
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class WatchlistEntry(Base):
+    __tablename__ = "watchlist_entries"
+    user_id: Mapped[str] = mapped_column(ForeignKey("account_users.user_id"), primary_key=True)
+    selection_id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
 class AuthSession(Base):
@@ -1027,3 +1047,51 @@ class AuthSession(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("account_users.user_id"), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+    token_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("account_users.user_id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AuthRateLimit(Base):
+    """Shared fixed-window counters; identifiers are hashes, never raw emails/IPs."""
+    __tablename__ = "auth_rate_limits"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class EmailVerification(Base):
+    __tablename__ = "email_verifications"
+    token_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("account_users.user_id"), nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class BillingEvent(Base):
+    __tablename__ = "billing_events"
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class BillingCursor(Base):
+    __tablename__ = "billing_cursors"
+    user_id: Mapped[str] = mapped_column(ForeignKey("account_users.user_id"), primary_key=True)
+    event_created: Mapped[int] = mapped_column(Integer, nullable=False)
+    terminal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class PublishedCorrection(Base):
+    """Append-only correction of an official result. Original selections/results remain intact."""
+    __tablename__ = "published_corrections"
+    correction_id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
+    pick_id: Mapped[str] = mapped_column(ForeignKey("published_picks.pick_id"), nullable=False, index=True)
+    result: Mapped[str] = mapped_column(String(16), nullable=False)
+    actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    units: Mapped[float] = mapped_column(Float, nullable=False)
+    settled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    evidence: Mapped[dict] = mapped_column(JSON, nullable=False)

@@ -66,10 +66,16 @@ def load_replay_model(date, league):
 
 def grade(db, game, player):
     """A touchdown already on the live box shows green. A miss waits until the final."""
+    if str(game.status or "") in {"canceled", "cancelled"}:
+        return "void"
     official = db.get(PublishedStat, f"{game.game_id}|{player}|anytime_td")
     source = str(official.source or "") if official is not None else ""
+    if source in {"espn.summary.participation_unconfirmed", "espn.summary.absent"}:
+        return "awaiting_box" if str(game.status or "") in {"final", "post"} else "pending"
+    if source == "espn.summary.confirmed_inactive":
+        return "void"
     scored_live = official is not None and (official.actual or 0) > 0 and source.startswith("espn.")
-    if str(game.status or "") != "final":
+    if str(game.status or "") not in {"final", "post"}:
         if scored_live:
             return "scored"
         return "pending"
@@ -100,12 +106,12 @@ def saved_day_card(db, date, league="all", *, now=None):
         return None
     saved = getter(BoardSnapshot, day_card_key(date, league))
     payload = saved.payload if saved is not None else None
-    if not payload or not payload.get("rows"):
+    if not isinstance(payload, dict) or "rows" not in payload:
         return None
-    card = {**payload, "rows": [{**row} for row in payload["rows"]]}
+    from copy import deepcopy
+    card = deepcopy(payload)
+    card["updated_at"] = as_utc(saved.updated_at).isoformat() if getattr(saved, "updated_at", None) else None
     _refresh_card_grades(db, card)
-    saved.payload = card
-    saved.updated_at = datetime.now(UTC)
     return _withhold_current_absences(db, card, as_utc(now) or datetime.now(UTC))
 
 
@@ -167,20 +173,15 @@ def _refresh_card_grades(db, card) -> None:
             entry = decision.get(lane) or {}
             if not entry.get("player_id"):
                 continue
-            if lane == "value_candidate" and not (entry.get("research_selected") or entry.get("price_supported")):
-                continue
-            prior = {**(results.get(lane) or {})}
-            prior["result"] = grade(db, game, entry["player_id"])
-            results[lane] = prior
+            results[lane] = _lane_result(db, game, lane, entry)
         if results:
             row["decision_results"] = results
     card["wins"] = sum(row.get("result") == "scored" for row in card["rows"])
     card["losses"] = sum(row.get("result") == "blank" for row in card["rows"])
+    card["decision_record"] = _decision_record(card["rows"])
 
 
 def _store_day_card(db, payload) -> None:
-    if not payload.get("rows") and not payload.get('unavailable_games'):
-        return
     key = day_card_key(payload.get("date"), payload.get("league"))
     kept = {
         field: payload.get(field)
@@ -208,6 +209,18 @@ def _store_day_card(db, payload) -> None:
                 'games':len(rows)+len(missing), 'decision_record':_decision_record(rows),
                 'wins':sum(r.get('result')=='scored' for r in rows),
                 'losses':sum(r.get('result')=='blank' for r in rows)})
+
+
+def _lane_result(db, game, lane, entry):
+    result = grade(db, game, entry['player_id'])
+    if game.status not in {'final', 'post', 'canceled', 'cancelled'} and result != 'void':
+        result = 'pending'  # Live TD highlights are provisional, not settled wins.
+    qualified = bool(lane == 'value_candidate' and entry.get('price_supported'))
+    price = entry.get('american')
+    profit = None
+    if qualified and isinstance(price, (int, float)) and math.isfinite(price) and abs(price) >= 100 and result in ('scored', 'blank'):
+        profit = (price / 100 if price > 0 else 100 / abs(price)) if result == 'scored' else -1.
+    return {'result': result, 'hypothetical_unit_profit': profit, 'bet_qualified': qualified}
 
 
 def _decision_record(rows):
@@ -308,7 +321,7 @@ def _team_expected_to_score(row, floor):
     return isinstance(points, (int, float)) and math.isfinite(points) and points >= floor
 
 
-def replay_day(db, date, league="all", now=None, *, cached_only=False):
+def replay_day(db, date, league="all", now=None, *, cached_only=False, checkpoint=False, deadline=None, input_versions=None):
     now = as_utc(now) or datetime.now(UTC)
     revised = revised_policy_requested(date)
     start = datetime.fromisoformat(date).replace(tzinfo=ZONE)
@@ -330,291 +343,319 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
     players = {} if cached_only else {p.player_id: p for p in db.scalars(select(Player))}
     histories, models = {}, {}
     rows, unavailable = [], []
+    prior_card = saved_day_card(db, date, league, now=now) or {}
+    prior_rows = {r["game_id"]: r for r in prior_card.get("rows", [])}
+    processed = set()
     for game in sorted(games, key=lambda g: (g.kickoff_utc, g.game_id)):
-        lg = game.league_id
-        if lg not in models:
-            models[lg] = load_replay_model(date, lg)
-        kick = as_utc(game.kickoff_utc)
-        guarded_key = ("scorer-desk-v1:" if revised else "guarded-desk-v1:") + game.game_id
-        guarded_saved = db.get(BoardSnapshot, guarded_key)
-        if guarded_saved is None and kick <= now:
-            # Policy changes apply prospectively. Keep a previously captured
-            # pregame decision under either policy's key once its game starts.
-            alternate = ('guarded-desk-v1:' if revised else 'scorer-desk-v1:') + game.game_id
-            previous = db.get(BoardSnapshot, alternate)
-            if previous is not None and (previous.payload or {}).get('evaluated'):
-                guarded_key, guarded_saved = alternate, previous
-        prospective = kick > now or guarded_saved is not None
-        model = load_combined_model(lg) if prospective or revised else models[lg]
-        retrain = requested_retrain(date, lg)
-        reconstructed = bool(retrain and retrain.get('reconstruct_public_pregame'))
-        if retrain:
-            model = load_combined_model(lg, research_candidate=not retrain.get('use_validated_model', False), version=retrain['version'])
-            if model and model.get('artifact_sha256') != retrain['artifact_sha256']:
-                model = None
-            if model:
-                model = {**model, 'user_requested_experiment': True}
-            prospective = kick > now
-        cutoff = min(now, kick - timedelta(seconds=1))
-        if not model or cutoff < as_utc(model.get("validation_end", "1900-01-01")):
-            unavailable.append({"game_id": game.game_id, "reason": "No combined model available for this date."})
-            continue
-        cache_key = guarded_key if prospective else f"{CACHE_PREFIX}{game.game_id}:{model['artifact_sha256']}"
-        if revised and not prospective:
-            cache_key = f"scorer-replay-v1:{game.game_id}:{model['artifact_sha256']}"
-        if retrain:
-            cache_key = guarded_key if retrain.get('standing_local') or retrain.get('standing') else f"retrained-desk-v1:{game.game_id}:{model['artifact_sha256']}"
-        if reconstructed:
-            cache_key = f"corrected-inputs-v1:{game.game_id}:{model['artifact_sha256']}:{retrain.get('input_revision', 1)}"
-        saved = db.get(BoardSnapshot, cache_key)
-        chosen = (saved.payload or {}).get("row") if saved and (kick <= now or cached_only) else None
-        if cached_only and not (saved and (saved.payload or {}).get('evaluated')):
-            unavailable.append({'game_id':game.game_id, 'reason':'No saved pick for this model yet; update queued.'})
-            continue
-        if cached_only and chosen and kick > now:
-            # Saved probabilities can load without a full model run. A new out
-            # report or documented backup role still hides an unsafe old pick.
-            from spe.models.player_td.desk_evidence import current_context
-            from spe.models.player_td.scorer_eligibility import exclusions
-            tid = game.home_team_id if chosen.get('team') == chosen.get('home_abbr') else game.away_team_id
-            latest = current_context(db, game.game_id, chosen['player_id'], now,
-                team_id=canonical_team(tid, aliases))
-            stored_analysis = chosen.get('desk_analysis') or {}
-            stored_context = stored_analysis.get('current_context') or {}
-            check = {**chosen, 'desk_analysis':{**stored_analysis, 'current_context':{
-                **stored_context, **{k:v for k,v in latest.items() if k in ('availability','depth') and v is not None}}}}
-            blocked = exclusions(check)
-            if blocked:
-                unavailable.append({'game_id':game.game_id, 'reason':'Saved pick withheld pending replacement: '+'; '.join(blocked)})
-                continue
-            alternative = (chosen.get('decision') or {}).get('value_candidate')
-            if alternative:
-                alt_tid = game.home_team_id if alternative.get('team') == chosen.get('home_abbr') else game.away_team_id
-                alt_latest = current_context(db, game.game_id, alternative['player_id'], now,
-                    team_id=canonical_team(alt_tid, aliases))
-                inputs = alternative.get('eligibility_inputs') or {}
-                alt_context = {**inputs.get('current_context', {}),
-                    **{k:v for k,v in alt_latest.items() if k in ('availability','depth') and v is not None}}
-                alt_blocked = exclusions({'position':alternative.get('position'),
-                    'forecast':{'p_estimate':alternative['probability']},
-                    'desk_analysis':{'features':inputs.get('features',{}),'current_context':alt_context}})
-                if alt_blocked:
-                    chosen = {**chosen, 'decision':{**chosen['decision'], 'value_candidate':None,
-                        'alternative_status':'withheld_availability',
-                        'alternative_note':'The saved alternative no longer passes the playing-status checks; a replacement is being reviewed.'}}
-            if latest.get('availability'):
-                chosen = {**chosen, 'selection_warnings':list(dict.fromkeys([
-                    *chosen.get('selection_warnings', []),
-                    f"Latest availability check: {latest['availability']['status']} ({now.isoformat()})"]))}
-        if not cached_only and not (saved and kick <= now and (saved.payload or {}).get("evaluated")):
-            # Features always stop before this game's kickoff, even when grading finals.
-            season = cutoff.year if cutoff.month >= 7 else cutoff.year - 1
-            history_key = (lg, season, prospective, None if reconstructed else cutoff)
-            if history_key not in histories:
-                season_end = cutoff.replace(year=season+1, month=6, day=30)
-                loaded = load_history(db, lg, min(now, season_end), reconstructed=True) if reconstructed else load_history(db, lg, min(cutoff, season_end))
-                history = OpportunityHistory(prepare_history(loaded, aliases))
-                from spe.models.player_td.desk_evidence import load_evidence
-                history.evidence = load_evidence(lg, replay=not prospective)
-                histories[history_key] = (history, AllocationHistory(history))
-            history, allocator = histories[history_key]
-            context = context_for_game(db, game.game_id, cutoff, replay=kick <= now)
-            from sqlalchemy import or_
-            reports = db.scalars(select(InjuryEvent).where(InjuryEvent.game_id == game.game_id,
-                InjuryEvent.reported_at <= cutoff, or_(InjuryEvent.observed_at <= cutoff, InjuryEvent.provider == 'conference_public') if reconstructed else InjuryEvent.observed_at <= cutoff,
-                InjuryEvent.quality_status.notin_(("invalid", "quarantined"))).order_by(InjuryEvent.reported_at)).all()
-            from spe.models.player_td.availability_status import resolved_reports
-            status = {p: r['status'] for p,r in resolved_reports(reports).items()}
-            excluded = {p for p, s in status.items() if s in INACTIVE}
-            offers = {}
-            ticks = db.execute(select(Outcome.player_id, OddsTick).join(OddsTick, OddsTick.outcome_id == Outcome.outcome_id).where(
-                Outcome.game_id == game.game_id, Outcome.market_id == "anytime_td", OddsTick.is_live.is_(False),
-                OddsTick.captured_at <= cutoff, OddsTick.observed_at <= cutoff,
-                OddsTick.captured_at >= cutoff - timedelta(days=7),
-                OddsTick.quality_status.notin_(("invalid", "quarantined"))).order_by(OddsTick.captured_at)).all()
-            per_book = {}
-            for pid, tick in ticks:
-                if abs(tick.price_american) >= 100 and (not tick.source_at or as_utc(tick.source_at) <= cutoff):
-                    per_book[(pid, tick.bookmaker_id)] = tick
-            for (pid, _), tick in per_book.items():
-                if pid not in offers or american_to_implied(tick.price_american) < american_to_implied(offers[pid].price_american):
-                    offers[pid] = tick
-            candidates = []
-            personnel = None
-            if prospective and lg == 'nfl' and retrain and retrain.get('simulation', {}).get('weekly_context'):
-                from spe.models.player_td.weekly_context import capture_personnel
-                personnel = capture_personnel(db, game, cutoff)
-            from spe.models.player_td.scouting_report import capture_matchup, capture_personnel, model_fields, build_report
-            fitted_fields = model_fields(model)
-            for team_id, opponent_id, home in ((game.home_team_id, game.away_team_id, True), (game.away_team_id, game.home_team_id, False)):
-                team, opponent = canonical_team(team_id, aliases), canonical_team(opponent_id, aliases)
-                from spe.models.player_td.candidate_universe import team_candidates
-                from spe.models.player_td.desk_evidence import current_context
-                from spe.models.player_td.scorer_eligibility import exclusions
-                team_rows=list(team_candidates(history, allocator, team, opponent, cutoff, home))
-                supplements = {}
-                if lg == 'nfl':
-                    from spe.models.player_td.nflverse_context import supplemental_context
-                    supplements = supplemental_context(db, [r['player_id'] for r in team_rows], cutoff, team_id=team)
-                current_by_player={}
-                team_excluded=set(excluded)
-                for candidate in team_rows:
-                    pid=candidate['player_id']
-                    current_by_player[pid]=current_context(db,game.game_id,pid,cutoff,reconstructed=reconstructed,
-                        team_id=team,nfl_supplement=supplements.get(pid,{}))
-                    if exclusions({'position':candidate['position'],'forecast':{'p_estimate':.5},
-                        'desk_analysis':{'features':candidate['features'],'current_context':current_by_player[pid]}}):
-                        team_excluded.add(pid)
-                starters = [r['player_id'] for r in team_rows if r['position']=='QB' and r['player_id'] not in team_excluded
-                    and (current_by_player[r['player_id']].get('depth') or {}).get('rank')==1]
-                allocation_context = {**context, **({'starting_qb_id':starters[0]} if len(starters)==1 else {})}
-                research_model = None
-                if lg=='nfl' and prospective and not model.get('scoring_paths'):
-                    research_model=load_combined_model('nfl',research_candidate=True,version='desk_combined_v11')
-                allocation_model = {**model,'scoring_paths':research_model['scoring_paths']} if research_model and research_model.get('scoring_paths') else model
-                allocation = allocator.allocate(allocation_model, team, opponent, cutoff, home, team_excluded, market=allocation_context)
-                if not allocation:
+        import time
+        if deadline is not None and time.monotonic() >= deadline:
+            break
+        try:
+            with db.begin_nested():
+                lg = game.league_id
+                if lg not in models:
+                    models[lg] = load_replay_model(date, lg)
+                kick = as_utc(game.kickoff_utc)
+                guarded_key = ("scorer-desk-v1:" if revised else "guarded-desk-v1:") + game.game_id
+                guarded_saved = db.get(BoardSnapshot, guarded_key)
+                if guarded_saved is None and kick <= now:
+                    # Policy changes apply prospectively. Keep a previously captured
+                    # pregame decision under either policy's key once its game starts.
+                    alternate = ('guarded-desk-v1:' if revised else 'scorer-desk-v1:') + game.game_id
+                    previous = db.get(BoardSnapshot, alternate)
+                    if previous is not None and (previous.payload or {}).get('evaluated'):
+                        guarded_key, guarded_saved = alternate, previous
+                prospective = kick > now or guarded_saved is not None
+                model = load_combined_model(lg) if prospective or revised else models[lg]
+                retrain = requested_retrain(date, lg)
+                reconstructed = bool(retrain and retrain.get('reconstruct_public_pregame'))
+                if retrain:
+                    model = load_combined_model(lg, research_candidate=not retrain.get('use_validated_model', False), version=retrain['version'])
+                    if model and model.get('artifact_sha256') != retrain['artifact_sha256']:
+                        model = None
+                    if model:
+                        model = {**model, 'user_requested_experiment': True}
+                    prospective = kick > now
+                cutoff = min(now, kick - timedelta(seconds=1))
+                if not model or cutoff < as_utc(model.get("validation_end", "1900-01-01")):
+                    unavailable.append({"game_id": game.game_id, "reason": "No combined model available for this date."})
                     continue
-                scouting_inputs = capture_matchup(history, team, opponent, cutoff)
-                vacated_workload = capture_personnel(history, team, cutoff, status, players)
-                for candidate in team_rows:
-                    pid = candidate['player_id']
-                    if pid not in allocation['players']:
-                        continue
-                    player = players.get(pid)
-                    if not player or status.get(pid) in INACTIVE | ({"doubtful"} if revised else {"doubtful", "questionable", "uncertain"}):
-                        continue
-                    f = candidate['features']
-                    f.update(market_features(context, home, model.get("market_total_trained", True)))
-                    combined = combined_prediction(model, f, allocation, pid)
-                    if research_model and research_model.get('scoring_paths'):
-                        from spe.models.player_td.matchup_research import attach_unfitted_research
-                        combined=attach_unfitted_research(combined,allocation,pid,research_model['artifact_sha256'])
-                    qb = ((combined.get('scoring_paths') or {}).get('research') or {}).get('quarterback')
-                    if qb and players.get(qb.get('player_id')):
-                        qb['name'] = players[qb['player_id']].name
-                    from spe.models.player_td.desk_evidence import explanations, current_context
-                    evidence_reasons, evidence_risks = explanations(f)
-                    if reconstructed:
-                        evidence_risks.append('Reconstructed pregame research: uses prior-game boxes and officially published pre-kickoff reports collected later. Not information our system demonstrably held before kickoff.')
-                    if model.get('role_features'):
-                        evidence_reasons.append('Retrained role model uses the last two observed team games, workload shares and favored-team role interactions.')
-                    if model.get("user_requested_experiment") and not reconstructed:
-                        evidence_risks.append('User-requested retrained replay; original pregame record is separate.' if model.get('live_enabled') else "Experimental expanded model selected for this day's replay; it did not pass the historical validation gate.")
-                    quote = offers.get(pid)
-                    candidates.append({"game_id": game.game_id, "league_id": lg, "player_id": pid,
-                        "player_name": player.name, "position": candidate['position'],
-                        "outcome_id": f"replay:{game.game_id}:{pid}", "market_id": "anytime_td", "side": "yes", "line": None,
-                        "team": teams[team_id].abbreviation, "opponent": teams[opponent_id].abbreviation,
-                        "home_abbr": teams[game.home_team_id].abbreviation, "away_abbr": teams[game.away_team_id].abbreviation,
-                        "kickoff_utc": kick.isoformat(), "book_price": quote.price_american if quote else None,
-                        "bookmaker": quote.bookmaker_id if quote else None,
-                        "source_timestamp": as_utc(quote.captured_at).isoformat() if quote else None,
-                        "price_source_at": as_utc(quote.source_at).isoformat() if quote and quote.source_at else None,
-                        "market_context": context, "team_implied_points": context.get("home_implied_points" if home else "away_implied_points"),
-                        "forecast": {"p_estimate": combined["probability"], "model_version": model["version"] + "-" + lg + "-" + model["artifact_sha256"][:10],
-                            "research_only": True, "play_enabled": False, "prediction_as_of": now.isoformat(), "data_cutoff": cutoff.isoformat()},
-                        "desk_analysis": {"combination": combined, "combination_status": "active",
-                            "scouting_inputs": scouting_inputs, "vacated_workload": vacated_workload,
-                            "fitted_feature_names": fitted_fields,
-                            "market_total_active": bool(model.get('market_total_trained') or model.get('scorer_model',{}).get('uses_market_totals')),
-                            "features": f, "matchup_features_active": bool(model.get("rich_features")),
-                            "free_opportunities_active": bool(model.get("free_opportunities") or model.get('scorer_model') or model.get('player_matchups')),
-                            "player_matchups_active": bool(model.get('player_matchups')),
-                            "situational_features_active": bool(model.get("situational_features") or model.get('scorer_model')),
-                            "reasons": evidence_reasons, "risks": evidence_risks,
-                            "current_context": current_by_player[pid],
-                            "sources": ["Stored prior-game play-by-play", "Prior-game player box scores"] +
-                                (["SportsDataverse ESPN play-by-play"] if lg == 'fbs' and (f.get("rush_pbp_known") or f.get("target_pbp_known")) else []) +
-                                (["nflverse play-by-play"] if lg == 'nfl' and (f.get('pbp_games') or f.get('offense_evidence_known')) else []) +
-                                (["PFR snap counts via nflverse"] if lg == 'nfl' and f.get('snap_games') else []),
-                            "evidence_timing": "Revised historical plays; availability assumed 48 hours after prior games."},
-                        "retrospective": not prospective, "generated_at": now.isoformat()})
-            simulation_run = None
-            if personnel is not None:
-                for candidate in candidates:
-                    candidate['desk_analysis']['current_context']['personnel'] = personnel
-            if prospective and lg == 'nfl' and retrain and retrain.get('simulation'):
-                from spe.models.player_td.gameflow_stage import apply
-                candidates, simulation_run = apply(candidates, model, game, cutoff, retrain['simulation'])
-            if prospective or revised:
-                from spe.models.player_td.selection_safety import assess
-                for candidate in candidates:
-                    candidate['selection_safety']=assess(candidate,cutoff,bool(model.get('live_enabled')))
-            if prospective or model.get('decision_engine', '').startswith('scoring_case_'):
-                from spe.models.player_td.scoring_decision import choose
-                chosen = choose(candidates)
-            else:
-                chosen = select_game_scorer(candidates, value_aware=bool(model.get('player_matchups'))) if revised else select_replay_candidate(candidates)
-            if chosen:
-                chosen = {**chosen, 'desk_analysis': {**chosen['desk_analysis'],
-                    'scouting_report': build_report(chosen, candidates)}}
-            challenger = None
-            if now < kick:
-                from spe.models.player_td.scorer_shadow import compare
-                challenger = compare(candidates, chosen, model, cutoff)
-                if chosen and challenger:
-                    chosen = {**chosen, 'challenger_comparison':challenger}
-            from spe.models.player_td.pregame_candidates import save_candidates
-            save_candidates(db, game, candidates, chosen, now, model['artifact_sha256'], challenger,
-                            simulation=simulation_run)
-            from spe.models.player_td.selection_safety import POLICY_VERSION
-            payload = {"row": chosen, "evaluated": True, "selection_version": SELECTION_VERSION,
-                       "model_version": model['version'], "model_artifact_sha256": model['artifact_sha256'],
-                       "selection_blockers": sorted({b for c in candidates for b in (c.get('selection_safety') or {}).get('blockers',[])}),
-                       "game_id": game.game_id, "kickoff_utc": kick.isoformat(), "generated_at": now.isoformat()}
-            if prospective or revised:
-                payload['selection_version']=POLICY_VERSION
-            if revised:
-                payload['selection_version']=(chosen or {}).get('selection_version','highest_chance_scorer_v2')
-            if saved is None:
-                saved = BoardSnapshot(key=cache_key, payload=payload, updated_at=now)
-                db.add(saved)
-            else:
-                saved.payload, saved.updated_at = payload, now
-        if not chosen:
-            reason = "Pass: requires a priced scorer at 40%+, usable spread and total, team implied points of 21+, and sufficient role history."
-            if prospective or revised:
-                detail=(saved.payload or {}).get('selection_blockers',[]) if saved else payload.get('selection_blockers',[])
-                from spe.models.player_td.selection_safety import BLOCKER_LABELS
-                reason="Pass: no candidate meets the probability, price, availability and role requirements. " + '; '.join(BLOCKER_LABELS.get(b,b.replace('_',' ')) for b in detail)
-            unavailable.append({"game_id": game.game_id, "reason": reason})
-            continue
-        result = grade(db, game, chosen["player_id"])
-        from spe.models.player_td.scorer_readiness import readiness
-        analysis = chosen.get('desk_analysis') or {}
-        if not analysis.get('scouting_report'):
-            from spe.models.player_td.scouting_report import build_report
-            # Response-only explanation. Never alter a started game's snapshot
-            # or query later observations to fill gaps in its saved prediction.
-            analysis = {**analysis, 'scouting_report': build_report(chosen, frozen_inputs_only=True)}
-        else:
-            from spe.models.player_td.scouting_report import selection_context
-            analysis = {**analysis, 'scouting_report': selection_context(analysis['scouting_report'], chosen)}
-        if 'market_total_active' not in analysis:
-            version = chosen.get('forecast',{}).get('model_version','')
-            # These saved FBS artifacts were fitted before historical totals existed.
-            if lg == 'fbs' and any(version.startswith('desk_combined_v'+v+'-') for v in ('2','3','4','5','6')):
-                analysis = {**analysis, 'market_total_active':False}
-        decision_results = {}
-        if chosen.get('decision'):
-            for lane in ('most_likely', 'value_candidate'):
-                entry = chosen['decision'].get(lane)
-                # A merely interesting point estimate is not a recorded value bet.
-                if entry and (lane == 'most_likely' or entry.get('research_selected') or entry.get('price_supported')):
-                    lane_result = grade(db, game, entry['player_id'])
-                    price = entry.get('american')
-                    profit = None
-                    if lane == 'value_candidate' and entry.get('price_supported') and price and lane_result in ('scored', 'blank'):
-                        profit = (price/100 if price > 0 else 100/abs(price)) if lane_result == 'scored' else -1.
-                    decision_results[lane] = {'result': lane_result, 'hypothetical_unit_profit': profit,
-                        'bet_qualified':bool(lane=='value_candidate' and entry.get('price_supported'))}
-        rows.append({**chosen, "desk_analysis":analysis, "result": result, "game_status": game.status,
-                     **({'decision_results':decision_results} if decision_results else {}),
-                     "selection_readiness": readiness(chosen, as_utc(chosen.get('forecast',{}).get('data_cutoff')) or cutoff),
-                     "final_score": f"{game.away_score}–{game.home_score}" if game.status == "final" and game.away_score is not None and game.home_score is not None else None})
+                cache_key = guarded_key if prospective else f"{CACHE_PREFIX}{game.game_id}:{model['artifact_sha256']}"
+                if revised and not prospective:
+                    cache_key = f"scorer-replay-v1:{game.game_id}:{model['artifact_sha256']}"
+                if retrain:
+                    cache_key = guarded_key if retrain.get('standing_local') or retrain.get('standing') else f"retrained-desk-v1:{game.game_id}:{model['artifact_sha256']}"
+                if reconstructed:
+                    cache_key = f"corrected-inputs-v1:{game.game_id}:{model['artifact_sha256']}:{retrain.get('input_revision', 1)}"
+                saved = db.get(BoardSnapshot, cache_key)
+                reuse_recent = bool(checkpoint and saved and as_utc(saved.updated_at) > now-timedelta(minutes=15)
+                    and (saved.payload or {}).get('model_artifact_sha256') == model['artifact_sha256']
+                    and (saved.payload or {}).get('input_versions') == input_versions)
+                chosen = (saved.payload or {}).get("row") if saved and (kick <= now or cached_only or reuse_recent) else None
+                if cached_only and not (saved and (saved.payload or {}).get('evaluated')):
+                    unavailable.append({'game_id':game.game_id, 'reason':'No saved pick for this model yet; update queued.'})
+                    continue
+                if (cached_only or reuse_recent) and chosen and kick > now:
+                    # Saved probabilities can load without a full model run. A new out
+                    # report or documented backup role still hides an unsafe old pick.
+                    from spe.models.player_td.desk_evidence import current_context
+                    from spe.models.player_td.scorer_eligibility import exclusions
+                    tid = game.home_team_id if chosen.get('team') == chosen.get('home_abbr') else game.away_team_id
+                    latest = current_context(db, game.game_id, chosen['player_id'], now,
+                        team_id=canonical_team(tid, aliases))
+                    stored_analysis = chosen.get('desk_analysis') or {}
+                    stored_context = stored_analysis.get('current_context') or {}
+                    check = {**chosen, 'desk_analysis':{**stored_analysis, 'current_context':{
+                        **stored_context, **{k:v for k,v in latest.items() if k in ('availability','depth') and v is not None}}}}
+                    blocked = exclusions(check)
+                    if blocked:
+                        if cached_only:
+                            unavailable.append({'game_id':game.game_id, 'reason':'Saved pick withheld pending replacement: '+'; '.join(blocked)})
+                            continue
+                        reuse_recent = False
+                    alternative = (chosen.get('decision') or {}).get('value_candidate')
+                    if alternative:
+                        alt_tid = game.home_team_id if alternative.get('team') == chosen.get('home_abbr') else game.away_team_id
+                        alt_latest = current_context(db, game.game_id, alternative['player_id'], now,
+                            team_id=canonical_team(alt_tid, aliases))
+                        inputs = alternative.get('eligibility_inputs') or {}
+                        alt_context = {**inputs.get('current_context', {}),
+                            **{k:v for k,v in alt_latest.items() if k in ('availability','depth') and v is not None}}
+                        alt_blocked = exclusions({'position':alternative.get('position'),
+                            'forecast':{'p_estimate':alternative['probability']},
+                            'desk_analysis':{'features':inputs.get('features',{}),'current_context':alt_context}})
+                        if alt_blocked:
+                            reuse_recent = False
+                            chosen = {**chosen, 'decision':{**chosen['decision'], 'value_candidate':None,
+                                'alternative_status':'withheld_availability',
+                                'alternative_note':'The saved alternative no longer passes the playing-status checks; a replacement is being reviewed.'}}
+                    if latest.get('availability'):
+                        chosen = {**chosen, 'selection_warnings':list(dict.fromkeys([
+                            *chosen.get('selection_warnings', []),
+                            f"Latest availability check: {latest['availability']['status']} ({now.isoformat()})"]))}
+                if not cached_only and not reuse_recent and not (saved and kick <= now and (saved.payload or {}).get("evaluated")):
+                    # Features always stop before this game's kickoff, even when grading finals.
+                    season = cutoff.year if cutoff.month >= 7 else cutoff.year - 1
+                    history_key = (lg, season, prospective, None if reconstructed else cutoff)
+                    if history_key not in histories:
+                        season_end = cutoff.replace(year=season+1, month=6, day=30)
+                        loaded = load_history(db, lg, min(now, season_end), reconstructed=True) if reconstructed else load_history(db, lg, min(cutoff, season_end))
+                        history = OpportunityHistory(prepare_history(loaded, aliases))
+                        from spe.models.player_td.desk_evidence import load_evidence
+                        history.evidence = load_evidence(lg, replay=not prospective)
+                        histories[history_key] = (history, AllocationHistory(history))
+                    history, allocator = histories[history_key]
+                    context = context_for_game(db, game.game_id, cutoff, replay=kick <= now)
+                    from sqlalchemy import or_
+                    reports = db.scalars(select(InjuryEvent).where(InjuryEvent.game_id == game.game_id,
+                        InjuryEvent.reported_at <= cutoff, or_(InjuryEvent.observed_at <= cutoff, InjuryEvent.provider == 'conference_public') if reconstructed else InjuryEvent.observed_at <= cutoff,
+                        InjuryEvent.quality_status.notin_(("invalid", "quarantined"))).order_by(InjuryEvent.reported_at)).all()
+                    from spe.models.player_td.availability_status import resolved_reports
+                    status = {p: r['status'] for p,r in resolved_reports(reports).items()}
+                    excluded = {p for p, s in status.items() if s in INACTIVE}
+                    offers = {}
+                    ticks = db.execute(select(Outcome.player_id, OddsTick).join(OddsTick, OddsTick.outcome_id == Outcome.outcome_id).where(
+                        Outcome.game_id == game.game_id, Outcome.market_id == "anytime_td", OddsTick.is_live.is_(False),
+                        OddsTick.captured_at <= cutoff, OddsTick.observed_at <= cutoff,
+                        OddsTick.captured_at >= cutoff - timedelta(days=7),
+                        OddsTick.quality_status.notin_(("invalid", "quarantined"))).order_by(OddsTick.captured_at)).all()
+                    per_book = {}
+                    for pid, tick in ticks:
+                        if abs(tick.price_american) >= 100 and (not tick.source_at or as_utc(tick.source_at) <= cutoff):
+                            per_book[(pid, tick.bookmaker_id)] = tick
+                    for (pid, _), tick in per_book.items():
+                        if pid not in offers or american_to_implied(tick.price_american) < american_to_implied(offers[pid].price_american):
+                            offers[pid] = tick
+                    candidates = []
+                    personnel = None
+                    if prospective and lg == 'nfl' and retrain and retrain.get('simulation', {}).get('weekly_context'):
+                        from spe.models.player_td.weekly_context import capture_personnel
+                        personnel = capture_personnel(db, game, cutoff)
+                    from spe.models.player_td.scouting_report import capture_matchup, capture_personnel, model_fields, build_report
+                    fitted_fields = model_fields(model)
+                    for team_id, opponent_id, home in ((game.home_team_id, game.away_team_id, True), (game.away_team_id, game.home_team_id, False)):
+                        team, opponent = canonical_team(team_id, aliases), canonical_team(opponent_id, aliases)
+                        from spe.models.player_td.candidate_universe import team_candidates
+                        from spe.models.player_td.desk_evidence import current_context
+                        from spe.models.player_td.scorer_eligibility import exclusions
+                        team_rows=list(team_candidates(history, allocator, team, opponent, cutoff, home))
+                        supplements = {}
+                        if lg == 'nfl':
+                            from spe.models.player_td.nflverse_context import supplemental_context
+                            supplements = supplemental_context(db, [r['player_id'] for r in team_rows], cutoff, team_id=team)
+                        current_by_player={}
+                        team_excluded=set(excluded)
+                        for candidate in team_rows:
+                            pid=candidate['player_id']
+                            current_by_player[pid]=current_context(db,game.game_id,pid,cutoff,reconstructed=reconstructed,
+                                team_id=team,nfl_supplement=supplements.get(pid,{}))
+                            if exclusions({'position':candidate['position'],'forecast':{'p_estimate':.5},
+                                'desk_analysis':{'features':candidate['features'],'current_context':current_by_player[pid]}}):
+                                team_excluded.add(pid)
+                        starters = [r['player_id'] for r in team_rows if r['position']=='QB' and r['player_id'] not in team_excluded
+                            and (current_by_player[r['player_id']].get('depth') or {}).get('rank')==1]
+                        allocation_context = {**context, **({'starting_qb_id':starters[0]} if len(starters)==1 else {})}
+                        research_model = None
+                        if lg=='nfl' and prospective and not model.get('scoring_paths'):
+                            research_model=load_combined_model('nfl',research_candidate=True,version='desk_combined_v11')
+                        allocation_model = {**model,'scoring_paths':research_model['scoring_paths']} if research_model and research_model.get('scoring_paths') else model
+                        allocation = allocator.allocate(allocation_model, team, opponent, cutoff, home, team_excluded, market=allocation_context)
+                        if not allocation:
+                            continue
+                        scouting_inputs = capture_matchup(history, team, opponent, cutoff)
+                        vacated_workload = capture_personnel(history, team, cutoff, status, players)
+                        for candidate in team_rows:
+                            pid = candidate['player_id']
+                            if pid not in allocation['players']:
+                                continue
+                            player = players.get(pid)
+                            if not player or status.get(pid) in INACTIVE | ({"doubtful"} if revised else {"doubtful", "questionable", "uncertain"}):
+                                continue
+                            f = candidate['features']
+                            f.update(market_features(context, home, model.get("market_total_trained", True)))
+                            combined = combined_prediction(model, f, allocation, pid)
+                            if research_model and research_model.get('scoring_paths'):
+                                from spe.models.player_td.matchup_research import attach_unfitted_research
+                                combined=attach_unfitted_research(combined,allocation,pid,research_model['artifact_sha256'])
+                            qb = ((combined.get('scoring_paths') or {}).get('research') or {}).get('quarterback')
+                            if qb and players.get(qb.get('player_id')):
+                                qb['name'] = players[qb['player_id']].name
+                            from spe.models.player_td.desk_evidence import explanations, current_context
+                            evidence_reasons, evidence_risks = explanations(f)
+                            if reconstructed:
+                                evidence_risks.append('Reconstructed pregame research: uses prior-game boxes and officially published pre-kickoff reports collected later. Not information our system demonstrably held before kickoff.')
+                            if model.get('role_features'):
+                                evidence_reasons.append('Retrained role model uses the last two observed team games, workload shares and favored-team role interactions.')
+                            if model.get("user_requested_experiment") and not reconstructed:
+                                evidence_risks.append('User-requested retrained replay; original pregame record is separate.' if model.get('live_enabled') else "Experimental expanded model selected for this day's replay; it did not pass the historical validation gate.")
+                            quote = offers.get(pid)
+                            candidates.append({"game_id": game.game_id, "league_id": lg, "player_id": pid,
+                                "player_name": player.name, "position": candidate['position'],
+                                "outcome_id": f"replay:{game.game_id}:{pid}", "market_id": "anytime_td", "side": "yes", "line": None,
+                                "team": teams[team_id].abbreviation, "opponent": teams[opponent_id].abbreviation,
+                                "home_abbr": teams[game.home_team_id].abbreviation, "away_abbr": teams[game.away_team_id].abbreviation,
+                                "kickoff_utc": kick.isoformat(), "book_price": quote.price_american if quote else None,
+                                "bookmaker": quote.bookmaker_id if quote else None,
+                                "source_timestamp": as_utc(quote.captured_at).isoformat() if quote else None,
+                                "price_source_at": as_utc(quote.source_at).isoformat() if quote and quote.source_at else None,
+                                "market_context": context, "team_implied_points": context.get("home_implied_points" if home else "away_implied_points"),
+                                "forecast": {"p_estimate": combined["probability"], "model_version": model["version"] + "-" + lg + "-" + model["artifact_sha256"][:10],
+                                    "research_only": True, "play_enabled": False, "prediction_as_of": now.isoformat(), "data_cutoff": cutoff.isoformat()},
+                                "desk_analysis": {"combination": combined, "combination_status": "active",
+                                    "scouting_inputs": scouting_inputs, "vacated_workload": vacated_workload,
+                                    "fitted_feature_names": fitted_fields,
+                                    "market_total_active": bool(model.get('market_total_trained') or model.get('scorer_model',{}).get('uses_market_totals')),
+                                    "features": f, "matchup_features_active": bool(model.get("rich_features")),
+                                    "free_opportunities_active": bool(model.get("free_opportunities") or model.get('scorer_model') or model.get('player_matchups')),
+                                    "player_matchups_active": bool(model.get('player_matchups')),
+                                    "situational_features_active": bool(model.get("situational_features") or model.get('scorer_model')),
+                                    "reasons": evidence_reasons, "risks": evidence_risks,
+                                    "current_context": current_by_player[pid],
+                                    "sources": ["Stored prior-game play-by-play", "Prior-game player box scores"] +
+                                        (["SportsDataverse ESPN play-by-play"] if lg == 'fbs' and (f.get("rush_pbp_known") or f.get("target_pbp_known")) else []) +
+                                        (["nflverse play-by-play"] if lg == 'nfl' and (f.get('pbp_games') or f.get('offense_evidence_known')) else []) +
+                                        (["PFR snap counts via nflverse"] if lg == 'nfl' and f.get('snap_games') else []),
+                                    "evidence_timing": "Revised historical plays; availability assumed 48 hours after prior games."},
+                                "retrospective": not prospective, "generated_at": now.isoformat()})
+                    simulation_run = None
+                    if personnel is not None:
+                        for candidate in candidates:
+                            candidate['desk_analysis']['current_context']['personnel'] = personnel
+                    if prospective and lg == 'nfl' and retrain and retrain.get('simulation'):
+                        from spe.models.player_td.gameflow_stage import apply
+                        candidates, simulation_run = apply(candidates, model, game, cutoff, retrain['simulation'])
+                    if prospective or revised:
+                        from spe.models.player_td.selection_safety import assess
+                        for candidate in candidates:
+                            candidate['selection_safety']=assess(candidate,cutoff,bool(model.get('live_enabled')))
+                    if prospective or model.get('decision_engine', '').startswith('scoring_case_'):
+                        from spe.models.player_td.scoring_decision import choose
+                        chosen = choose(candidates)
+                    else:
+                        chosen = select_game_scorer(candidates, value_aware=bool(model.get('player_matchups'))) if revised else select_replay_candidate(candidates)
+                    if chosen:
+                        chosen = {**chosen, 'desk_analysis': {**chosen['desk_analysis'],
+                            'scouting_report': build_report(chosen, candidates)}}
+                    challenger = None
+                    if now < kick:
+                        from spe.models.player_td.scorer_shadow import compare
+                        challenger = compare(candidates, chosen, model, cutoff)
+                        if chosen and challenger:
+                            chosen = {**chosen, 'challenger_comparison':challenger}
+                    from spe.models.player_td.pregame_candidates import save_candidates
+                    save_candidates(db, game, candidates, chosen, now, model['artifact_sha256'], challenger,
+                                    simulation=simulation_run)
+                    from spe.models.player_td.selection_safety import POLICY_VERSION
+                    payload = {"row": chosen, "evaluated": True, "selection_version": SELECTION_VERSION,
+                               "input_versions": input_versions,
+                               "model_version": model['version'], "model_artifact_sha256": model['artifact_sha256'],
+                               "selection_blockers": sorted({b for c in candidates for b in (c.get('selection_safety') or {}).get('blockers',[])}),
+                               "game_id": game.game_id, "kickoff_utc": kick.isoformat(), "generated_at": now.isoformat()}
+                    if prospective or revised:
+                        payload['selection_version']=POLICY_VERSION
+                    if revised:
+                        payload['selection_version']=(chosen or {}).get('selection_version','highest_chance_scorer_v2')
+                    if saved is None:
+                        saved = BoardSnapshot(key=cache_key, payload=payload, updated_at=now)
+                        db.add(saved)
+                    else:
+                        saved.payload, saved.updated_at = payload, now
+                if not chosen:
+                    reason = "Pass: requires a priced scorer at 40%+, usable spread and total, team implied points of 21+, and sufficient role history."
+                    if prospective or revised:
+                        detail=(saved.payload or {}).get('selection_blockers',[]) if saved else payload.get('selection_blockers',[])
+                        from spe.models.player_td.selection_safety import BLOCKER_LABELS
+                        reason="Pass: no candidate meets the probability, price, availability and role requirements. " + '; '.join(BLOCKER_LABELS.get(b,b.replace('_',' ')) for b in detail)
+                    unavailable.append({"game_id": game.game_id, "reason": reason})
+                    continue
+                result = grade(db, game, chosen["player_id"])
+                from spe.models.player_td.scorer_readiness import readiness
+                analysis = chosen.get('desk_analysis') or {}
+                if not analysis.get('scouting_report'):
+                    from spe.models.player_td.scouting_report import build_report
+                    # Response-only explanation. Never alter a started game's snapshot
+                    # or query later observations to fill gaps in its saved prediction.
+                    analysis = {**analysis, 'scouting_report': build_report(chosen, frozen_inputs_only=True)}
+                else:
+                    from spe.models.player_td.scouting_report import selection_context
+                    analysis = {**analysis, 'scouting_report': selection_context(analysis['scouting_report'], chosen)}
+                if 'market_total_active' not in analysis:
+                    version = chosen.get('forecast',{}).get('model_version','')
+                    # These saved FBS artifacts were fitted before historical totals existed.
+                    if lg == 'fbs' and any(version.startswith('desk_combined_v'+v+'-') for v in ('2','3','4','5','6')):
+                        analysis = {**analysis, 'market_total_active':False}
+                decision_results = {}
+                if chosen.get('decision'):
+                    for lane in ('most_likely', 'value_candidate'):
+                        entry = chosen['decision'].get(lane)
+                        # Every named alternative is a scorer pick; only qualified prices enter returns.
+                        if entry and entry.get('player_id'):
+                            decision_results[lane] = _lane_result(db, game, lane, entry)
+                rows.append({**chosen, "desk_analysis":analysis, "result": result, "game_status": game.status,
+                             **({'decision_results':decision_results} if decision_results else {}),
+                             "selection_readiness": readiness(chosen, as_utc(chosen.get('forecast',{}).get('data_cutoff')) or cutoff),
+                             "final_score": f"{game.away_score}–{game.home_score}" if game.status == "final" and game.away_score is not None and game.home_score is not None else None})
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("TD game unavailable: %s %s", game.game_id, type(exc).__name__)
+            previous = prior_rows.get(game.game_id)
+            if previous and as_utc(game.kickoff_utc) <= now and not any(r["game_id"] == game.game_id for r in rows):
+                rows.append({**previous, "update_failed": True})
+            unavailable.append({"game_id": game.game_id, "reason": "Player research update failed; retry scheduled.", "status": "failed"})
+        finally:
+            processed.add(game.game_id)
+            if checkpoint:
+                _checkpoint_day(db, date, league, rows, unavailable, prior_rows, games, processed)
+                db.commit()
+    pending_games = [g for g in games if g.game_id not in processed]
+    if pending_games:
+        known = {r['game_id'] for r in rows}
+        rows.extend(r for gid, r in prior_rows.items() if gid not in processed and gid not in known)
+        unavailable.extend({'game_id':g.game_id, 'reason':'Update queued; completed games are saved.', 'status':'queued'}
+                           for g in pending_games if g.game_id not in prior_rows)
     decision_record = _decision_record(rows)
     payload = {"date": date, "league": league, "rows": rows, "unavailable_games": unavailable,
+            "refresh_complete": not pending_games,
             "decision_record": decision_record,
             "selection_version": "highest_chance_scorer_v2" if revised else SELECTION_VERSION,
             "games": len(games), "retrospective": True,
@@ -622,3 +663,17 @@ def replay_day(db, date, league="all", now=None, *, cached_only=False):
             "note": "Combined-model replay using prior-game inputs and recorded pregame prices. Recomputed picks are not the original pregame record."}
     _store_day_card(db, payload)
     return payload
+
+
+def _checkpoint_day(db, date, league, rows, unavailable, prior_rows, games, processed):
+    """A stopped job retains completed work and existing selections for queued games."""
+    kept = list(rows) + [r for gid, r in prior_rows.items() if gid not in processed]
+    queued = [{'game_id':g.game_id, 'reason':'Update queued; completed games are saved.', 'status':'queued'}
+              for g in games if g.game_id not in processed and g.game_id not in prior_rows]
+    _store_day_card(db, {'date':date, 'league':league, 'rows':kept,
+        'unavailable_games':list(unavailable)+queued, 'games':len(games),
+        'selection_version':SELECTION_VERSION, 'retrospective':False,
+        'decision_record':_decision_record(kept),
+        'wins':sum(r.get('result')=='scored' for r in kept),
+        'losses':sum(r.get('result')=='blank' for r in kept),
+        'note':'Saved picks. A refresh preserves completed work and original started-game selections.'})

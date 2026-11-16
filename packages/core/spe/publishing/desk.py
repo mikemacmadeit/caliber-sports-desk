@@ -162,12 +162,16 @@ def build(rows, *, now=None, book=None, market=None, search=None, saved=None, of
             "price_not_verified_recently" not in r["qualification"]["reasons"],
             american_to_decimal(int(r["book_price"])) if finite(r.get("book_price")) is not None and abs(float(r["book_price"])) >= 100 else 0,
         ))
-        cards.append(card(selected, now))
+        # Rank light records first. Build explanations/offers only for this page.
+        cards.append({"id": selection_key(selected), "qualification": selected["qualification"],
+            "conservative_ev": finite((selected.get("forecast") or {}).get("ev_after_haircut")),
+            "kickoff": selected["kickoff_utc"], "_row": selected,
+            "changes": [c for c in selected.get("changes", []) if (not c.get("bookmaker") or c["bookmaker"] == selected.get("bookmaker")) and as_utc(c.get("at")) and now-timedelta(hours=24) < as_utc(c["at"]) <= now]})
     cards.sort(key=lambda c: (not c["qualification"]["eligible"], "price_not_verified_recently" in c["qualification"]["reasons"], -(c["conservative_ev"] if c["conservative_ev"] is not None else -100), str(c["kickoff"]), c["id"]))
     unique = {c["id"]: c for c in reversed(cards)}
     cards = sorted(unique.values(), key=lambda c: (not c["qualification"]["eligible"], "price_not_verified_recently" in c["qualification"]["reasons"], -(c["conservative_ev"] if c["conservative_ev"] is not None else -100), str(c["kickoff"]), c["id"]))
     reasons = Counter(r for c in cards for r in c["qualification"]["reasons"])
-    return {"rows": cards[offset:offset + limit], "total": len(cards), "offset": offset, "limit": limit,
+    return {"rows": [card(c["_row"], now) for c in cards[offset:offset + limit]], "total": len(cards), "offset": offset, "limit": limit,
             "market_counts": {key: len(keys) for key, keys in market_keys.items()},
             "books": sorted(available_books), "qualified": sum(c["qualification"]["eligible"] for c in cards),
             "changed": sum(bool(c["changes"]) for c in cards),

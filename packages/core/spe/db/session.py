@@ -41,7 +41,9 @@ def get_engine() -> Engine:
             _engine = create_engine(url, future=True, echo=False)
             _enable_sqlite_fk(_engine)
         else:
-            _engine = create_engine(url, future=True, echo=False, pool_pre_ping=True)
+            _engine = create_engine(url, future=True, echo=False, pool_pre_ping=True,
+                                    pool_size=2, max_overflow=1, pool_timeout=2,
+                                    connect_args={"connect_timeout": 2})
         _SessionLocal = sessionmaker(bind=_engine, autoflush=False, expire_on_commit=False)
     return _engine
 
@@ -81,6 +83,17 @@ def session_factory() -> Session:
 
 def init_db() -> None:
     get_engine()
+    if settings.app_env in {"prod", "production"}:
+        from sqlalchemy import text
+        with get_engine().connect() as conn:
+            try:
+                revision = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            except Exception as exc:
+                raise RuntimeError("Database migration required: run alembic -c infra/alembic.ini upgrade head before starting production.") from exc
+            if revision != "20261116_04":
+                raise RuntimeError("Database schema is not at the release revision.")
+        settings.parquet_dir.mkdir(parents=True, exist_ok=True)
+        return
     import spe.db.models  # noqa: F401
     from sqlalchemy.exc import OperationalError
 
@@ -96,5 +109,5 @@ def init_db() -> None:
             Base.metadata.create_all(bind=conn)
         ensure_schema(engine)
     except OperationalError:
-        pass
+        raise
     settings.parquet_dir.mkdir(parents=True, exist_ok=True)

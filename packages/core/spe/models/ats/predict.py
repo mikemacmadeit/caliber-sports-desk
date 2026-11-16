@@ -183,6 +183,81 @@ def record_wins(record: object) -> int | None:
     return int(head)
 
 
+# A quarterback's first NFL start. The team on `side` is faded on the moneyline and the spread.
+ROOKIE_QB_STARTS = (
+    {"date": "2026-11-15", "home": "Las Vegas Raiders", "away": "Seattle Seahawks", "side": "home"},
+    {"date": "2026-11-15", "home": "Arizona Cardinals", "away": "Los Angeles Rams", "side": "home"},
+)
+
+
+def rookie_qb_side(row: dict[str, Any]) -> str | None:
+    """The side making a first NFL start, if this game has one."""
+    marked = row.get("rookie_qb_start")
+    if marked in {"home", "away"}:
+        return str(marked)
+    kickoff = str(row.get("kickoff_utc") or "")[:10]
+    home = str(row.get("home_team") or "")
+    away = str(row.get("away_team") or "")
+    for debut in ROOKIE_QB_STARTS:
+        if debut["date"] == kickoff and debut["home"] == home and debut["away"] == away:
+            return str(debut["side"])
+    return None
+
+
+def apply_rookie_qb_fade(row: dict[str, Any]) -> dict[str, Any]:
+    """Take the opponent when a rookie quarterback is making his first start."""
+    debut = rookie_qb_side(row)
+    if debut not in {"home", "away"}:
+        return row
+    opponent = "away" if debut == "home" else "home"
+    home = str(row.get("home_team") or "Home")
+    away = str(row.get("away_team") or "Away")
+    handicap = _finite(row.get("home_handicap"))
+    if row.get("pick_market") != "withheld" and row.get("favored_side") == debut:
+        row["favored_side"] = opponent
+        row["pick_team"] = home if opponent == "home" else away
+        row["pick_label"] = f"{row['pick_team']} to win"
+        row["pick_line"] = None if handicap is None else (handicap if opponent == "home" else -handicap)
+        row["pick_basis"] = "rookie_qb"
+    if handicap is None or row.get("ats_side") == opponent:
+        return row
+    team = home if opponent == "home" else away
+    line = handicap if opponent == "home" else -handicap
+    row["ats_side"] = opponent
+    row["ats_team"] = team
+    row["ats_line"] = line
+    row["ats_pick_label"] = f"{team} {format_spread_line(line)}"
+    row["ats_basis"] = "rookie_qb"
+    row["ats_locked"] = False
+    return row
+
+
+SHORT_NUMBER = 3.5
+
+
+def apply_short_favorite(row: dict[str, Any]) -> dict[str, Any]:
+    """A dog on a number of 3.5 or less lays the points with the favorite instead."""
+    if row.get("ats_basis") == "rookie_qb":
+        return row
+    handicap = _finite(row.get("home_handicap"))
+    line = _finite(row.get("ats_line"))
+    side = row.get("ats_side")
+    if handicap is None or abs(handicap) > SHORT_NUMBER or line is None or line < 0 or side not in {"home", "away"}:
+        return row
+    opponent = "away" if side == "home" else "home"
+    home = str(row.get("home_team") or "Home")
+    away = str(row.get("away_team") or "Away")
+    team = home if opponent == "home" else away
+    laid = handicap if opponent == "home" else -handicap
+    row["ats_side"] = opponent
+    row["ats_team"] = team
+    row["ats_line"] = laid
+    row["ats_pick_label"] = f"{team} {format_spread_line(laid)}"
+    row["ats_basis"] = "short_number"
+    row["ats_locked"] = False
+    return row
+
+
 def lays_points_with_fewer_wins(row: dict[str, Any]) -> bool:
     """The named side is laying points and has fewer wins than the opponent."""
     line = _finite(row.get("ats_line"))
@@ -299,6 +374,7 @@ def apply_recorded_result(
 ) -> dict[str, Any]:
     """Grade both calls once the game has a recorded score."""
     _apply_saved_moneyline_record(row)
+    apply_rookie_qb_fade(row)
     if status and home_score is not None and away_score is not None and status.lower() in {"final", "in_progress"}:
         row["game_status"] = status.lower()
         row["home_score"] = int(home_score)
@@ -325,6 +401,20 @@ def _named_spread(row: dict[str, Any]) -> bool:
 
 def attach_spread_pick(row: dict[str, Any]) -> dict[str, Any]:
     """Add the cover side to a board row. The winner pick stays as it is."""
+    apply_rookie_qb_fade(row)
+    apply_short_favorite(row)
+    if row.get("ats_basis") in {"rookie_qb", "short_number"} and _named_spread(row):
+        if _game_has_started(row):
+            row["ats_locked"] = True
+        row["ats_pick_result"] = grade_displayed_pick(
+            status=row.get("game_status"),
+            home_score=row.get("home_score"),
+            away_score=row.get("away_score"),
+            pick_market="spread",
+            favored_side=row.get("ats_side"),
+            home_handicap=row.get("home_handicap"),
+        )
+        return row
     if _game_has_started(row) and (_named_spread(row) or row.get("ats_locked") is True) and not (
         row.get("ats_basis") == "number" and lays_points_with_fewer_wins(row)
     ):

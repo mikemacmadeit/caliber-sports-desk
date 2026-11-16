@@ -746,9 +746,12 @@ def _attach_prop_results(session: Session, rows: list[dict[str, Any]]) -> None:
             row["result"] = "pending"
             continue
         saved = published.get((row.get("game_id"), row.get("player_id"), row.get("market_id")))
-        if saved is not None and str(saved.source or "") == "espn.summary.absent":
+        if saved is not None and str(saved.source or "") == "espn.summary.confirmed_inactive":
             row["result"] = "void"
             row["actual"] = None
+            continue
+        if saved is not None and saved.source in {"espn.summary.absent", "espn.summary.participation_unconfirmed"}:
+            row["result"], row["actual"] = "pending", None
             continue
         actual = None if saved is None else saved.actual
         if actual is None:
@@ -757,8 +760,11 @@ def _attach_prop_results(session: Session, rows: list[dict[str, Any]]) -> None:
                 row["result"] = "pending"
                 continue
             market = row.get("market_id")
+            if stat.quality_status in {"invalid", "quarantined"} or (stat.quality_status == "espn_box_listed" and market != "anytime_td"):
+                row["result"], row["actual"] = "pending", None
+                continue
             if market == "anytime_td":
-                actual = float((stat.rush_td or 0) + (stat.rec_td or 0) + (stat.pass_td or 0))
+                actual = float((stat.rush_td or 0) + (stat.rec_td or 0))
             elif market == "receptions":
                 actual = float(stat.receptions or 0)
             elif market == "rushing_yards":
@@ -999,20 +1005,11 @@ def list_desk_calls(
 
 
 def _games_for_desk_takes(session: Session, league: str | None) -> list[Game]:
-    from sqlalchemy import text
-
-    ids = [
-        row[0]
-        for row in session.execute(
-            text(
-                """
-                SELECT DISTINCT game_id FROM shadow_predictions
-                WHERE market_id = 'anytime_td'
-                  AND json_extract(components, '$.desk_take') IS NOT NULL
-                """
-            )
-        )
-    ]
+    from spe.db.models import ShadowPrediction
+    ids = list(session.scalars(select(ShadowPrediction.game_id).where(
+        ShadowPrediction.market_id == "anytime_td",
+        ShadowPrediction.components["desk_take"].as_string().is_not(None),
+    ).distinct()))
     if not ids:
         return []
     stmt = (

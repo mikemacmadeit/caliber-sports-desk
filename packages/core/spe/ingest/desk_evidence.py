@@ -6,6 +6,7 @@ plays lack player IDs: that gap is reported, never filled with catches-as-target
 import argparse
 import json
 import sqlite3
+from decimal import Decimal
 from collections import defaultdict
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,38 +16,48 @@ from spe.models.player_td.desk_opportunity import canonical_team
 from spe.models.player_td.desk_evidence import weighted
 
 
+def _rows(db, sql):
+    if isinstance(db, sqlite3.Connection):
+        rows = db.execute(sql)
+    else:
+        from sqlalchemy import text
+        rows = db.execute(text(sql)).mappings()
+    for row in rows:
+        yield {k: v.isoformat() if hasattr(v, "isoformat") else float(v) if isinstance(v, Decimal) else v for k, v in dict(row).items()}
+
+
 def export(db, output):
-    aliases = canonical_team_map([SimpleNamespace(**{**dict(r), "aliases": json.loads(r["aliases"] or "[]")})
-        for r in db.execute("SELECT team_id,league_id,aliases FROM teams")])
-    db.execute("""CREATE TEMP VIEW valid_plays AS
+    aliases = canonical_team_map([SimpleNamespace(**{**dict(r), "aliases": json.loads(r["aliases"] or "[]") if isinstance(r["aliases"], str) else (r["aliases"] or [])})
+        for r in _rows(db, "SELECT team_id,league_id,aliases FROM teams")])
+    valid_plays = """WITH valid_plays AS (
       SELECT p.*,g.league_id,g.kickoff_utc FROM plays p JOIN games g USING(game_id)
       WHERE g.status='final' AND g.data_tier NOT IN ('alias','demo')
       AND g.kickoff_utc >= '2023-07-01' AND p.quality_status NOT IN ('invalid','quarantined')
       AND p.offense_id IN (g.home_team_id,g.away_team_id)
       AND p.defense_id IN (g.home_team_id,g.away_team_id) AND p.offense_id != p.defense_id
-      AND p.is_scrimmage=1 AND p.play_type NOT LIKE '%kneel%'
+      AND p.is_scrimmage IS TRUE AND p.play_type NOT LIKE '%kneel%'
       AND p.play_type NOT LIKE '%spike%' AND p.play_type NOT LIKE '%penalty%'
       AND p.play_type NOT LIKE '%two%point%' AND p.period <= 4
-    """)
+    ) """
     # Aggregated source provenance remains attached to every game.
     expressions = []
     for kind in ("pass", "rush"):
         expressions.extend([
-            f"avg(case when is_{kind}=1 then epa end) as {kind}_epa",
-            f"avg(case when is_{kind}=1 and epa is not null then epa>0 end) as {kind}_success",
-            f"avg(case when is_{kind}=1 then yards end) as {kind}_yards"])
+            f"avg(case when is_{kind} IS TRUE then epa end) as {kind}_epa",
+            f"avg(case when is_{kind} IS TRUE and epa is not null then case when epa>0 then 1.0 else 0.0 end end) as {kind}_success",
+            f"avg(case when is_{kind} IS TRUE then yards end) as {kind}_yards"])
     sql = """SELECT game_id,league_id,kickoff_utc,offense_id as team_id,defense_id as opponent_id,
         max(observed_at) as observed_at,count(*) as plays,
-        avg(case when is_pass=1 then yards>=20 else yards>=10 end) as explosive_rate,
-        avg(case when abs(score_before_off-score_before_def)<=7 and period<=3 then is_pass end) as neutral_pass_rate,
+        avg(case when is_pass IS TRUE and yards>=20 then 1.0 when is_rush IS TRUE and yards>=10 then 1.0 else 0.0 end) as explosive_rate,
+        avg(case when abs(score_before_off-score_before_def)<=7 and period<=3 then case when is_pass IS TRUE then 1.0 else 0.0 end end) as neutral_pass_rate,
         count(distinct case when yardline between 0 and 20 then drive_id end) as red_zone_drives,
-        1.0*sum(case when yardline between 0 and 20 and is_td=1 and is_turnover=0 then 1 else 0 end)/
+        1.0*sum(case when yardline between 0 and 20 and is_td IS TRUE and is_turnover IS FALSE then 1 else 0 end)/
           nullif(count(distinct case when yardline between 0 and 20 then drive_id end),0) as red_zone_td_rate,
-        avg(yardline between 0 and 100) as field_coverage,
-        avg(case when is_rush=1 then rusher_player_id is not null
-             when is_pass=1 and play_type not like '%sack%' then receiver_player_id is not null end) as identity_coverage,
-        """ + ",".join(expressions) + " FROM valid_plays GROUP BY game_id,offense_id ORDER BY kickoff_utc"
-    raw_teams = [dict(r) for r in db.execute(sql)]
+        avg(case when yardline between 0 and 100 then 1.0 else 0.0 end) as field_coverage,
+        avg(case when is_rush IS TRUE then case when rusher_player_id is not null then 1.0 else 0.0 end
+             when is_pass IS TRUE and play_type not like '%sack%' then case when receiver_player_id is not null then 1.0 else 0.0 end end) as identity_coverage,
+        """ + ",".join(expressions) + " FROM valid_plays GROUP BY game_id,league_id,kickoff_utc,offense_id,defense_id ORDER BY kickoff_utc"
+    raw_teams = list(_rows(db, valid_plays + sql))
     unique = {}
     for r in raw_teams:
         key = (r["kickoff_utc"][:10], canonical_team(r["team_id"], aliases), canonical_team(r["opponent_id"], aliases))
@@ -54,8 +65,8 @@ def export(db, output):
             unique[key] = r
     teams = sorted(unique.values(), key=lambda r:r["kickoff_utc"])
     # Pace uses consecutive offensive snaps in the same drive and quarter only.
-    pace = {(r["game_id"],r["team_id"]):r["pace"] for r in db.execute("""
-      WITH ordered AS (SELECT game_id,offense_id as team_id,period,drive_id,game_seconds_remaining,
+    pace = {(r["game_id"],r["team_id"]):r["pace"] for r in _rows(db, valid_plays + """
+      , ordered AS (SELECT game_id,offense_id as team_id,period,drive_id,game_seconds_remaining,
         lag(game_seconds_remaining) OVER(PARTITION BY game_id,offense_id,period,drive_id ORDER BY game_seconds_remaining DESC) as previous
         FROM valid_plays WHERE game_seconds_remaining IS NOT NULL AND drive_id IS NOT NULL)
       SELECT game_id,team_id,avg(previous-game_seconds_remaining) as pace FROM ordered
@@ -83,18 +94,18 @@ def export(db, output):
         by_defense[(season,r["opponent_id"])].append(r)
         team_index[(r["game_id"],r["team_id"])] = r
     players = []
-    for r0 in db.execute("""WITH touches AS (
+    for r0 in _rows(db, valid_plays + """, touches AS (
        SELECT game_id,league_id,kickoff_utc,offense_id as team_id,rusher_player_id as player_id,
-       observed_at,yardline,1 as carry,0 as target FROM valid_plays WHERE is_rush=1 AND rusher_player_id IS NOT NULL
+       observed_at,yardline,1 as carry,0 as target FROM valid_plays WHERE is_rush IS TRUE AND rusher_player_id IS NOT NULL
        UNION ALL
        SELECT game_id,league_id,kickoff_utc,offense_id,receiver_player_id,observed_at,yardline,0,1
-       FROM valid_plays WHERE is_pass=1 AND receiver_player_id IS NOT NULL AND play_type NOT LIKE '%sack%')
+       FROM valid_plays WHERE is_pass IS TRUE AND receiver_player_id IS NOT NULL AND play_type NOT LIKE '%sack%')
        SELECT game_id,league_id,kickoff_utc,team_id,player_id,max(observed_at) as observed_at,
-       sum(target) as targets,sum(carry*(yardline between 0 and 20)) as inside20_carries,
-       sum(carry*(yardline between 0 and 5)) as inside5_carries,
-       sum(target*(yardline between 0 and 20)) as inside20_targets,
-       sum(target*(yardline between 0 and 5)) as inside5_targets
-       FROM touches GROUP BY game_id,team_id,player_id"""):
+       sum(target) as targets,sum(case when yardline between 0 and 20 then carry else 0 end) as inside20_carries,
+       sum(case when yardline between 0 and 5 then carry else 0 end) as inside5_carries,
+       sum(case when yardline between 0 and 20 then target else 0 end) as inside20_targets,
+       sum(case when yardline between 0 and 5 then target else 0 end) as inside5_targets
+       FROM touches GROUP BY game_id,league_id,kickoff_utc,team_id,player_id"""):
         r = dict(r0)
         r["team_id"] = canonical_team(r["team_id"],aliases)
         source = team_index.get((r["game_id"],r["team_id"]),{})
@@ -108,6 +119,17 @@ def export(db, output):
         payload={"teams":[r for r in teams if r["league_id"]==league],
                  "players":[r for r in players if r["league_id"]==league],
                  "availability":"Revised historical sources; replay assumes availability 48 hours after kickoff."}
+        path = output / (league+".json")
+        if path.exists():
+            prior = json.loads(path.read_text())
+            # Cloud databases need not retain all historical raw plays. Replace
+            # only games actually re-exported, preserving their original timestamps.
+            for field in ('teams', 'players'):
+                replaced = {r['game_id'] for r in payload[field]}
+                payload[field] = [r for r in prior.get(field, []) if r['game_id'] not in replaced] + payload[field]
+            for field in ('current_pbp_sha256', 'current_pbp_observed_at'):
+                if field in prior:
+                    payload[field] = prior[field]
         free_path = output / "fbs_free_opportunities.json"
         if league == "fbs" and free_path.exists():
             free = json.loads(free_path.read_text())
@@ -117,7 +139,6 @@ def export(db, output):
         situation_path = output / "fbs_situations.json"
         if league == "fbs" and situation_path.exists():
             payload["situations"] = json.loads(situation_path.read_text())["teams"]
-        path=output/(league+".json")
         tmp=path.with_suffix('.tmp')
         tmp.write_text(json.dumps(payload,allow_nan=False),encoding='utf-8')
         tmp.replace(path)
@@ -126,21 +147,19 @@ def export(db, output):
     return report
 
 
-def refresh_local_evidence(*, force=False):
-    """Bounded local refresh; no downloads and no change to original source rows."""
+def refresh_local_evidence(*, force=False, db=None):
+    """Prepare the same measured features on SQLite and production PostgreSQL."""
     import time
-    from sqlalchemy.engine import make_url
     from spe.config import settings
-    url = make_url(settings.database_url)
-    if url.get_backend_name() != "sqlite" or not url.database or url.database == ":memory:":
-        return {"status": "requires_export_job"}
     output = settings.parquet_dir / "desk_evidence"
-    paths = [output/(lg+".json") for lg in ("nfl","fbs")]
+    paths = [output/(lg+".json") for lg in ("nfl", "fbs")]
     if not force and all(p.exists() and time.time()-p.stat().st_mtime < 21600 for p in paths):
         return {"status": "fresh"}
-    with sqlite3.connect(Path(url.database).resolve().as_uri()+"?mode=ro",uri=True) as db:
-        db.row_factory=sqlite3.Row
-        return {"status":"refreshed",**export(db,output)}
+    if db is not None:
+        return {"status": "refreshed", **export(db.connection(), output)}
+    from spe.db.session import session_factory
+    with session_factory() as session:
+        return {"status": "refreshed", **export(session.connection(), output)}
 
 
 if __name__=='__main__':

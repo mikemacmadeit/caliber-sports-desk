@@ -184,9 +184,10 @@ def research_board(
     *,
     limit: int = 1,
     league_id: str | None = None,
+    as_of: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Research upcoming games. NFL and FBS stay separate when league_id is set."""
-    now = datetime.now(UTC)
+    now = as_of or datetime.now(UTC)
     query = (
         session.query(Game)
         .options(
@@ -206,7 +207,7 @@ def research_board(
     results = []
     for game in games:
         before = _latest_accepted(session, game.game_id, "game_research")
-        run = research_game(session, game, model)
+        run = research_game(session, game, model, as_of=now)
         cached = before is not None and before.run_id == run.run_id
         results.append(
             {

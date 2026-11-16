@@ -7,9 +7,9 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from spe.accounts.auth import user_by_stripe_customer
+from spe.accounts.auth import is_subscribed, user_by_stripe_customer
 from spe.config import settings
-from spe.db.models import AccountUser
+from spe.db.models import AccountUser, BillingCursor, BillingEvent
 
 PRICE_CENTS = 1999
 PRODUCT_NAME = "Caliber"
@@ -32,6 +32,8 @@ def _stripe():
     import stripe
 
     stripe.api_key = settings.stripe_secret_key
+    stripe.default_http_client = stripe.RequestsClient(timeout=10)
+    stripe.max_network_retries = 0
     return stripe
 
 
@@ -63,18 +65,56 @@ def apply_subscription(user: AccountUser, sub: Any) -> None:
     if customer:
         user.stripe_customer_id = str(customer)
     end = _period_end(data)
-    if end is not None:
-        user.current_period_end = end
+    user.current_period_end = end
 
 
 def apply_stripe_event(session: Session, event: dict[str, Any]) -> None:
     kind = event.get("type")
+    if kind not in {"checkout.session.completed", "customer.subscription.updated", "customer.subscription.deleted"}:
+        return
+    event_id, created = event.get("id"), event.get("created")
+    if not isinstance(event_id, str) or not isinstance(created, int):
+        raise BillingError("Invalid billing event.")
+    if session.get_bind().dialect.name == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    # The receipt and account update commit together; failed handling remains retryable.
+    stmt = insert(BillingEvent).values(event_id=event_id).on_conflict_do_nothing().returning(BillingEvent.event_id)
+    if session.execute(stmt).scalar_one_or_none() is None:
+        return
     obj = (event.get("data") or {}).get("object") or {}
+    user_id = obj.get("client_reference_id") or (obj.get("metadata") or {}).get("user_id")
+    query = session.query(AccountUser)
+    if user_id:
+        query = query.filter(AccountUser.user_id == user_id)
+    else:
+        customer = obj.get("customer")
+        if not customer:
+            raise BillingError("Billing event has no account reference.")
+        query = query.filter(AccountUser.stripe_customer_id == customer)
+    user = query.with_for_update().one_or_none()
+    if user is None:
+        raise BillingError("Billing account is not available yet.", status=503)
+    cursor = session.get(BillingCursor, user.user_id)
+    terminal = kind == "customer.subscription.deleted"
+    if cursor and (created < cursor.event_created or (created == cursor.event_created and cursor.terminal)):
+        return
+    # A cancellation for an old subscription must not cancel its replacement.
+    if terminal and user.subscription_id and obj.get("id") != user.subscription_id:
+        return
     if kind == "checkout.session.completed":
         _apply_checkout(session, obj)
-        return
-    if kind in {"customer.subscription.updated", "customer.subscription.deleted"}:
+    else:
+        if terminal:
+            obj = {**obj, "status": "canceled"}
         _apply_subscription_event(session, obj)
+    if cursor is None:
+        cursor = BillingCursor(user_id=user.user_id, event_created=created, terminal=terminal)
+        session.add(cursor)
+    else:
+        cursor.event_created, cursor.terminal = created, terminal
+    session.flush()
 
 
 def _apply_checkout(session: Session, checkout: dict[str, Any]) -> None:
@@ -95,8 +135,7 @@ def _apply_checkout(session: Session, checkout: dict[str, Any]) -> None:
         stripe = _stripe()
         apply_subscription(user, stripe.Subscription.retrieve(str(subscription)))
         return
-    if checkout.get("status") == "complete" and checkout.get("mode") == "subscription":
-        user.subscription_status = "active"
+    raise BillingError("Subscription details are not available yet. Try again shortly.", status=503)
 
 
 def _apply_subscription_event(session: Session, sub: dict[str, Any]) -> None:
@@ -128,11 +167,17 @@ def _web_origin() -> str:
     for part in str(settings.web_origin or "").split(","):
         origin = part.strip().rstrip("/")
         if origin:
+            if settings.app_env in {"prod", "production"} and not origin.startswith("https://"):
+                raise BillingError("A secure public website address is required for billing.", status=503)
             return origin
     return "http://localhost:3000"
 
 
 def create_checkout(user: AccountUser) -> str:
+    if is_subscribed(user):
+        raise BillingError("Your subscription is already active. Use billing to manage it.", status=409)
+    if not user.email_verified_at:
+        raise BillingError("Verify your email before subscribing.", status=403)
     stripe = _stripe()
     origin = _web_origin()
     params: dict[str, Any] = {
@@ -146,10 +191,18 @@ def create_checkout(user: AccountUser) -> str:
         "allow_promotion_codes": True,
     }
     if user.stripe_customer_id:
+        subscriptions = stripe.Subscription.list(customer=user.stripe_customer_id, status="all", limit=100)
+        if any(s.get("status") in {"active", "trialing", "past_due", "unpaid", "incomplete"}
+               for s in _as_dict(subscriptions).get("data", [])):
+            raise BillingError("You already have a subscription to manage in billing.", status=409)
         params["customer"] = user.stripe_customer_id
     else:
         params["customer_email"] = user.email
-    created = stripe.checkout.Session.create(**params)
+    # Stable parameters/key allow retries and double clicks to reuse one checkout.
+    import time
+    window = int(time.time()) // (30 * 60)
+    params["expires_at"] = (window + 2) * 30 * 60
+    created = stripe.checkout.Session.create(**params, idempotency_key=f"checkout:{user.user_id}:{window}")
     url = created.get("url") if isinstance(created, dict) else created.url
     if not url:
         raise BillingError("Stripe did not return a checkout link.", status=502)

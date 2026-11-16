@@ -196,7 +196,14 @@ def load_props(
     cached = read_entry(market, league, date, path)
     if cached is not None:
         from spe.publishing.policy import annotate
-        rows = [annotate(row) for row in cached.get("rows") or []]
+        rows = []
+        for row in cached.get("rows") or []:
+            if not isinstance(row, dict):
+                continue
+            try:
+                rows.append(annotate(row))
+            except Exception:
+                rows.append(row)
         if not is_fresh(cached):
             if settings.app_env == "dev" and path is not None:
                 _refresh_in_background(market, league, date, path)

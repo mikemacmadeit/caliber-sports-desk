@@ -1,8 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { LockedCall } from "@/components/LockedCall";
 import type { PropPick, PropPickCard } from "@/lib/api";
 import { marketLabel } from "@/lib/format";
+
+function hasBoard(card: PropPickCard | null) {
+  if (!card) return false;
+  return (Array.isArray(card.day) && card.day.length > 0) || (Array.isArray(card.picks) && card.picks.length > 0);
+}
 
 export function TodayPropPicks({ league, date, gameId, market, initialCard = null, hideWhenEmpty = false }: {
   league: string; date: string; gameId?: string; market?: string; pending?: boolean; initialCard?: PropPickCard | null; hideWhenEmpty?: boolean;
@@ -10,35 +16,51 @@ export function TodayPropPicks({ league, date, gameId, market, initialCard = nul
   const [card, setCard] = useState(initialCard);
   const [error, setError] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const cardRef = useRef(initialCard);
+  useEffect(() => { cardRef.current = card; }, [card]);
   useEffect(() => {
     let disposed = false;
     let controller: AbortController | null = null;
     setCard(initialCard);
+    cardRef.current = initialCard;
     async function refresh() {
       controller?.abort();
       controller = new AbortController();
-      const timer = setTimeout(() => controller?.abort(), 15000);
+      const timer = setTimeout(() => controller?.abort(), 25000);
       try {
         const params = new URLSearchParams({ league, date });
         const response = await fetch(`/api/backend/v1/props/picks?${params}`, { signal: controller.signal, cache: "no-store" });
         if (!response.ok) throw new Error("unavailable");
         const next: PropPickCard = await response.json();
-        if (next.degraded) throw new Error("degraded");
-        if (!disposed) { setCard(next); setError(false); setNow(Date.now()); }
-      } catch { if (!disposed) setError(true); }
+        if (!disposed) { setCard(next); cardRef.current = next; setError(false); setNow(Date.now()); }
+      } catch {
+        if (!disposed && !hasBoard(cardRef.current)) setError(true);
+      }
       finally { clearTimeout(timer); }
     }
-    setError(Boolean(initialCard?.degraded));
+    setError(false);
     if (!initialCard || initialCard.degraded) void refresh();
     const poll = setInterval(() => void refresh(), 60000);
     const clock = setInterval(() => setNow(Date.now()), 1000);
     return () => { disposed = true; controller?.abort(); clearInterval(poll); clearInterval(clock); };
   }, [league, date, initialCard]);
-  if (error) return <p role="status" className="text-sm text-mute">Updates are temporarily unavailable. Current opportunities are paused while prices are verified.</p>;
+  if (error && !hasBoard(card)) {
+    if (hideWhenEmpty) return null;
+    return <p role="status" className="text-sm text-mute">Published prices are not available right now.</p>;
+  }
   if (!card) return <p className="text-sm text-mute">Checking published opportunities…</p>;
   const posted = Array.isArray(card.day);
-  const picks = (posted ? card.day! : card.picks).filter(p => (!gameId || p.game_id === gameId) && (!market || p.market_id === market) &&
+  const source = posted ? card.day! : card.picks;
+  const picks = source.filter(p => (!gameId || p.game_id === gameId) && (!market || p.market_id === market) &&
     !p.locked && (posted || (p.qualification?.eligible && p.qualification.valid_until && Date.parse(p.qualification.valid_until) > now)));
+  if (!picks.length && (card.locked || source.some((pick) => pick.locked))) {
+    return (
+      <LockedCall
+        title="Published calls are locked"
+        detail="They open when the games kick off. Subscribers see them now — $19.99 a month."
+      />
+    );
+  }
   if (!picks.length) {
     if (hideWhenEmpty) return null;
     return <p className="plate px-5 py-6 text-sm text-mute">No qualifying opportunity right now. A pick needs a verified price, sufficient data, and enough estimated value.</p>;

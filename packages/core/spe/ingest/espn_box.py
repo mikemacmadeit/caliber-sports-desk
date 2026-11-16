@@ -145,8 +145,12 @@ def ingest_final_box_scores(
         if not event_id:
             summary["no_event"] += 1
             continue
-        payload = fetch(game.league_id, event_id)
+        try:
+            payload = fetch(game.league_id, event_id)
+        except Exception:
+            payload = None
         if not isinstance(payload, dict):
+            summary["status"] = "degraded"
             continue
         summary["games"] += 1
         catalog = _catalog(session, game.game_id)
@@ -154,9 +158,17 @@ def ingest_final_box_scores(
             player_id
             for (player_id,) in session.query(PlayerGameStat.player_id).filter(PlayerGameStat.game_id == game.game_id)
         }
-        for athlete in parse_scoring_touchdowns(payload):
-            decision = match_name(athlete["name"], catalog) if catalog else None
-            player_id = None if decision is None or decision.review_status != "auto" else decision.canonical_id
+        from spe.identity.results import espn_player_ids, match_result
+        from spe.publishing.boxes import parse
+        identities = espn_player_ids(session, {pid for pid, _ in catalog})
+        athletes = parse_scoring_touchdowns(payload)
+        complete = parse(payload)
+        for player_id, name in catalog:
+            athlete = match_result(athletes, player_id, name, identities)
+            official = match_result(complete, player_id, name, identities)
+            if athlete is None or official is None or "anytime_td" not in official["markets"]:
+                summary["unmatched"] += 1
+                continue
             if player_id is None or session.get(Player, player_id) is None:
                 summary["unmatched"] += 1
                 continue

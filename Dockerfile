@@ -11,9 +11,12 @@ COPY pyproject.toml README.md ./
 COPY packages/core ./packages/core
 COPY services/api ./services/api
 COPY services/worker ./services/worker
+COPY infra/alembic.ini ./infra/alembic.ini
+COPY infra/alembic ./infra/alembic
 
 # Postgres driver required in cloud; SQLite still works locally.
-RUN pip install --no-cache-dir -e ".[postgres]"
+COPY constraints.txt ./constraints.txt
+RUN pip install --no-cache-dir -c constraints.txt -e ".[postgres]"
 
 ENV PYTHONPATH=/app/packages/core:/app/services/api:/app/services/worker
 ENV PARQUET_DIR=/data/parquet
@@ -31,4 +34,4 @@ EXPOSE 8000
 
 # Shell form so ${PORT} works on Render (they inject PORT; local defaults to 8000).
 # Cron / one-off jobs override the command in the host config.
-CMD sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

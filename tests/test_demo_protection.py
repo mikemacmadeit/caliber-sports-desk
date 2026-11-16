@@ -248,7 +248,8 @@ def test_slate_hides_espn_copy_of_the_same_game(db):
     )
     db.commit()
     slate = games_for_slate(db, "2026-11-08", "nfl")
-    assert {g.game_id for g in slate} == {"nfl:2026_09_LA_WAS", "espn:nfl:999"}
+    # Venue metadata can differ across providers; the same clubs and kickoff are one game.
+    assert {g.game_id for g in slate} == {"nfl:2026_09_LA_WAS"}
 
 
 def test_demo_play_is_not_a_validated_play(db):

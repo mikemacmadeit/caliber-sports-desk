@@ -1,25 +1,8 @@
 import Link from "next/link";
-import savedSaturday from "@/lib/ledger/2026-11-14.json";
-import { LedgerRecord, type LedgerCard } from "@/components/LedgerRecord";
+import { LedgerRecord, type LedgerCard, type YearRecord } from "@/components/LedgerRecord";
 import { PageHeader } from "@/components/PageHeader";
+import { apiGet } from "@/lib/api";
 import { dayParts, slateToday } from "@/lib/days";
-
-const SAVED: Record<string, LedgerCard & { rows: SavedRow[] }> = {
-  "2026-11-14": savedSaturday,
-};
-
-type SavedRow = { league_id: string; result: string; units?: number | null };
-
-function unitsFor(league: string): Record<string, number> {
-  const totals: Record<string, number> = {};
-  for (const [date, card] of Object.entries(SAVED)) {
-    const rows = league === "all" ? card.rows : (card.rows ?? []).filter((row) => row.league_id === league);
-    const priced = rows.filter((row) => row.units != null && row.result !== "pending");
-    if (!priced.length) continue;
-    totals[date] = priced.reduce((sum, row) => sum + Number(row.units), 0);
-  }
-  return totals;
-}
 
 export default async function TrackRecordPage({
   searchParams,
@@ -31,7 +14,12 @@ export default async function TrackRecordPage({
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(params.date || "") ? params.date! : previousDay(slateToday());
   const month = /^\d{4}-\d{2}$/.test(params.month || "") ? params.month! : selected.slice(0, 7);
   const when = dayParts(selected);
-  const card = await loadCard(selected, league);
+  const [card, calendar, year] = await Promise.all([
+    apiGet<LedgerCard>(`/v1/published/day?date=${selected}&league=${league}`, 12000).catch(() => null),
+    apiGet<{ units: Record<string, number> }>(`/v1/published/calendar?month=${month}&league=${league}`, 12000).catch(() => null),
+    apiGet<YearRecord>(`/v1/published/year?year=${selected.slice(0, 4)}&league=${league}`, 12000).catch(() => null),
+  ]);
+  const units = calendar?.units ?? {};
 
   return (
     <div className="space-y-8">
@@ -47,13 +35,15 @@ export default async function TrackRecordPage({
           </Link>
         ))}
       </nav>
+      {!card || !calendar || !year ? <p role="status" className="text-sm text-mute">Some records are temporarily unavailable. Refresh to try again.</p> : null}
       <LedgerRecord
         month={month}
         selected={selected}
         league={league}
         title={`${when.weekday} · ${when.monthDay}`}
         card={card}
-        units={unitsFor(league)}
+        units={units}
+        year={year}
       />
     </div>
   );
@@ -63,25 +53,6 @@ function leagueHref(league: string, date: string, month: string) {
   const params = new URLSearchParams({ date, month });
   if (league !== "all") params.set("league", league);
   return `/track-record?${params}`;
-}
-
-async function loadCard(date: string, league: string): Promise<LedgerCard | null> {
-  const saved = SAVED[date];
-  if (saved) {
-    const rows = league === "all" ? saved.rows : (saved.rows ?? []).filter((row) => row.league_id === league);
-    return { ...saved, rows };
-  }
-  const api = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  try {
-    const res = await fetch(`${api}/v1/published/day?date=${date}&league=${league}`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as LedgerCard;
-  } catch {
-    return null;
-  }
 }
 
 function previousDay(iso: string) {

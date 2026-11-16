@@ -14,6 +14,14 @@ import pandas as pd
 from spe.ingest.canonical import nfl_game_id, nfl_player_id, nfl_team_id
 from spe.ingest.values import as_str
 
+PBP_CONTEXT_COLUMNS = (
+    "game_id", "play_id", "posteam", "defteam", "play_type", "yardline_100",
+    "receiver_player_id", "rusher_player_id", "passer_player_id", "air_yards",
+    "epa", "score_differential", "qtr", "fixed_drive", "drive", "no_play",
+    "two_point_attempt", "extra_point_attempt", "qb_kneel", "qb_spike", "sack",
+    "rush_touchdown", "pass_touchdown", "yards_gained", "complete_pass",
+)
+
 
 def number(value):
     try:
@@ -38,7 +46,8 @@ def pbp_context(frame: pd.DataFrame, positions: dict[str, str]) -> list[dict]:
         return []
     if not required.issubset(frame.columns):
         raise ValueError(f"Missing PBP columns: {sorted(required - set(frame.columns))}")
-    df = frame.drop_duplicates(["game_id", "play_id"], keep="last").copy()
+    # nflverse PBP contains hundreds of unused columns. Do not copy them repeatedly.
+    df = frame.loc[:, [c for c in PBP_CONTEXT_COLUMNS if c in frame.columns]].drop_duplicates(["game_id", "play_id"], keep="last").copy()
     valid = df["play_type"].isin(["run", "pass"])
     for flag in ("no_play", "two_point_attempt", "extra_point_attempt", "qb_kneel", "qb_spike"):
         valid &= ~_series(df, flag).eq(1)

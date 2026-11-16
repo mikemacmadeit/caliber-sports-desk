@@ -7,6 +7,8 @@ from sqlalchemy.engine import Engine
 
 
 _COLUMNS = [
+    ("account_users", "email_verified_at", "TIMESTAMP"),
+    ("account_users", "deleted_at", "TIMESTAMP"),
     ("games", "data_tier", "VARCHAR(16) DEFAULT 'demo' NOT NULL"),
     ("games", "home_score", "INTEGER"),
     ("games", "away_score", "INTEGER"),
@@ -14,14 +16,14 @@ _COLUMNS = [
     ("recommendations", "data_tier", "VARCHAR(16) DEFAULT 'demo' NOT NULL"),
     ("plays", "wp", "FLOAT"),
     ("plays", "success", "BOOLEAN"),
-    ("plays", "is_pass", "BOOLEAN DEFAULT 0 NOT NULL"),
-    ("plays", "is_rush", "BOOLEAN DEFAULT 0 NOT NULL"),
-    ("plays", "is_td", "BOOLEAN DEFAULT 0 NOT NULL"),
-    ("plays", "is_turnover", "BOOLEAN DEFAULT 0 NOT NULL"),
-    ("plays", "is_red_zone", "BOOLEAN DEFAULT 0 NOT NULL"),
-    ("plays", "is_goal_line", "BOOLEAN DEFAULT 0 NOT NULL"),
-    ("plays", "is_scrimmage", "BOOLEAN DEFAULT 0 NOT NULL"),
-    ("plays", "first_down", "BOOLEAN DEFAULT 0 NOT NULL"),
+    ("plays", "is_pass", "BOOLEAN DEFAULT FALSE NOT NULL"),
+    ("plays", "is_rush", "BOOLEAN DEFAULT FALSE NOT NULL"),
+    ("plays", "is_td", "BOOLEAN DEFAULT FALSE NOT NULL"),
+    ("plays", "is_turnover", "BOOLEAN DEFAULT FALSE NOT NULL"),
+    ("plays", "is_red_zone", "BOOLEAN DEFAULT FALSE NOT NULL"),
+    ("plays", "is_goal_line", "BOOLEAN DEFAULT FALSE NOT NULL"),
+    ("plays", "is_scrimmage", "BOOLEAN DEFAULT FALSE NOT NULL"),
+    ("plays", "first_down", "BOOLEAN DEFAULT FALSE NOT NULL"),
     ("plays", "game_seconds_remaining", "INTEGER"),
     ("plays", "drive_id", "VARCHAR(32)"),
     ("plays", "passer_player_id", "VARCHAR(64)"),
@@ -44,7 +46,7 @@ _COLUMNS = [
     ("participation_plays", "time_to_throw", "FLOAT"),
     ("participation_plays", "was_pressure", "BOOLEAN"),
     ("participation_plays", "ngs_air_yards", "FLOAT"),
-    ("account_users", "is_admin", "BOOLEAN DEFAULT 0 NOT NULL"),
+    ("account_users", "is_admin", "BOOLEAN DEFAULT FALSE NOT NULL"),
 ]
 
 

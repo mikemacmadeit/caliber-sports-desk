@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { SlateGame } from "@/lib/api";
 import { browserGet, browserPost } from "@/lib/browserApi";
-import { mpsToMph, pct } from "@/lib/format";
+import { pct } from "@/lib/format";
 
 type AnytimeTd = {
   player_id: string;
@@ -44,7 +44,8 @@ export function ScenarioLab({ games }: { games: SlateGame[] }) {
   const [gameId, setGameId] = useState(games[0]?.game_id ?? "");
   const [gameQuery, setGameQuery] = useState("");
   const [draws, setDraws] = useState(10000);
-  const [windMph, setWindMph] = useState("");
+  const [homePoints, setHomePoints] = useState("");
+  const [awayPoints, setAwayPoints] = useState("");
   const [result, setResult] = useState<LabResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -54,14 +55,16 @@ export function ScenarioLab({ games }: { games: SlateGame[] }) {
     setResult(null);
     setError("");
     const overrides: Record<string, unknown> = {};
-    if (windMph.trim()) {
-      const mph = Number(windMph);
-      if (!Number.isFinite(mph)) {
-        setError("Enter wind as a number in miles per hour, or leave it blank.");
-        setBusy(false);
-        return;
+    if (!Number.isInteger(draws) || draws < 1000 || draws > 50000) {
+      setError("Choose between 1,000 and 50,000 simulations."); setBusy(false); return;
+    }
+    for (const [key, value] of [["home_points", homePoints], ["away_points", awayPoints]]) {
+      if (!value.trim()) continue;
+      const points = Number(value);
+      if (!Number.isFinite(points) || points < 1 || points > 75) {
+        setError("Enter expected points between 1 and 75, or leave them blank."); setBusy(false); return;
       }
-      overrides.wind_mps = mph / 2.237;
+      overrides[key] = points;
     }
     try {
       const body = await browserPost<{ run_id: string; note?: string }>("/v1/simulations", {
@@ -137,13 +140,14 @@ export function ScenarioLab({ games }: { games: SlateGame[] }) {
           />
         </label>
         <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-mute">
-          Wind override, mph
-          <input
-            className="field-input mt-2 font-mono"
-            value={windMph}
-            onChange={(e) => setWindMph(e.target.value)}
-            placeholder="Blank keeps the official read"
-          />
+          Home expected points
+          <input type="number" min={1} max={75} className="field-input mt-2 font-mono"
+            value={homePoints} onChange={(e) => setHomePoints(e.target.value)} placeholder="Saved team expectation" />
+        </label>
+        <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-mute">
+          Away expected points
+          <input type="number" min={1} max={75} className="field-input mt-2 font-mono"
+            value={awayPoints} onChange={(e) => setAwayPoints(e.target.value)} placeholder="Saved team expectation" />
         </label>
       </div>
       <button onClick={run} disabled={busy || !gameId} className="btn-primary mt-5">
@@ -175,10 +179,6 @@ function ScenarioResults({
   const anytime = (detail.summary?.anytime_td ?? [])
     .filter((row) => row.probability > 0)
     .slice(0, 8);
-  const windOverride =
-    detail.overrides && typeof detail.overrides.wind_mps === "number"
-      ? mpsToMph(detail.overrides.wind_mps as number)
-      : null;
   const stable =
     detail.convergence?.max_td_mc_se != null &&
     detail.convergence?.target_se != null &&
@@ -192,12 +192,10 @@ function ScenarioResults({
           {away} @ {home}
         </h3>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-mute">
-          {detail.research_only
-            ? `Research what-if for ${awayName} at ${homeName}. The official pick stays unchanged.`
-            : `Official read for ${awayName} at ${homeName}.`}
-          {windOverride ? ` Wind forced to about ${windOverride}.` : " Weather left at the official forecast."}{" "}
+          Research scenario for {awayName} at {homeName}, starting with the saved TD analysis.
+          Team scoring changes are hypothetical; the saved picks stay unchanged. Weather is not adjusted here.{" "}
           Based on {detail.draw_count.toLocaleString()} simulated games.
-          {stable ? " The run looks stable enough to read." : " Treat the edges as directional only."}
+          {stable ? " Simulation sampling error is small; model uncertainty still remains." : " Treat the edges as directional only."}
         </p>
         {(createdNote || detail.disclaimer) && (
           <p className="mt-2 text-sm leading-relaxed text-mute">
@@ -219,11 +217,11 @@ function ScenarioResults({
         />
         <Stat
           label="Scenario type"
-          value={detail.research_only ? "Research" : "Official"}
+          value="Research"
           hint={
             detail.research_only
               ? "What-if only — not a live recommendation"
-              : "Uses the live weather and assumptions"
+              : "Uses saved model estimates; not a live recommendation"
           }
         />
       </div>

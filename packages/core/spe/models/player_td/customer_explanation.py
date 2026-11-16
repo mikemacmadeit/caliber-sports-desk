@@ -126,7 +126,8 @@ def build(row):
                 'game_script_role':'a measured role that fits the favored or trailing game scenario'}
             advantages=[labels[k] for k in selected['research_rank']['advantages']]
             text=f"{alternative['name']} has the higher scoring estimate ({alternative['probability']:.0%} versus {p:.0%}). " if alternative['probability']>p else text
-            text+=f" {name}'s separate research case rests on "+', '.join(advantages)+'. This is why he is considered as an alternative; the price still has to qualify.'
+            if advantages:
+                text+=f" {name}'s separate research case rests on "+', '.join(advantages)+'. This is why he is considered as an alternative; the price still has to qualify.'
             own_qb=((selected.get('research') or {}).get('quarterback') or {})
             peer_qb=((alternative.get('research') or {}).get('quarterback') or {})
             if own_qb.get('usable') and peer_qb.get('usable') and own_qb['player_id']==peer_qb['player_id']:

@@ -78,7 +78,8 @@ def store_reports(db, rows):
     members=defaultdict(set)
     earliest=min((r['reported_at'] for r in rows),default=datetime.now(UTC))
     season=earliest.year-int(earliest.month<7)
-    for s in db.query(PlayerGameStat).join(Game).filter(Game.league_id=='fbs',Game.kickoff_utc>=f'{season}-07-01',
+    season_start = datetime(season, 7, 1, tzinfo=UTC)
+    for s in db.query(PlayerGameStat).join(Game).filter(Game.league_id=='fbs',Game.kickoff_utc>=season_start,
             PlayerGameStat.quality_status.notin_(('invalid','quarantined'))):
         if s.team_id and s.player_id in players:
             members[(s.team_id,_person(players[s.player_id].name))].add(s.player_id)

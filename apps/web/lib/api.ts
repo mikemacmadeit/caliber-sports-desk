@@ -1,65 +1,30 @@
-import { cookies } from "next/headers";
+import { readToken } from "@/lib/serverAuth";
 
 const API = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-async function sessionToken(): Promise<string> {
-  const jar = await cookies();
-  return jar.get("caliber_session")?.value ?? "";
-}
-
-/** Reuse saved boards in the Netlify SSR process across navigations. */
-const GET_CACHE_TTL_MS = 5 * 60_000;
-const getCache = new Map<string, { expires: number; value: unknown }>();
-
-function cacheableGetPath(path: string): boolean {
-  const pathname = path.split("?")[0];
-  return pathname === "/v1/days" || pathname === "/v1/anytime-td/research";
-}
-
-export async function apiGet<T>(path: string, timeoutMs = 15000): Promise<T> {
-  const session = await sessionToken();
-  const cacheKey = path;
-  const useCache = !session && cacheableGetPath(path);
-  if (useCache) {
-    const hit = getCache.get(cacheKey);
-    if (hit && hit.expires > Date.now()) {
-      return hit.value as T;
-    }
-  }
-  // AbortSignal.timeout is missing on some Netlify runtimes and throws before fetch.
+/** The API owns snapshots and grades. Never substitute another user's saved board. */
+export async function apiGet<T>(path: string, timeoutMs = 12000): Promise<T> {
+  const token = await readToken();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  let res: Response;
   try {
-    res = await fetch(`${API}${path}`, {
-      cache: "no-store",
-      signal: ctrl.signal,
-      headers: session ? { Authorization: `Bearer ${session}` } : undefined,
+    const res = await fetch(`${API}${path}`, {
+      cache: "no-store", signal: ctrl.signal,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) {
-    throw new Error(`${path} failed: ${res.status}`);
-  }
-  const value = (await res.json()) as T;
-  if (useCache) {
-    getCache.set(cacheKey, { expires: Date.now() + GET_CACHE_TTL_MS, value });
-  }
-  return value;
+    if (!res.ok) throw new Error("The board is temporarily unavailable. Please try again.");
+    return await res.json() as T;
+  } finally { clearTimeout(timer); }
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const token = await readToken();
   const res = await fetch(`${API}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: "POST", cache: "no-store", signal: AbortSignal.timeout(15000),
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(body),
-    cache: "no-store",
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${path} failed: ${res.status} ${text}`);
-  }
+  if (!res.ok) throw new Error("That request could not be completed. Please try again.");
   return res.json() as Promise<T>;
 }
 
@@ -281,7 +246,7 @@ export type TdDecisionCandidate = {
   } | null;
   research_selected?: boolean;
   minimum_american?: number;
-  research_rank?: { score: number; supported: boolean; advantages: string[]; note: string };
+  research_rank?: { score: number; supported: boolean; advantages: string[]; scoring_area_opportunities?: number; note: string };
   customer?: TdCustomerExplanation;
   football_case?: { supported: boolean; reasons: { kind: string; text: string; source: string; window: string }[];
     cautions: string[]; missing: string[] };

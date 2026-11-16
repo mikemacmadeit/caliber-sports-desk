@@ -30,6 +30,7 @@ Thumbs.db
 .cursor/
 tmp_*.py
 apps/web/tsconfig.tsbuildinfo
+apps/web/.cache/
 infra/alembic/versions/__pycache__/
 research/.ipynb_checkpoints/
 parquet/
@@ -41,3 +42,12 @@ storage/
 
 # Local Netlify folder
 .netlify
+
+# Temporary hosting exports can contain credentials.
+tmp_*
+*.dump
+*.backup
+.env.*
+!.env.example
+playwright-report/
+test-results/

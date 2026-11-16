@@ -1,37 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LockedCall } from "@/components/LockedCall";
 import { PropExplorer } from "@/components/PropExplorer";
+import { browserGet, peekBrowserCache } from "@/lib/browserApi";
 import type { PropRow } from "@/lib/api";
 
 export function PropBoard({ league, date, market }: { league: string; date: string; market: string }) {
-  const path = `/api/backend/v1/props?market=${encodeURIComponent(market)}&league=${encodeURIComponent(league)}&date=${encodeURIComponent(date)}`;
-  const [rows, setRows] = useState<PropRow[] | null>(null);
+  const path = `/v1/props?market=${encodeURIComponent(market)}&league=${encodeURIComponent(league)}&date=${encodeURIComponent(date)}`;
+  const cached = peekBrowserCache<{ rows?: PropRow[]; locked?: boolean }>(path);
+  const [rows, setRows] = useState<PropRow[] | null>(cached?.rows ? cached.rows.map(boardRow) : null);
+  const [locked, setLocked] = useState(Boolean(cached?.locked));
   const [error, setError] = useState(false);
 
   useEffect(() => {
     const ctrl = new AbortController();
-    setRows(null);
-    setError(false);
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      ctrl.abort();
-    }, 20000);
-    fetch(path, { cache: "no-store", signal: ctrl.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as { rows?: PropRow[] };
-        if (!ctrl.signal.aborted) setRows((data.rows || []).map(boardRow));
+    const hit = peekBrowserCache<{ rows?: PropRow[]; locked?: boolean }>(path);
+    if (hit?.rows) {
+      setRows(hit.rows.map(boardRow));
+      setLocked(Boolean(hit.locked));
+      setError(false);
+    } else {
+      setRows(null);
+      setLocked(false);
+      setError(false);
+    }
+    browserGet<{ rows?: PropRow[]; locked?: boolean }>(path, ctrl.signal)
+      .then((data) => {
+        if (!ctrl.signal.aborted) {
+          setRows((data.rows || []).map(boardRow));
+          setLocked(Boolean(data.locked));
+        }
       })
       .catch(() => {
-        if (timedOut || !ctrl.signal.aborted) setError(true);
-      })
-      .finally(() => clearTimeout(timer));
-    return () => {
-      clearTimeout(timer);
-      ctrl.abort();
-    };
+        if (!ctrl.signal.aborted && !hit?.rows) setError(true);
+      });
+    return () => ctrl.abort();
   }, [path]);
 
   if (rows == null && !error) {
@@ -45,7 +49,16 @@ export function PropBoard({ league, date, market }: { league: string; date: stri
       </div>
     );
   }
-  if (!rows.length) {
+  const open = rows.filter((row) => !row.locked);
+  if (locked && open.length === 0) {
+    return (
+      <LockedCall
+        title="The price board is locked"
+        detail="Every line opens at kickoff. Subscribers see the board now — $19.99 a month."
+      />
+    );
+  }
+  if (!open.length) {
     return (
       <div className="plate px-6 py-8">
         <p className="font-display text-4xl uppercase leading-none">No prices for this day</p>
@@ -55,8 +68,14 @@ export function PropBoard({ league, date, market }: { league: string; date: stri
   }
   return (
     <div className="space-y-8">
-      <DayTally rows={rows} />
-      <PropExplorer rows={rows} mode="flat" />
+      {locked ? (
+        <LockedCall
+          title="Upcoming lines are locked"
+          detail="Finished games stay on the board. Subscribers see the lines that have not kicked off — $19.99 a month."
+        />
+      ) : null}
+      <DayTally rows={open} />
+      <PropExplorer rows={open} mode="flat" />
     </div>
   );
 }
@@ -64,6 +83,7 @@ export function PropBoard({ league, date, market }: { league: string; date: stri
 function boardRow(row: PropRow): PropRow {
   const forecast = row.forecast;
   return {
+    locked: row.locked,
     outcome_id: row.outcome_id,
     game_id: row.game_id,
     league_id: row.league_id,

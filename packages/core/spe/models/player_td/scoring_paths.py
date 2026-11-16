@@ -1,8 +1,10 @@
 """Current-role scoring allocation with observable, disjoint opportunity paths.
 
-Fixed design: last two TEAM games blended equally with six-game history; small
-scoring-area samples shrink toward the player's channel share. Absence work
-stays with the same position/channel, with half held in an unknown-role reserve.
+Fixed design: last two TEAM games blended equally with six-game history. A
+player's ordinary carries do not create goal-line or red-zone share. Those
+scoring-area paths shrink toward no role. Open-field and other paths still
+shrink toward channel share. Absence work stays with the same position, with
+half held in an unknown-role reserve.
 Opponent conversion rates shrink toward fit-period league rates. Scenario
 ranges measure sensitivity, not confidence intervals. No outcome-time lookups.
 """
@@ -17,6 +19,13 @@ VERSION = 'scoring_paths_v1'
 CONTEXT_VERSION = 'scoring_paths_v2'
 SHARE_PRIOR = 3.
 CONVERSION_PRIOR = 25.
+SCORING_AREA = frozenset({'rush_5', 'rush_10', 'rush_20', 'rec_endzone', 'rec_redzone'})
+
+
+def role_share(observed, team_observed, channel_share, path):
+    """Scoring-area work is counted only when it was actually observed."""
+    prior = 0.0 if path in SCORING_AREA else channel_share
+    return (observed + SHARE_PRIOR * prior) / (team_observed + SHARE_PRIOR)
 
 
 def _count(m, path, key='opportunities'):
@@ -111,7 +120,7 @@ def project(history, model, team, opponent, cutoff, base, unavailable=(), contex
                 ps = info['series'] if scenario == 'longer_role' else info['series'][-2:]
                 ts = offense if scenario == 'longer_role' else offense[-2:]
                 channel_share = sum(_sum(m, kind) for m in ps)/max(1., sum(_sum(m, kind) for m in ts))
-                shares[pid][scenario] = (sum(_count(m, path) for m in ps)+SHARE_PRIOR*channel_share)/(sum(_count(m, path) for m in ts)+SHARE_PRIOR)
+                shares[pid][scenario] = role_share(sum(_count(m, path) for m in ps), sum(_count(m, path) for m in ts), channel_share, path)
             shares[pid]['central'] = (shares[pid]['longer_role']+shares[pid]['recent_role'])/2
             if contextual:
                 for scenario in ('central','longer_role','recent_role'):

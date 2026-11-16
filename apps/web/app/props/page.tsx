@@ -67,8 +67,7 @@ export default async function PropsPage({
       ) : null}
       {daysError ? (
         <div className="plate border border-gold/30 px-6 py-4 text-sm text-mute">
-          <p>Schedule load failed: {daysError}</p>
-          <p className="mt-1">Refresh after the API is back — this page no longer hard-crashes on a timeout.</p>
+          <p>The day list is taking a moment. The picks below still load.</p>
         </div>
       ) : null}
       <PropDeskPanel league={league} date={selected} />

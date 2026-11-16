@@ -28,6 +28,7 @@ export type DeskData = {
   rows: DeskCard[]; total: number; offset: number; limit: number; books: string[];
   market_counts?: Record<string, number>;
   qualified: number; changed: number; blockers: { reason: string; count: number }[];
+  locked?: boolean;
   status: "ready" | "warming" | "delayed"; date: string; league: string;
   refresh_status?: "worker_managed" | "ready" | "running" | "failed" | "idle";
   checked_at: string; updated_at: string | null; note: string;

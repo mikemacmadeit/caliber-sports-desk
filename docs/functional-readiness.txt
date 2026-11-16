@@ -1,0 +1,125 @@
+Caliber functional readiness fixes — local implementation, 2026-11-16
+
+Status
+The reproduced functional defects have been addressed locally. This is a release
+candidate, not a production launch or proof of improved prediction accuracy.
+Branch: codex/production-readiness. Base commit: b2b87e44e842c0dd087476fa6438e2e06a58a511.
+The existing dirty worktree was preserved. No production deploy, production data
+rewrite, data purchase, paid-provider call, live billing action, or email send occurred.
+
+Correctness
+- Removed the shortCatch hardcoded wager/result substitution. Removed active
+  frontend grading and the bundled Sunday/ATS fallbacks from customer pages.
+  API snapshots now own displayed selections and grades. Contract tests prevent
+  those overrides from being reconnected to customer pages.
+- Corrected the PostgreSQL timestamp bind in public_availability.store_reports.
+- Kept valid empty TD cards and their unavailable reasons; cleared obsolete empty
+  states; report actual scheduled-job freshness instead of always saying scheduled.
+- Result matching uses canonical ESPN mappings first, then unique exact names.
+  Numeric suffixes from unrelated provider IDs and ambiguous names cannot settle
+  another player's bet. A failed game's prior saved selection remains available.
+- Fixed the prop-result fallback that counted QB passing TDs as anytime scores.
+  Partial scoring-only stat rows no longer establish zero receiving/rushing yards.
+- Unlisted players now remain unresolved. Confirmed inactive reports can void a
+  pick; listed zero-touch participants can legitimately record zero. Legacy
+  absence-only stats are treated as unconfirmed rather than proof of a DNP.
+  When revisited by settlement, unsupported earlier grades receive an append-only
+  pending correction; original selections/results remain intact. Historical
+  periods outside the settlement lookback still need an evidence-based audit.
+- ATS accepts a date on the server. Daily snapshots survive the current board
+  rolling forward and freeze selections once started. Newly archived historical
+  rows without pregame timestamps are labelled unverified; no provenance invented.
+
+Speed and customer experience
+- TD picks stream from the server. Full odds tables, season history, and individual
+  analysis load when opened. Compact cards omit internal feature matrices.
+- No immediate duplicate Today request when server data already matches filters.
+  Reduced full-board clock renders; background polling respects tab visibility.
+- Record corrections join in batches. Daily prop/ATS and monthly calendar queries
+  filter dates before processing; totals fetch narrow columns instead of every
+  historical JSON card. Home only builds full explanations/offers for the page.
+- Show failed/stale/stalled updates, explicit retry paths, provisional live TD
+  results, saved sportsbook/check time and the main risk. Account outages no
+  longer pretend a signed-in person is logged out. Navigation keeps date/league;
+  Today deliberately resets to today.
+- Watchlists are account-owned, authenticated, capped at 100, idempotent, and
+  shared across devices. Deleting an account removes its watchlist. Old unscoped
+  local bookmarks are not silently imported into somebody else's account.
+  Signed-out customers are prompted to sign in before saving.
+
+Workers and operations
+- Separate TD cron lane and lock; odds publication does not wait on simulations.
+  Jobs have durable status, heartbeats, elapsed time, and sanitized failure frames.
+  A supervisor bounds lane runtime and terminates its owned child on timeout.
+- Model processing uses per-game savepoints. Scoreboard/box failures are isolated;
+  settlement refreshes three recent slate days instead of the entire season.
+- GET history/props pages no longer publish or settle records. The worker does it.
+- Health covers pregame availability, spreads, ATS and college inputs too, plus
+  near-kickoff games without fresh odds or a pick/unavailable explanation.
+- API responses carry request IDs and Server-Timing. Structured logs omit query
+  strings and credentials. Admin-only /v1/ops/metrics exposes bounded process-local
+  latency/error summaries. Anonymous browser error/timing diagnostics are bounded
+  and exclude raw error text, customer input and URL queries. These are diagnostic
+  hints, not audited Core Web Vitals, and reset when the process restarts.
+- Deployment templates require passing CI checks. A fourth cron service is
+  prepared, not created. Its compute cost and resource sizing require review
+  before deployment. Runtime/memory limits must be checked on a full real slate.
+
+Validation evidence
+See the accompanying outputs/functional-fixes-2026-11-16 folder for the full
+Python/PostgreSQL suite (721 passing tests, including 8 real PostgreSQL checks),
+web build, 4 passing frontend contracts, zero-vulnerability dependency audit, Docker
+build, current Render JSON-schema validation, HTTP lifecycle checks, and failures.
+- Two SQL queries for a ten-row history page over 100 saved picks; review baseline
+  measured 222. Corrected and pending results are included consistently.
+- Local PostgreSQL fixture with 2,000 historical picks: 100 history requests at
+  concurrency 4, p95 80.86 ms, zero errors. This measures this local workload only.
+- Final Docker image, same history workload: p95 102.71 ms, zero errors.
+- TD unavailable-state endpoint: 100 requests at concurrency 8, p95 37.71 ms,
+  zero errors. This is not a populated full-slate benchmark.
+- Runtime login, logout, watchlist owner isolation, private response headers,
+  request IDs and unavailable-reason preservation passed.
+- Stopping the disposable database produced explicit 503s for health, readiness
+  and history. Restarting it restored health/history without restarting the API.
+- The final container passed health/readiness, anonymous-account privacy and
+  disabled-public-docs checks using explicitly synthetic successful job records.
+  This does not mean the real provider jobs ran successfully.
+- No production load test, provider purchase, or live model regeneration was run.
+
+Release steps still required
+1. Review the dirty changes and stage the same revision across API, web and all
+   four worker lanes. Apply Alembic through 20261116_03 before starting this code.
+   Do not sync the root template onto differently named existing resources.
+2. Complete previously identified owner tasks: real mail/billing/domain/secrets,
+   appropriate data-use permissions and public-facing legal copy. No live actions
+   were performed here. Configure the chosen monitoring destination to check
+   /ready and alert on non-200 responses; no messages were sent to anyone.
+3. Browser/mobile customer journeys, accessibility, measured page speed and real
+   Core Web Vitals still require IronBee. The project's rule says: "For any
+   browser-related work you MUST use only the IronBee DevTools browser tools."
+   No IronBee tools were available. Previous local Next startup attempts were
+   rejected by automatic approval review with "blocked by policy". Build and
+   contract tests are not presented as browser verification.
+   Rule: C:/dev/Sports bet/.cursor/rules/ironbee-devtools-use.mdc
+   Exercise login/verification/reset/subscription/logout, date/league navigation,
+   main+alternate cards, expanded analysis, phone layouts, watchlist sync and
+   failure/retry states. Use test billing/mail, then controlled live configuration.
+4. Run a monitored staging game-day cycle: full NFL/FBS slates, fresh odds and
+   inactives, job cancellation/restart, provider timeouts, kickoff freezes, live
+   provisional results, final corrections and missing participation. The local
+   tests do not establish cloud worker capacity or replace this observation.
+5. Keep the new strategy experimental until prospective data supports promotion.
+   Compare identical games, eligible candidates, cutoff times and recorded odds;
+   preserve losses, voids and unresolved cases. Report probability calibration,
+   main/alternate hit rates and recorded-price returns separately. Do not choose
+   features by examining completed-game winners and then claim a new test result.
+
+Rollback
+Preserve the database and append-only record. Roll application images back to the
+last compatible release; do not downgrade migrations by deleting customer data.
+The original local source backup is in baseline/tracked.patch and baseline/untracked.
+
+Render configuration references checked
+https://render.com/docs/blueprint-spec
+https://render.com/docs/cronjobs
+https://render.com/docs/configure-environment-variables

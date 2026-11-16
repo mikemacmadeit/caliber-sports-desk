@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { AccountMenu } from "@/components/AccountMenu";
 import { rememberNavigation } from "@/lib/navHistory";
 
 const GROUPS = [
@@ -27,7 +28,6 @@ const GROUPS = [
     label: "The record",
     items: [
       { href: "/track-record", label: "Ledger", hint: "Calls that stay on the books" },
-      { href: "/data-quality", label: "Health", hint: "Whether the model is ready" },
     ],
   },
 ];
@@ -48,14 +48,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const search = searchParams.toString();
   const here = NAV.find((item) => isActive(pathname, item.href));
   // Record during render so a click cannot leave before this page is on the stack.
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !["/reset", "/verify"].includes(pathname)) {
     rememberNavigation(search ? `${pathname}?${search}` : pathname);
   }
 
-  // Main nav always opens "today". The day strip is what moves you to another date.
+  // Preserve the selected slate between football pages; Today resets the date.
   function hrefFor(href: string) {
-    void date;
-    return href;
+    if (href === "/" || href === "/scenario") return href;
+    const params = new URLSearchParams();
+    if (date) params.set("date", date);
+    const league = searchParams.get("league");
+    if (league) params.set("league", league);
+    return params.size ? `${href}?${params}` : href;
   }
 
   return (
@@ -106,6 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="px-5 py-5">
+          <AccountMenu className="mb-4" />
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-mute">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold" />
             Research desk
@@ -122,7 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="grid h-8 w-8 place-items-center bg-gold font-display text-xl leading-none text-ink-950">C</span>
             <span className="font-display text-2xl uppercase tracking-wide">Caliber</span>
           </Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">Research</span>
+          <AccountMenu />
         </div>
         <nav aria-label="Sections" className="flex flex-wrap gap-1 px-3 pb-2">
           {PRIMARY.map((item) => {
@@ -193,7 +198,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </p>
       </div>
 
-      <main className="min-w-0 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-8 lg:px-10 lg:py-10">{children}</main>
+      <main id="main-content" className="min-w-0 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-8 lg:px-10 lg:py-10">{children}
+        <footer className="mt-12 flex flex-wrap gap-5 border-t border-white/10 pt-5 text-sm text-mute">
+          <Link className="min-h-11" href="/help">Help</Link><Link className="min-h-11" href="/privacy">Privacy</Link><Link className="min-h-11" href="/terms">Terms</Link>
+        </footer>
+      </main>
     </div>
   );
 }

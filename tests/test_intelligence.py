@@ -19,6 +19,7 @@ from spe.db.models import (
     Outcome,
     Player,
     PlayerAnalytics,
+    RosterWeek,
     Recommendation,
     Season,
     Sport,
@@ -126,6 +127,9 @@ def _game(db) -> Game:
         data_tier="demo",
     )
     db.add(game)
+    db.add(RosterWeek(player_id="p1", team_id="nfl:AAA", season_year=2026, week=5,
+                      status="ACT", position="RB", depth_chart_position="RB", provider="test",
+                      provider_record_id="r1", observed_at=NOW-timedelta(days=1), effective_at=NOW-timedelta(days=1)))
     db.add(
         Market(
             market_id="anytime_td",
@@ -590,8 +594,8 @@ def test_research_board_keeps_leagues_separate(db):
         )
     )
     db.flush()
-    nfl_rows = research_board(db, Scripted(ResearchOutput()), limit=5, league_id="nfl")
-    fbs_rows = research_board(db, Scripted(ResearchOutput()), limit=5, league_id="fbs")
+    nfl_rows = research_board(db, Scripted(ResearchOutput()), limit=5, league_id="nfl", as_of=NOW)
+    fbs_rows = research_board(db, Scripted(ResearchOutput()), limit=5, league_id="fbs", as_of=NOW)
     assert all(row["league_id"] == "nfl" for row in nfl_rows)
     assert all(row["league_id"] == "fbs" for row in fbs_rows)
     assert {row["game_id"] for row in nfl_rows} == {"g1"}

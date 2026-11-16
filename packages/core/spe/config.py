@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     web_origin: str = "http://localhost:3000"
+    auth_proxy_secret: str = ""
     database_url: str = "sqlite:///./data/caliber.db"
     parquet_dir: Path = Path("./data/parquet")
 
@@ -73,6 +74,13 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_price_id: str = ""
     subscription_price_cents: int = 1999
+
+    # Password reset mail. Empty host means the reset page explains that mail is not set up.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
 
     @property
     def odds_market_list(self) -> list[str]:

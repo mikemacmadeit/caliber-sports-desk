@@ -1,10 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import { AnytimeTdRecord } from "@/components/AnytimeTdRecord";
+import { AnytimeTdRecordPanel } from "@/components/AnytimeTdRecord";
 import { AnytimeTdResearchBoard, type ResearchFinderPayload } from "@/components/AnytimeTdResearchBoard";
-import type { AtdScoreRow, AtdTake } from "@/components/AnytimeTdScorecard";
 import { DayStrip, EmptyDay } from "@/components/DayStrip";
 import { LeagueToggle } from "@/components/LeagueToggle";
-import { AnytimeTdBoard } from "@/components/AnytimeTdBoard";
+import { AnytimeTdBoard, type BoardPayload } from "@/components/AnytimeTdBoard";
 import { PageHeader } from "@/components/PageHeader";
 import { apiGet } from "@/lib/api";
 import { dayParts, slateToday, type SlateDays, withQuery } from "@/lib/days";
@@ -52,14 +52,6 @@ export default async function AnytimeTdPage({
       research = null;
     }
   }
-
-  const scorecard = researchView
-    ? null
-    : await apiGet<{
-        atd_scorecard?: { rows: AtdScoreRow[]; note?: string; open_and_settled_takes?: AtdTake[] };
-      }>("/v1/shadow/track-record", 5000).catch(() => null);
-  const scoreRows = scorecard?.atd_scorecard?.rows || [];
-  const gradedTakes = scorecard?.atd_scorecard?.open_and_settled_takes || [];
 
   const loadFailure = researchView ? Boolean(researchError && !research) : false;
   const upcoming = (days?.dates || []).filter((d) => d >= selected).slice(0, 5);
@@ -118,16 +110,16 @@ export default async function AnytimeTdPage({
               href={next ? withQuery("/anytime-td", { league, date: next === days.today ? undefined : next }) : null}
             />
           ) : (
-            <AnytimeTdBoard
+            <Suspense fallback={<p role="status">Loading saved touchdown picks…</p>}><SavedScorerBoard
               key={`${league}:${selected}`}
               league={league}
               date={selected}
               today={today}
               candidateDates={upcoming}
               emptyTitle={`No odds posted ${when}`}
-            />
+            /></Suspense>
           )}
-          <AnytimeTdRecord rows={scoreRows} takes={gradedTakes} league={league} />
+          <AnytimeTdRecordPanel league={league} />
           <p className="text-sm text-mute">
             <Link href={researchHref} className="text-gold">
               Model notes
@@ -138,4 +130,11 @@ export default async function AnytimeTdPage({
       )}
     </div>
   );
+}
+
+async function SavedScorerBoard(props: Parameters<typeof AnytimeTdBoard>[0]) {
+  let payload: BoardPayload | undefined;
+  try { payload = await apiGet<BoardPayload>(`/v1/anytime-td/replay?${new URLSearchParams({league: props.league, date: props.date})}`, 6000); }
+  catch { /* The client provides a retry and an explicit failure state. */ }
+  return <AnytimeTdBoard {...props} initialCalled={payload?.rows} initialUnavailable={payload?.unavailable_games} initialRefresh={payload?.refresh_status} />;
 }

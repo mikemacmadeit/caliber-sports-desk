@@ -6,13 +6,13 @@ import { useEffect, useState } from "react";
 
 export function AccountMenu({ className = "" }: { className?: string }) {
   const pathname = usePathname();
-  const [href, setHref] = useState("/login");
-  const [label, setLabel] = useState("Log in");
+  const [href, setHref] = useState("/account");
+  const [label, setLabel] = useState("Account");
 
   useEffect(() => {
     let cancel = false;
     fetch("/api/auth/me", { cache: "no-store" })
-      .then((res) => res.json())
+      .then((res) => { if (!res.ok) throw new Error("Account unavailable"); return res.json(); })
       .then((data) => {
         if (cancel) return;
         if (data.user?.admin) {
@@ -31,8 +31,8 @@ export function AccountMenu({ className = "" }: { className?: string }) {
       })
       .catch(() => {
         if (!cancel) {
-          setHref("/login");
-          setLabel("Log in");
+          setHref("/account");
+          setLabel("Account unavailable");
         }
       });
     return () => {
@@ -41,7 +41,7 @@ export function AccountMenu({ className = "" }: { className?: string }) {
   }, [pathname]);
 
   return (
-    <Link href={href} className={`font-mono text-[10px] uppercase tracking-[0.22em] text-gold ${className}`}>
+    <Link href={href} className={`inline-flex min-h-11 items-center font-mono text-[10px] uppercase tracking-[0.22em] text-gold ${className}`}>
       {label}
     </Link>
   );

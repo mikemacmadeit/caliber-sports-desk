@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from spe.config import settings
 
-from spe.analytics.nflverse_opportunities import pbp_context, snap_context
+from spe.analytics.nflverse_opportunities import PBP_CONTEXT_COLUMNS, pbp_context, snap_context
 from spe.db.base import as_utc
 from spe.db.models import Game, IngestRun, NflverseGameContext, Player, PlayerGameStat
 from spe.ingest.nflverse_historical import load_asset, ingest_nfl_history
@@ -115,7 +115,7 @@ def refresh_nflverse_desk(session, *, year=None, now=None, force=False):
     attempt("box_scores", lambda: ingest_nfl_history(session, seasons=[year], refresh=True))
 
     def pbp():
-        frame = load_asset("pbp", year, refresh=True)
+        frame = load_asset("pbp", year, refresh=True, columns=PBP_CONTEXT_COLUMNS)
         positions = {p.player_id.removeprefix("nfl:"): p.position_group for p in session.query(Player).filter(Player.player_id.like("nfl:%"))}
         records = pbp_context(frame, positions)
         if not records:

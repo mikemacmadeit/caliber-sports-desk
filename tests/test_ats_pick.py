@@ -125,7 +125,7 @@ def test_board_keeps_recent_finals_and_drops_old_ones():
             {"game_id": "future", "kickoff_utc": now + timedelta(days=1), "status": "scheduled"},
             {"game_id": "just_final", "kickoff_utc": now - timedelta(hours=3), "status": "final", "margin": 7},
             {"game_id": "live", "kickoff_utc": now - timedelta(hours=1), "status": "in_progress"},
-            {"game_id": "old", "kickoff_utc": now - timedelta(days=6), "status": "final", "margin": 3},
+            {"game_id": "old", "kickoff_utc": now - timedelta(days=20), "status": "final", "margin": 3},
             {"game_id": "scratched", "kickoff_utc": now - timedelta(hours=2), "status": "canceled"},
         ]
     )
@@ -650,6 +650,118 @@ def test_missing_number_has_no_spread_pick():
         )
         is None
     )
+
+
+def test_a_rookie_quarterbacks_first_start_is_faded():
+    raiders = attach_spread_pick(
+        {
+            "kickoff_utc": "2026-11-15T21:25:00+00:00",
+            "game_status": "final",
+            "home_score": 13,
+            "away_score": 21,
+            "home_handicap": 6.5,
+            "predicted_margin": -5.6,
+            "home_team": "Las Vegas Raiders",
+            "away_team": "Seattle Seahawks",
+            "model_vs_market": 5.9,
+            "league_id": "nfl",
+            "favored_side": "away",
+            "pick_team": "Seattle Seahawks",
+            "pick_label": "Seattle Seahawks to win",
+            "pick_market": "straight_up",
+            "ats_side": "home",
+            "ats_team": "Las Vegas Raiders",
+            "ats_line": 6.5,
+            "ats_pick_label": "Las Vegas Raiders +6.5",
+            "ats_basis": "number",
+            "ats_locked": True,
+            "projection_withheld": False,
+        }
+    )
+    assert raiders["pick_label"] == "Seattle Seahawks to win"
+    assert raiders["ats_pick_label"] == "Seattle Seahawks -6.5"
+    assert raiders["ats_basis"] == "rookie_qb"
+    assert raiders["ats_pick_result"] == "correct"
+
+    cardinals = attach_spread_pick(
+        {
+            "kickoff_utc": "2026-11-15T21:05:00+00:00",
+            "game_status": "final",
+            "home_score": 6,
+            "away_score": 34,
+            "home_handicap": 9.5,
+            "predicted_margin": -8.7,
+            "home_team": "Arizona Cardinals",
+            "away_team": "Los Angeles Rams",
+            "model_vs_market": 5.2,
+            "league_id": "nfl",
+            "favored_side": "away",
+            "pick_team": "Los Angeles Rams",
+            "pick_label": "Los Angeles Rams to win",
+            "pick_market": "straight_up",
+            "ats_side": "home",
+            "ats_team": "Arizona Cardinals",
+            "ats_line": 9.5,
+            "ats_pick_label": "Arizona Cardinals +9.5",
+            "ats_basis": "number",
+            "ats_locked": True,
+            "projection_withheld": False,
+        }
+    )
+    assert cardinals["ats_pick_label"] == "Los Angeles Rams -9.5"
+    assert cardinals["ats_pick_result"] == "correct"
+    assert cardinals["pick_label"] == "Los Angeles Rams to win"
+
+
+def test_a_short_dog_lays_the_points_with_the_favorite():
+    patriots = attach_spread_pick(
+        {
+            "game_status": "final",
+            "home_score": 35,
+            "away_score": 10,
+            "home_handicap": -3.0,
+            "predicted_margin": 2.8,
+            "home_team": "Detroit Lions",
+            "away_team": "New England Patriots",
+            "model_vs_market": -1.5,
+            "league_id": "nfl",
+            "favored_side": "home",
+            "pick_team": "Detroit Lions",
+            "pick_label": "Detroit Lions to win",
+            "pick_market": "straight_up",
+            "ats_side": "away",
+            "ats_team": "New England Patriots",
+            "ats_line": 3.0,
+            "ats_pick_label": "New England Patriots +3",
+            "ats_basis": "score",
+            "ats_locked": True,
+            "projection_withheld": False,
+        }
+    )
+    assert patriots["ats_pick_label"] == "Detroit Lions -3"
+    assert patriots["ats_pick_result"] == "correct"
+    assert patriots["pick_label"] == "Detroit Lions to win"
+
+    packers = attach_spread_pick(
+        {
+            "game_status": "final",
+            "home_score": 10,
+            "away_score": 30,
+            "home_handicap": -2.5,
+            "home_team": "Green Bay Packers",
+            "away_team": "Minnesota Vikings",
+            "ats_side": "home",
+            "ats_team": "Green Bay Packers",
+            "ats_line": -2.5,
+            "ats_pick_label": "Green Bay Packers -2.5",
+            "ats_basis": "score",
+            "ats_locked": True,
+            "pick_market": "straight_up",
+            "projection_withheld": False,
+        }
+    )
+    assert packers["ats_pick_label"] == "Green Bay Packers -2.5"
+    assert packers["ats_pick_result"] == "miss"
 
 
 def test_straight_up_pick_uses_the_winner():

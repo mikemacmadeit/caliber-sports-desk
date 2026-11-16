@@ -98,7 +98,8 @@ def test_cards_carry_club_colors_and_logos():
     assert build([blank], now=NOW)["rows"][0]["team_mark"] is None
 
 
-def test_desk_route_reads_only_snapshots_and_removes_canceled_games(db):
+def test_desk_route_reads_only_snapshots_and_removes_canceled_games(db, monkeypatch):
+    monkeypatch.setattr("app.main._viewer_is_subscribed", lambda request: True)
     from app.main import app
     from app.deps import db_session
     from app.queries import kickoff_day

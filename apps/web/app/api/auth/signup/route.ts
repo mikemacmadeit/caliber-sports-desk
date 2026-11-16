@@ -1,3 +1,4 @@
+import { authHeaders } from "@/lib/serverAuth";
 import { NextResponse } from "next/server";
 import { detail, withSession } from "@/lib/serverAuth";
 
@@ -7,7 +8,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const res = await fetch(`${API}/v1/auth/signup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(request),
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({ email: body.email ?? "", password: body.password ?? "" }),
     cache: "no-store",
   });

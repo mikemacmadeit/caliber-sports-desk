@@ -1,0 +1,42 @@
+Release candidate: production readiness corrections, November 16, 2026
+
+This supersedes implementation details in the preceding local readiness notes.
+Deployment success must be verified separately using the exact released commit.
+
+Behavior
+- ATS pages preserve the server's selection, subscription lock and final result.
+- TD participation-unconfirmed results stay pending; confirmed inactivity is void.
+  Live scoring highlights do not count as settled wins. Passing TDs are excluded.
+- Daily, monthly and yearly records use the corrected database ledger. Historical
+  display archives without proven pregame capture are excluded from verified returns.
+- Worker-produced college evidence is compressed, hashed and shared in PostgreSQL.
+  Consumers preserve source timestamps. PostgreSQL and SQLite use the same exporter.
+  Missing raw historical plays cannot erase existing measured evidence.
+- Nested provider failures mark jobs degraded, retain previous shared inputs and
+  appear in readiness. Shared college artifact freshness is checked separately.
+- TD refreshes commit progress after each game and reuse recent completed work.
+  Supervisor timeouts release locks; a later run resumes remaining work.
+- Scenario Lab starts with saved pregame probabilities and actual team expectations.
+  Team-scoring overrides have an explicit mathematical effect. Unsupported wind
+  controls were removed. Draw counts, concurrency and per-account requests are bounded.
+- All current TD selections and scenarios remain experimental. This release does
+  not promote a failed model artifact or claim an accuracy improvement.
+
+Release order
+1. Back up the existing database and rehearse additive Alembic migrations.
+2. Pass backend, PostgreSQL, frontend contract and production build checks.
+3. Configure /health as Render's routing probe and /ready for data freshness.
+4. Deploy the API with pre-deploy migration through 20261116_04.
+5. Deploy supervised odds, settlement, inputs and separate TD worker lanes.
+6. Deploy the matching Netlify website, with the same private AUTH_PROXY_SECRET.
+7. Verify public API behavior and actual worker completion before declaring healthy.
+
+Boundaries
+Original picks and historical outcomes must not be replaced with hindsight picks.
+Missing source data must not be labeled healthy. Known-out players are withheld,
+but a fresh active report cannot guarantee future snaps or a touchdown.
+SMTP, live Stripe configuration, owner policies and domain setup remain owner tasks.
+Full browser journey sign-off requires the project's IronBee tools, unavailable
+in the current agent session. No equivalent browser sign-off is claimed.
+The full selection/simulation policy still needs prospective NFL and college
+evaluation separately, using frozen pre-kickoff candidates, inputs and prices.

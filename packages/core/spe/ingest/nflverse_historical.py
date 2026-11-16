@@ -55,13 +55,17 @@ def cache_dir() -> Path:
     return path
 
 
-def load_asset(key: str, season: int | None = None, *, refresh: bool = False) -> pd.DataFrame:
+def load_asset(key: str, season: int | None = None, *, refresh: bool = False, columns=None) -> pd.DataFrame:
     adapter = NflverseAdapter()
     url = adapter.asset_url(key, season)
     filename = url.rsplit("/", 1)[-1]
     dest = cache_dir() / filename
     download_file(url, dest, refresh=refresh)
-    return pd.read_parquet(dest)
+    if columns is not None:
+        import pyarrow.parquet as pq
+        available = set(pq.ParquetFile(dest).schema_arrow.names)
+        columns = [c for c in columns if c in available]
+    return pd.read_parquet(dest, columns=columns)
 
 
 def ingest_nfl_history(

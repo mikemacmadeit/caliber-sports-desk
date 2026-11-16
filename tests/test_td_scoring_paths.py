@@ -89,6 +89,25 @@ def test_missing_college_charting_does_not_invent_a_stress_test():
     assert pick['decision']['value_candidate'] is None
 
 
+def test_touch_volume_without_a_scoring_area_role_is_not_the_alternate():
+    leader = priced('Henry', .24, -140)
+    volume = priced('Hill', .16, 450)
+    volume['desk_analysis']['combination']['scoring_paths']['paths'] = []
+    role = priced('Hampton', .148, 310)
+    alt = choose([leader, volume, role])['decision']['value_candidate']
+    assert alt['name'] == 'Hampton'
+    assert alt['alternative_basis'] == 'football_research'
+    assert alt['football_case']['supported']
+    assert not choose([leader, volume])['decision']['value_candidate']['football_case']['supported']
+
+
+def test_scoring_area_share_does_not_borrow_ordinary_touches():
+    from spe.models.player_td.scoring_paths import role_share
+    assert role_share(0, 8, .25, 'rush_5') == 0
+    assert role_share(7, 8, .54, 'rush_5') == 7 / 11
+    assert role_share(0, 8, .25, 'rush_open') == (3 * .25) / 11
+
+
 def test_missing_research_uses_scoring_rank_without_inventing_an_advantage():
     leader=priced('leader',.65,-250)
     cheap=priced('cheap',.45,500,.4)

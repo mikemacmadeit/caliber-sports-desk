@@ -1,0 +1,24 @@
+# Send only runtime source/artifacts to the Docker build context.
+**
+!Dockerfile
+!pyproject.toml
+!README.md
+!constraints.txt
+!packages/
+!packages/core/
+!packages/core/**
+!services/
+!services/api/
+!services/api/**
+!services/worker/
+!services/worker/**
+!infra/
+!infra/alembic.ini
+!infra/alembic/
+!infra/alembic/**
+!deploy/
+!deploy/runtime-data/
+!deploy/runtime-data/**
+**/__pycache__/**
+**/*.pyc
+**/.env*

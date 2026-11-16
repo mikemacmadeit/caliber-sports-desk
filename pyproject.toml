@@ -46,7 +46,8 @@ where = ["packages/core"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["packages/core", "services/api"]
+pythonpath = ["packages/core", "services/api", "services/worker", "scripts", "."]
+asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 
 [tool.ruff]

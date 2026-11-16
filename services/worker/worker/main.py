@@ -1872,7 +1872,7 @@ def main() -> None:
     if len(sys.argv) >= 2 and sys.argv[1] == "production-cycle":
         parser = argparse.ArgumentParser()
         parser.add_argument("command")
-        parser.add_argument("--lane", choices=("odds", "inputs", "settlement"), required=True)
+        parser.add_argument("--lane", choices=("odds", "inputs", "settlement", "touchdowns"), required=True)
         args = parser.parse_args()
         from spe.publishing.pipeline import production_cycle
         print(json.dumps(production_cycle(args.lane), default=str))

@@ -1,0 +1,152 @@
+CALIBER: TECHNICAL FIXES AND LAUNCH HANDOFF
+Prepared November 16, 2026
+
+STATUS
+Local implementation on codex/production-readiness, based on b2b87e4.
+This is a tested release candidate, not a production deployment or public-launch approval.
+Existing uncommitted work was preserved. No live picks, customer accounts, payments,
+emails, data purchases, hosting plans or production database schema were changed.
+
+COMPLETED LOCALLY
+1. Account protection: shared atomic login/recovery limits, signed proxy identity,
+   expiring single-use recovery and verification tokens, session revocation, email
+   verification before checkout, and password-confirmed account removal. Accounts
+   with a renewing subscription must cancel through billing before removal.
+2. Billing: duplicate-event receipts, account locking, older-event protection,
+   protection against an old subscription canceling its replacement, repeated
+   checkout idempotency, active-subscription checks, finite request timeouts.
+3. Boards: API is the source of picks/results. Removed frontend ESPN grading and
+   static JSON fallback paths. Private responses use no-store. Empty/error results
+   no longer resurrect old local boards or a previous customer's cached response.
+4. Record: prospective picks remain separate from unverified archives/replays.
+   Main and named alternate results are read from recorded game data. Official
+   statistics wait for final games; provisional live TD markers can still appear.
+   Missing participation evidence is unresolved, not an invented TD loss. Returns
+   require actual eligible recorded prices. Corrections append an audit entry and
+   preserve the original published result. Recent published boxes are rechecked.
+5. Workers: TD model/simulation refresh runs in the scheduled odds lane. Public
+   production TD reads never launch model/data workers. Optional paid college injury
+   coverage cannot fail otherwise successful free-source ingestion. Source failures
+   and unknown coverage remain explicit. Interrupted jobs are detected under the
+   lane lock. Downloads have bounded retries and atomic replacement. NFL play data
+   reads use the required columns and avoid materializing duplicate row lists.
+6. Operations: versioned Alembic migrations, production startup schema validation,
+   limited PostgreSQL connection pools, database health check and feed readiness
+   probe, CI with PostgreSQL and frontend builds, pinned Python dependencies,
+   patched npm dependency override and a restricted Docker build context.
+7. Customer UI: recovery, verification, deletion, errors, keyboard skip link, help,
+   support-contact configuration, and clearly marked privacy/terms drafts.
+   TD card payload omits internal matrices and keeps the existing user explanations.
+
+KEY IMPLEMENTATION FILES
+services/api/app/auth_routes.py, billing.py, mail.py, main.py
+packages/core/spe/accounts/auth.py, limits.py
+packages/core/spe/publishing/pipeline.py, ledger.py, boxes.py
+packages/core/spe/models/player_td/desk_replay.py, desk_replay_results.py, presentation.py
+packages/core/spe/db/session.py, models.py
+apps/web/lib/api.ts, browserApi.ts, serverAuth.ts
+apps/web/app/api/backend/[...path]/route.ts, apps/web/middleware.ts
+infra/alembic/versions/20261116_01_launch_baseline.py
+infra/alembic/versions/20261116_02_account_and_result_audit.py
+.github/workflows/tests.yml, constraints.txt, Dockerfile, .dockerignore
+tests/test_launch_hardening.py, tests/test_postgres_launch.py
+scripts/check_release.py
+
+VALIDATION
+The final Python run passed 704 tests, including six real PostgreSQL tests. The
+frontend production build and Docker build passed. The suite reported 11 existing
+empty-data/deprecation warnings, with no failures. Logs are in the evidence folder.
+Runtime API checks covered signup, secure cookies, verification reuse, password
+reset/session revocation, test-account deletion and rate-limit enforcement.
+Anonymous -> subscriber -> anonymous reads proved the synthetic private picks and
+alternate did not leak between viewers. No production users were involved.
+Both fresh and existing SQLite schemas migrated without losing the test account.
+Fresh PostgreSQL migrations matched the model's tables/columns. A local pg_dump /
+pg_restore rehearsal matched all 70 tables' row counts and data hashes.
+npm audit reported zero vulnerabilities at the time of checking; pip check passed.
+The saved 12-game payload fell from 1,615,979 to 422,429 bytes (73.9% smaller).
+This is a serialization comparison, not a measured production latency improvement.
+Docker runtime: /health 200, /v1/auth/me 200 with no-store, /docs 404. /ready correctly
+returned 503 because the disposable test database had never run ingestion jobs.
+
+WHAT THE OWNER NEEDS TO PROVIDE / DECIDE
+1. Final public domain and ownership/access to its DNS.
+2. Free-preview versus paid features, final price, cancellation/refund policy.
+   Current code retains the existing $19.99 monthly UI and pregame paywall policy.
+3. Stripe business verification and payout account, then test-mode credentials,
+   product/price and webhook configuration. Do not paste secret keys into chat.
+4. Transactional email account/sender and a monitored support address.
+5. Legal operator, privacy retention, intended markets/age requirements, approved
+   policies and data-provider display/attribution permissions. Draft pages are
+   not approved legal policies. No purchase is presumed necessary.
+6. A person responsible for alerts and support during the beta.
+
+TECHNICAL RELEASE STEPS AFTER THOSE DECISIONS
+These are release actions still to perform; they are not assigned back to the
+owner as coding tasks and have not happened automatically.
+
+A. Review the whole candidate diff, including the preserved preexisting changes,
+   and produce one reviewed commit. Run CI on that exact commit. API, worker and
+   web must use compatible versions. Do not push master casually: existing jobs
+   are configured to auto-deploy from that branch.
+B. Verify a production backup exists and restore a protected copy to an isolated
+   staging database. Local restore evidence does not prove the hosted backup is
+   usable. Rehearse migration against that copy before the production database.
+C. Existing API is caliber-api-xtkn (srv-dbpi1fon74is73e1e3p0), database is
+   caliber-db-xtkn (dpg-dbpi15gn74is73e1d3rg-a). Existing workers are caliber-hourly,
+   caliber-inputs and caliber-scoreboard. Do not apply the generic root render.yaml
+   blindly: its resource names differ and may create new services/database.
+D. Correct the EXISTING API health-check path from /docs to /health before release.
+   Add its pre-deploy migration command:
+     python -m alembic -c infra/alembic.ini upgrade head
+   Target revision is 20261116_02. Stop/release workers in a coordinated order so
+   schema checks do not race migration. Downgrades deliberately do not drop data.
+   Roll back application code to a compatible version; use a protected backup
+   only through a deliberate recovery plan, never by deleting published records.
+E. Configure API WEB_ORIGIN (HTTPS), private AUTH_PROXY_SECRET, Stripe and SMTP.
+   Set the same AUTH_PROXY_SECRET in the Next server and its API_URL to the API.
+   Only NEXT_PUBLIC_SUPPORT_EMAIL is public. Never expose payment/SMTP/DB secrets
+   through NEXT_PUBLIC variables. Set a real NWS contact. Open-Meteo remains off.
+F. Stage the release and exercise complete email and Stripe TEST-mode journeys:
+   signup -> verify -> checkout -> refresh -> renewal -> failure -> recovery ->
+   cancellation -> expired access; wrong-user confirmation; account removal;
+   expired/reused reset links; duplicate and delayed webhook delivery. This turn
+   mocked payment/email services and did not contact them on behalf of customers.
+G. IronBee browser QA: phone/desktop, keyboard, navigation, form errors, recovery,
+   main/alternate cards, prices, live/final/empty states, cancellation and logout.
+   The repository rule requires IronBee; it was unavailable in this session.
+   Automatic approval review also blocked local Next.js server startup, providing
+   only 'blocked by policy'. No browser/customer click-through test is claimed.
+H. Run all three scheduled lanes successfully in staging, then a representative
+   NFL and college game-day cycle with pregame snapshots and final results.
+   Validate repeat runs, input outages, fresh withdrawals, postponed/canceled games
+   and result corrections. Unknown participation must remain unresolved until
+   supported evidence and the declared grading rule are available.
+I. Use /health for service routing and /ready for scheduled freshness monitoring.
+   Read-only probe (exits nonzero for missing/stale/failed jobs):
+     python scripts/check_release.py --api-url https://<api> --output release-check.json
+   Connect this or /ready to the chosen alert destination. Sending external alerts
+   was not authorized in this task. No automatic monitor notification was created.
+J. Test realistic concurrent traffic in staging, set a response-time/error budget,
+   then release the coordinated API/worker/web versions. The live DB had connection
+   failures during review; memory exhaustion was NOT established. No plan upgrade
+   was made or asserted necessary. Verify the actual hosted cause and recovery.
+
+MODEL EVIDENCE STILL NEEDED
+No retraining or retrospective replacement of picks was used to make the record
+look better. More reliable software and extra simulations are not proof of better
+predictions. Keep research/beta labeling. Freeze candidates, version, cutoff and
+price before kickoff; compare current, simulation and market baselines on matching
+future games, separately for NFL/FBS. Report main and alternate hit rates,
+probability calibration and recorded-price returns separately. Existing historical
+calibration failed its promotion gate; future outcomes are still required.
+
+EVIDENCE LOCATION
+C:\Users\micha\Documents\Codex\2026-11-14\compare-these-two-local-projects-nfl\outputs\production-fixes-2026-11-16
+Contains the original worktree backup, test/build logs, API smoke reports, dependency
+audit, restore hashes and payload sizes. These contain no live customer export.
+
+PRIMARY REFERENCE USED FOR PROXY CONFIGURATION
+Netlify-supported client connection header:
+https://answers.netlify.com/t/upcoming-change-stripping-exposed-netlify-headers-from-function-and-proxy-requests/52665
+Trusted edge handling must be checked in the actual hosted staging environment.

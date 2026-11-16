@@ -171,7 +171,7 @@ def test_a_game_that_has_not_kicked_off_is_not_fetched(db):
     assert rows[0]["result"] == "pending"
 
 
-def test_a_live_touchdown_is_green_and_a_blank_teammate_stays_open(db):
+def test_live_touchdowns_are_provisional_until_the_game_is_final(db):
     _seed(db)
     rows = [
         _row("nfl:6963", "Amon-Ra St. Brown"),
@@ -185,8 +185,9 @@ def test_a_live_touchdown_is_green_and_a_blank_teammate_stays_open(db):
     })
     apply_recorded_results(db, [], rows, fetch=lambda league, event: box)
     by_name = {row["player_name"]: row["result"] for row in rows}
-    assert by_name["Amon-Ra St. Brown"] == "win"
-    assert by_name["Isaac TeSlaa"] == "win"
+    assert by_name["Amon-Ra St. Brown"] == "pending"
+    assert next(r for r in rows if r["player_name"] == "Amon-Ra St. Brown")["live_result"] == "scored"
+    assert by_name["Isaac TeSlaa"] == "pending"
     assert by_name["Jahmyr Gibbs"] == "pending"
 
 
@@ -280,7 +281,7 @@ def _athlete(player_id: str, name: str, stats: list[str]) -> dict:
     return {"athlete": {"id": player_id.split(":")[-1], "displayName": name}, "stats": stats}
 
 
-def test_a_player_missing_from_the_final_box_is_void_not_a_loss(db):
+def test_a_player_missing_from_the_final_box_has_unconfirmed_participation(db):
     _CHECKED.clear()
     _seed(db)
     game = db.get(Game, "nfl:2026_10_NE_DET")
@@ -305,13 +306,13 @@ def test_a_player_missing_from_the_final_box_is_void_not_a_loss(db):
     }
     box = _final_box([("receiving", ["REC", "YDS", "TD"], [_athlete("nfl:6963", "Amon-Ra St. Brown", ["4", "40", "1"])])])
     apply_recorded_results(db, [], [row], fetch=lambda league, event: box)
-    assert row["result"] == "void"
+    assert row["result"] == "pending"
     assert row["actual"] is None
     stat = db.get(PublishedStat, "nfl:2026_10_NE_DET|nfl:9139|receiving_yards")
-    assert stat.source == "espn.summary.absent"
+    assert stat.source == "espn.summary.participation_unconfirmed"
 
 
-def test_an_official_zero_for_a_missing_player_is_void(db):
+def test_an_unsupported_zero_for_a_missing_player_is_withheld(db):
     _CHECKED.clear()
     _seed(db)
     game = db.get(Game, "nfl:2026_10_NE_DET")
@@ -336,7 +337,7 @@ def test_an_official_zero_for_a_missing_player_is_void(db):
     }
     box = _final_box([("receiving", ["REC", "YDS", "TD"], [_athlete("nfl:6963", "Amon-Ra St. Brown", ["4", "40", "1"])])])
     apply_recorded_results(db, [], [row], fetch=lambda league, event: box)
-    assert row["result"] == "void"
+    assert row["result"] == "pending"
     assert row["actual"] is None
 
 

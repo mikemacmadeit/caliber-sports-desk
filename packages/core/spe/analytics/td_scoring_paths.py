@@ -46,7 +46,9 @@ def aggregate(frame, positions):
         entry['opportunities'] += 1
         entry['tds'] += td
         entry['yards'] += yards
-    for r in frame.to_dict('records'):
+    columns = list(frame.columns)
+    for values in frame.itertuples(index=False, name=None):
+        r = dict(zip(columns, values))
         kind = 'rush' if r['carry'] else 'rec' if r['target'] else None
         if kind is None:
             continue

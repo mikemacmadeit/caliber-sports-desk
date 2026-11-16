@@ -1,5 +1,5 @@
 # Existing Caliber production workers. Adopt matching jobs; retain the existing API and database.
-# Set API_SPORTS_KEY on caliber-inputs in Render when available. Missing FBS coverage stays degraded.
+# API_SPORTS_KEY is optional. Missing coverage is reported; free inputs keep running.
 services:
 - type: cron
   runtime: docker
@@ -7,12 +7,12 @@ services:
   region: oregon
   repo: https://github.com/mikemacmadeit/caliber-sports-desk
   branch: master
-  autoDeployTrigger: commit
+  autoDeployTrigger: checksPass
   dockerfilePath: ./Dockerfile
   dockerContext: .
   name: caliber-hourly
   schedule: '*/5 * * * *'
-  dockerCommand: python -m worker.main production-cycle --lane odds
+  dockerCommand: python -m worker.supervise --lane odds --timeout 240
   envVars:
   - key: APP_ENV
     value: prod
@@ -42,12 +42,12 @@ services:
   region: oregon
   repo: https://github.com/mikemacmadeit/caliber-sports-desk
   branch: master
-  autoDeployTrigger: commit
+  autoDeployTrigger: checksPass
   dockerfilePath: ./Dockerfile
   dockerContext: .
   name: caliber-scoreboard
   schedule: '*/15 * * * *'
-  dockerCommand: python -m worker.main production-cycle --lane settlement
+  dockerCommand: python -m worker.supervise --lane settlement --timeout 720
   envVars:
   - key: APP_ENV
     value: prod
@@ -65,12 +65,12 @@ services:
   region: oregon
   repo: https://github.com/mikemacmadeit/caliber-sports-desk
   branch: master
-  autoDeployTrigger: commit
+  autoDeployTrigger: checksPass
   dockerfilePath: ./Dockerfile
   dockerContext: .
   name: caliber-inputs
   schedule: '*/15 * * * *'
-  dockerCommand: python -m worker.main production-cycle --lane inputs
+  dockerCommand: python -m worker.supervise --lane inputs --timeout 720
   envVars:
   - key: APP_ENV
     value: prod
@@ -84,3 +84,28 @@ services:
     value: /app/packages/core:/app/services/api:/app/services/worker
   - key: NWS_USER_AGENT
     value: Caliber Sports Desk (calibersportsbet@gmail.com)
+
+# Separate lane prevents simulation time from delaying odds publication.
+- type: cron
+  runtime: docker
+  plan: 1c-2g
+  region: oregon
+  repo: https://github.com/mikemacmadeit/caliber-sports-desk
+  branch: master
+  autoDeployTrigger: checksPass
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  name: caliber-touchdowns
+  schedule: '2-59/5 * * * *'
+  dockerCommand: python -m worker.supervise --lane touchdowns --timeout 240
+  envVars:
+  - key: APP_ENV
+    value: prod
+  - key: DATABASE_URL
+    fromDatabase:
+      name: caliber-db-xtkn
+      property: connectionString
+  - key: PARQUET_DIR
+    value: /data/parquet
+  - key: PYTHONPATH
+    value: /app/packages/core:/app/services/api:/app/services/worker
