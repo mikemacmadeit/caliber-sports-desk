@@ -94,6 +94,21 @@ def test_postgres_td_grades_are_batched(pgdb):
     test_td_card_grades_batch_sources_and_match_individual_grading(pgdb)
 
 
+def test_postgres_ledger_range(pgdb):
+    from test_reliability_followup import test_record_range_matches_every_daily_card_and_has_bounded_queries
+    test_record_range_matches_every_daily_card_and_has_bounded_queries(pgdb)
+
+
+def test_postgres_board_connection_reuse(pgdb, monkeypatch):
+    from test_reliability_followup import test_shared_boards_use_the_request_connection
+    test_shared_boards_use_the_request_connection(pgdb, monkeypatch)
+
+
+def test_postgres_ats_history_eligibility(pgdb):
+    from test_reliability_followup import test_ats_record_filters_preserve_first_eligible_freeze
+    test_ats_record_filters_preserve_first_eligible_freeze(pgdb)
+
+
 def test_postgres_published_corrections(pgdb):
     from test_launch_hardening import test_stat_correction_is_auditable_and_consistent_across_record_views
     test_stat_correction_is_auditable_and_consistent_across_record_views(pgdb)

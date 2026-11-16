@@ -67,3 +67,23 @@ and exact-commit deployment/job/HTTP checks are recorded in the accompanying
 optimization-review-20261116 output directory. Browser journey verification still
 requires the project's unavailable IronBee tools. This is not a prediction-accuracy
 claim or a large-concurrency capacity certification.
+
+Second reliability pass
+- Reuse the caller's database session for ATS/prop snapshot reads, batch the four
+  prop markets and avoid reading the same market again just to check availability.
+- Month/year records fetch each source once for the date range. Official TD grades,
+  corrections, alternates, verified-publication exclusions and original prices use
+  the same rules as the daily record. No cross-request result cache is introduced.
+  ATS cohort/cutoff/price exclusions also run in SQL before loading full predictions.
+- Process billing webhook database/Stripe work in the thread pool so a slow callback
+  cannot block unrelated API traffic. The "production" environment alias follows
+  the same no-inline-ATS-refresh and secure-email-origin rules as "prod".
+- Account proxy failures return useful errors. Missing tokens or missing checkout,
+  recovery and subscription-confirmation data cannot be reported as successful.
+- CI uses PostgreSQL 18 like production, read-only repository permissions, bounded
+  job timeouts and cancellation of superseded runs on the same branch.
+Evidence: outputs/reliability-followup-20261116 in the Codex task workspace. Restored
+record outputs matched; a 35-day regression checks bounded queries and correction
+visibility on SQLite/PostgreSQL. Authenticated API checks cover signup, reset/session
+revocation, private watchlists and logout. Account/web route contracts and the full
+suite/build also run in CI. No live billing charges or email sends are part of QA.

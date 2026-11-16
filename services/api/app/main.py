@@ -601,12 +601,13 @@ def _matchup_note(row: dict[str, Any]) -> str | None:
 @app.get("/v1/props/picks")
 def prop_picks(league: League = Query(default="all"), date: IsoDay | None = None,
                session: Session = Depends(db_session)) -> dict[str, Any]:
-    from spe.props.board_cache import load_slate_props, read_entry, WARM_MARKETS
+    from spe.props.board_cache import load_slate_props, slate_entries, WARM_MARKETS
     from spe.publishing.ledger import current_picks, day_picks, record_frozen_desk_picks, settle
     selected = date or slate_today()
     games = games_for_slate(session, selected, league)
-    rows = load_slate_props(session, league, selected)
-    degraded = bool(games) and any(read_entry(market, league, selected) is None for market in WARM_MARKETS)
+    entries = slate_entries(session, league, selected)
+    rows = load_slate_props(session, league, selected, entries=entries)
+    degraded = bool(games) and any(entries.get(market) is None for market in WARM_MARKETS)
     return {"date": selected, "league": league, "games_on_slate": len(games), "degraded": degraded,
             "picks": current_picks(session, rows),
             "day": day_picks(session, league, selected),

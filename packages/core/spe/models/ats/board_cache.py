@@ -26,10 +26,10 @@ def cache_path() -> Path:
     return Path(settings.parquet_dir).parent / "cache" / "ats_board.json"
 
 
-def read_board(path: Path | None = None) -> dict[str, Any] | None:
+def read_board(path: Path | None = None, *, session: Session | None = None) -> dict[str, Any] | None:
     if path is None:
         from spe.publishing.store import read
-        return read("ats")
+        return read("ats", db=session)
     target = path or cache_path()
     try:
         payload = json.loads(target.read_text(encoding="utf-8"))
@@ -148,7 +148,7 @@ def keep_finished_spreads(previous: dict[str, Any] | None, payload: dict[str, An
 def refresh_board(session: Session, path: Path | None = None) -> dict[str, Any]:
     from spe.models.ats.predict import predict_upcoming_ats
 
-    previous = read_board(path)
+    previous = read_board(path, session=session)
     payload = predict_upcoming_ats(session, include_simulation=False)
     if not (payload.get("rows") or []) and previous and (previous.get("rows") or []):
         return previous
@@ -167,14 +167,14 @@ def load_board(session: Session, path: Path | None = None, *, date: str | None =
         archived = read(f"ats-day:{date}", session)
         if archived is not None:
             return {**archived, "archive_note": "Saved ATS selections. Results update from confirmed scores; the saved side and line stay fixed after kickoff."}
-    cached = read_board(path)
+    cached = read_board(path, session=session)
     if cached and (cached.get("rows") or []) and is_fresh(cached):
         return cached
     if cached and (cached.get("rows") or []):
-        if settings.app_env != "prod":
+        if settings.app_env not in {"prod", "production"}:
             _refresh_in_background(path)
         return cached
-    if settings.app_env == "prod":
+    if settings.app_env in {"prod", "production"}:
         return {"rows": [], "degraded": True, "reason": "awaiting_worker"}
     return refresh_board(session, path)
 

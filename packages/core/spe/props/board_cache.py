@@ -66,10 +66,11 @@ def read_entry(
     league: str | None,
     date: str | None,
     path: Path | None = None,
+    *, session: Session | None = None,
 ) -> dict[str, Any] | None:
     if path is None:
         from spe.publishing.store import read
-        return read("props:" + entry_key(market, league, date))
+        return read("props:" + entry_key(market, league, date), db=session)
     store = read_store(path)
     entry = (store.get("entries") or {}).get(entry_key(market, league, date))
     if not isinstance(entry, dict) or "rows" not in entry:
@@ -193,17 +194,9 @@ def load_props(
     if path is None and not block_on_miss and settings.app_env == "dev":
         from spe.publishing.local_board import ensure_local_board
         ensure_local_board(session, date, league or "all")
-    cached = read_entry(market, league, date, path)
+    cached = read_entry(market, league, date, path, session=session)
     if cached is not None:
-        from spe.publishing.policy import annotate
-        rows = []
-        for row in cached.get("rows") or []:
-            if not isinstance(row, dict):
-                continue
-            try:
-                rows.append(annotate(row))
-            except Exception:
-                rows.append(row)
+        rows = _entry_rows(cached)
         if not is_fresh(cached):
             if settings.app_env == "dev" and path is not None:
                 _refresh_in_background(market, league, date, path)
@@ -223,6 +216,29 @@ def load_props(
     return []
 
 
+def _entry_rows(entry):
+    from spe.publishing.policy import annotate
+    rows = []
+    for row in (entry or {}).get("rows") or []:
+        if not isinstance(row, dict):
+            continue
+        rows.append(annotate(row))
+    return rows
+
+
+def slate_entries(session, league, date, markets=WARM_MARKETS):
+    from spe.publishing.store import read_many
+    if date is None:
+        from app.queries import slate_today
+        date = slate_today()
+    if settings.app_env == "dev":
+        from spe.publishing.local_board import ensure_local_board
+        ensure_local_board(session, date, league or "all")
+    keys = {market: "props:" + entry_key(market, league, date) for market in markets}
+    saved = read_many(keys.values(), session)
+    return {market: saved.get(key) for market, key in keys.items()}
+
+
 def load_slate_props(
     session: Session,
     league: str | None,
@@ -231,8 +247,13 @@ def load_slate_props(
     markets: tuple[str, ...] = WARM_MARKETS,
     path: Path | None = None,
     block_on_miss: bool = False,
+    entries: dict | None = None,
 ) -> list[dict[str, Any]]:
     """Merge the warmed market boards for picks / tickets. Avoids a full all-market scan."""
+    if path is None and not block_on_miss:
+        if entries is None:
+            entries = slate_entries(session, league, date, markets)
+        return [row for market in markets for row in _entry_rows(entries.get(market))]
     rows: list[dict[str, Any]] = []
     for market in markets:
         try:

@@ -56,11 +56,29 @@ export async function authHeaders(request?: Request): Promise<Headers> {
 
 export async function apiAuth(path: string, init: RequestInit = {}) {
   const token = await readToken();
-  const headers = await authHeaders();
-  new Headers(init.headers).forEach((v, k) => headers.set(k, v));
-  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(`${API}${path}`, { ...init, headers, cache: "no-store", signal: AbortSignal.timeout(15000) });
+  return authFetch(path, { ...init, headers });
+}
+
+export async function authFetch(path: string, init: RequestInit = {}, request?: Request) {
+  const headers = await authHeaders(request);
+  new Headers(init.headers).forEach((v, k) => headers.set(k, v));
+  try {
+    return await fetch(`${API}${path}`, {
+      ...init, headers, cache: "no-store", signal: AbortSignal.timeout(14000),
+    });
+  } catch {
+    return NextResponse.json(
+      { detail: "Account service is temporarily unavailable. Please try again." },
+      { status: 503, headers: { "Retry-After": "5" } },
+    );
+  }
+}
+
+export async function objectBody(source: { json(): Promise<unknown> }): Promise<Record<string, unknown>> {
+  const body = await source.json().catch(() => null);
+  return body !== null && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {};
 }
 
 export function detail(data: { detail?: unknown }, fallback: string) {

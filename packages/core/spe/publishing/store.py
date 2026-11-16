@@ -8,6 +8,16 @@ from spe.db.models import BoardSnapshot
 from spe.db.session import session_factory
 
 
+def read_many(keys, db):
+    """Read related snapshots on the caller's connection in one round trip."""
+    from sqlalchemy import select
+    keys = list(dict.fromkeys(keys))
+    if not keys:
+        return {}
+    return {row.key: row.payload for row in db.scalars(
+        select(BoardSnapshot).where(BoardSnapshot.key.in_(keys)))}
+
+
 def read(key, db=None):
     if db is not None:
         row = db.get(BoardSnapshot, key)

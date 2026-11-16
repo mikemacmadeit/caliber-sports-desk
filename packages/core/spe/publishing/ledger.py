@@ -169,17 +169,14 @@ def slate_dates(db, month=None) -> list[str]:
         day = _slate_day(_column(item))
         if day:
             found.add(day)
-    try:
-        from spe.models.ats.board_cache import read_board
+    from spe.models.ats.board_cache import read_board
 
-        board = read_board() or {}
-        for row in board.get("rows") or []:
-            if isinstance(row, dict):
-                day = _slate_day(row.get("kickoff_utc"))
-                if day:
-                    found.add(day)
-    except Exception:
-        pass
+    board = read_board(session=db) or {}
+    for row in board.get("rows") or []:
+        if isinstance(row, dict):
+            day = _slate_day(row.get("kickoff_utc"))
+            if day:
+                found.add(day)
     return sorted(found)
 
 
@@ -223,13 +220,9 @@ def ledger_day(db, date: str, league: str | None = None) -> dict[str, Any]:
 
 def ledger_calendar(db, month: str, league: str | None = None) -> dict[str, Any]:
     totals = {}
-    for day in slate_dates(db, month=month):
-        if not day.startswith(month + "-"):
-            continue
-        card = ledger_day(db, day, league)
-        if card.get("record_status") != "saved_pregame":
-            continue
-        priced = [r for r in card["rows"] if r.get("units") is not None and r.get("result") in {"win", "loss", "push"}]
+    dates = [d for d in slate_dates(db, month=month) if d.startswith(month + "-")]
+    for day, rows in _ledger_days(db, dates, league).items():
+        priced = [r for r in rows if r.get("units") is not None and r.get("result") in {"win", "loss", "push"}]
         if priced:
             totals[day] = round(sum(r["units"] for r in priced), 4)
     return {"month": month, "units": totals}
@@ -238,14 +231,12 @@ def ledger_calendar(db, month: str, league: str | None = None) -> dict[str, Any]
 def ledger_year(db, year: int, league: str | None = None) -> dict[str, Any]:
     """Use the same corrected, verified records as the daily and monthly views."""
     rows, days = [], 0
-    for day in slate_dates(db):
-        if not day.startswith(f"{year}-"):
-            continue
-        card = ledger_day(db, day, league)
-        if card.get("record_status") != "saved_pregame" or not card["rows"]:
+    dates = [d for d in slate_dates(db) if d.startswith(f"{year}-")]
+    for day_rows in _ledger_days(db, dates, league).values():
+        if not day_rows:
             continue
         days += 1
-        rows.extend(card["rows"])
+        rows.extend(day_rows)
     summary = _ledger_summary(rows)
     labels = {"point_spread": "Spreads", "anytime_td": "Anytime TD", "receptions": "Receptions",
               "rushing_yards": "Rushing yards", "receiving_yards": "Receiving yards"}
@@ -258,11 +249,58 @@ def ledger_year(db, year: int, league: str | None = None) -> dict[str, Any]:
     return {"year": str(year), "days": days, **summary, "priced": summary["priced_bets"], "markets": markets}
 
 
+def _ledger_days(db, dates, league):
+    """Same verified records as ledger_day, fetched together for the whole range.
+
+    Display-only packaged archives are deliberately absent from performance totals.
+    There is no cross-request cache: official corrections apply on the next read.
+    """
+    from copy import deepcopy
+    from sqlalchemy import select
+    from spe.db.models import BoardSnapshot
+    from spe.models.player_td.desk_replay import (
+        day_card_key, _refresh_card_grades, _withhold_current_absences,
+    )
+
+    dates = sorted(set(dates))
+    if not dates:
+        return {}
+    start, _ = _day_bounds(dates[0])
+    _, end = _day_bounds(dates[-1])
+    published = defaultdict(list)
+    for row in _picks_in_range(db, league, start, end):
+        if row.get("market_id") != "anytime_td":
+            published[_slate_day(row.get("kickoff_utc"))].append(row)
+    spreads = defaultdict(list)
+    for row in ats_history(db, league, limit=None, start=start, end=end)["rows"]:
+        spreads[_slate_day(row.get("kickoff_utc"))].append(row)
+
+    keys = {day_card_key(day, league): day for day in dates}
+    cards = {}
+    for saved in db.scalars(select(BoardSnapshot).where(BoardSnapshot.key.in_(keys))):
+        if isinstance(saved.payload, dict) and "rows" in saved.payload:
+            cards[keys[saved.key]] = deepcopy(saved.payload)
+    # Mutate the copied rows once so each day's record uses the same official data.
+    combined = {"rows": [row for card in cards.values() for row in card["rows"]]}
+    if combined["rows"]:
+        _refresh_card_grades(db, combined)
+    now = datetime.now(UTC)
+    result = {}
+    for day in dates:
+        card = _withhold_current_absences(db, cards[day], now) if day in cards else {}
+        result[day] = _ledger_rows([], [], published[day] + spreads[day] + _scorer_rows(card))
+    return result
+
+
 def _replay_scorers(db, date: str, league: str | None) -> list[dict[str, Any]]:
     """Every anytime touchdown the desk named for the day, including the ones that lost."""
     from spe.models.player_td.desk_replay import saved_day_card
 
     payload = saved_day_card(db, date, league or "all") or {}
+    return _scorer_rows(payload)
+
+
+def _scorer_rows(payload):
     rows = []
     for row in payload.get("rows") or []:
         if row.get("retrospective") is not False:
@@ -475,16 +513,20 @@ def day_picks(db, league=None, date=None):
     """
     if not date:
         return []
+    start, end = _day_bounds(date)
+    return _picks_in_range(db, league, start, end)
+
+
+def _picks_in_range(db, league, start, end):
     query = _result_query(db)
     if league and league != "all":
         query = query.filter(PublishedPick.league_id == league)
-    start, end = _day_bounds(date)
     query = query.filter(PublishedPick.kickoff_utc >= start, PublishedPick.kickoff_utc < end)
     out = []
     for pick, original, correction in query.all():
         settled = correction or original
         kick = as_utc(pick.kickoff_utc)
-        if kick is None or kick.astimezone(SLATE).date().isoformat() != date:
+        if kick is None:
             continue
         out.append(
             {
@@ -507,9 +549,12 @@ def current_picks(db, rows, now=None):
     Reobserving an unchanged price renews freshness, but never the frozen terms.
     New projections must still qualify; model revisions cannot rewrite the record.
     """
+    if not rows:
+        return []
     now = as_utc(now) or datetime.now(UTC)
     live = {(r.get("outcome_id"), r.get("bookmaker"), r.get("book_price")): r for r in rows}
     game_ids = {r.get("game_id") for r in rows}
+    games = {g.game_id: g for g in db.query(Game).filter(Game.game_id.in_(game_ids or {"__none__"}))}
     out = []
     for record in (
         db.query(PublishedPick).filter(PublishedPick.game_id.in_(game_ids or {"__none__"})).all()
@@ -519,7 +564,7 @@ def current_picks(db, rows, now=None):
         if old is None or published_at is None:
             continue
         row = live.get((old.get("outcome_id"), old.get("bookmaker"), old.get("book_price")))
-        game = db.get(Game, record.game_id)
+        game = games.get(record.game_id)
         if (
             not game
             or game.status not in {"scheduled", "pre", "upcoming"}
@@ -716,7 +761,7 @@ def calibration_summary(pairs):
             "bins": bins}
 
 
-def ats_history(db, league=None, offset=0, limit=100, date=None):
+def ats_history(db, league=None, offset=0, limit=100, date=None, *, start=None, end=None):
     """Separate frozen ATS research history. Never reconstruct it from the board."""
     from spe.db.models import AtsPrediction, AtsSettlement
     from spe.models.ats.research_bundle import CLEAN_PROSPECTIVE_COHORT
@@ -725,11 +770,18 @@ def ats_history(db, league=None, offset=0, limit=100, date=None):
         db.query(AtsPrediction, AtsSettlement, Game)
         .join(Game, Game.game_id == AtsPrediction.game_id)
         .outerjoin(AtsSettlement, AtsSettlement.ats_id == AtsPrediction.ats_id)
+        .filter(
+            AtsPrediction.components["eligibility"].as_string() == "clean_prospective",
+            AtsPrediction.components["cohort_version"].as_string() == CLEAN_PROSPECTIVE_COHORT,
+            AtsPrediction.predicted_at < Game.kickoff_utc,
+            (AtsPrediction.price_american >= 100) | (AtsPrediction.price_american <= -100),
+        )
     )
     if league and league != "all":
         query = query.filter(AtsPrediction.league_id == league)
     if date:
         start, end = _day_bounds(date)
+    if start is not None and end is not None:
         query = query.filter(Game.kickoff_utc >= start, Game.kickoff_utc < end)
     records, groups = (
         [],
@@ -797,7 +849,7 @@ def ats_history(db, league=None, offset=0, limit=100, date=None):
             }
         )
     return {
-        "rows": list(reversed(records))[offset : offset + limit],
+        "rows": list(reversed(records))[offset : None if limit is None else offset + limit],
         "summaries": summaries,
         "total": len(records),
         "methodology": "Frozen ATS research predictions, separate from published prop opportunities. First eligible freeze per game in the current research cohort. Original line and price; one unit risked. Legacy and consensus-only records excluded. These are research results, not a verified betting edge.",

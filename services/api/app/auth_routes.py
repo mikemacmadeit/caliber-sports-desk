@@ -281,8 +281,14 @@ def confirm(body: CheckoutConfirm, request: Request, session: Session = Depends(
 @router.post("/v1/billing/webhook")
 async def stripe_webhook(request: Request, session: Session = Depends(db_session)) -> dict:
     payload = await request.body()
+    from starlette.concurrency import run_in_threadpool
+    return await run_in_threadpool(_process_webhook, session, payload, request.headers.get("stripe-signature"))
+
+
+def _process_webhook(session: Session, payload: bytes, signature: str | None) -> dict:
+    # Database locks and Stripe retrievals must not block the API's event loop.
     try:
-        event = construct_event(payload, request.headers.get("stripe-signature"))
+        event = construct_event(payload, signature)
         apply_stripe_event(session, event)
     except BillingError as exc:
         raise HTTPException(exc.status, exc.message) from exc

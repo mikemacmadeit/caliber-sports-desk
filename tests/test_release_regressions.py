@@ -163,14 +163,14 @@ def test_completed_td_game_is_durable_before_caller_commit(db, monkeypatch):
 
 def test_year_excludes_archives_and_unpriced_returns(db, monkeypatch):
     from spe.publishing import ledger
-    monkeypatch.setattr(ledger, 'slate_dates', lambda *a, **k:['2026-01-01','2026-01-02','2025-12-31'])
-    monkeypatch.setattr(ledger, 'ledger_day', lambda db, date, league:{
-        'record_status':'archived_unverified' if date.endswith('02') else 'saved_pregame',
-        'rows':[{'result':'win','units':None,'market_id':'anytime_td'},
-                {'result':'loss','units':-1.,'market_id':'receptions'}]})
+    from test_reliability_followup import seed_records
+    seed_records(db)
+    monkeypatch.setattr(ledger, 'slate_dates', lambda *a, **k:['2026-01-04','2026-02-01','2025-12-31'])
+    monkeypatch.setattr(ledger, '_packaged_day', lambda *a,**k:{'rows':[{'result':'win','units':999}]})
+    assert ledger.ledger_day(db,'2026-02-01')['record_status'] == 'archived_unverified'
     year = ledger.ledger_year(db, 2026)
-    assert year['days'] == 1 and year['win'] == 1 and year['loss'] == 1
-    assert year['units'] == -1 and year['priced'] == 1
+    assert year['days'] == 1 and year['win'] == 1 and year['loss'] == 2
+    assert year['units'] == -2 and year['priced'] == 2
 
 
 def test_deployed_artifacts_resolve_both_leagues(monkeypatch):

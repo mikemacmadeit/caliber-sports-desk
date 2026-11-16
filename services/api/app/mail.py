@@ -24,7 +24,7 @@ def send_email_verification(email: str, token: str) -> None:
 
 def send_link(email: str, token: str, *, route: str, subject: str, purpose: str) -> None:
     origin = next((part.strip().rstrip("/") for part in str(settings.web_origin or "").split(",") if part.strip()), "")
-    if not origin.startswith("https://") and settings.app_env == "prod":
+    if not origin.startswith("https://") and settings.app_env in {"prod", "production"}:
         raise ValueError("Production email requires an HTTPS web origin")
     link = f"{origin}/{route}?token={token}"
     message = EmailMessage()

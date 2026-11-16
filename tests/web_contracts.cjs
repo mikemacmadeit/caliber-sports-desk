@@ -20,6 +20,54 @@ function moduleAt(file, overrides = {}, globals = {}) {
   return exports;
 }
 
+function authModule(fetch) {
+  return moduleAt('lib/serverAuth.ts', {
+    'next/headers': { cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() },
+    'next/server': { NextResponse: { json: (...args) => Response.json(...args) } },
+  }, { fetch, Headers, process: { env: {} } });
+}
+
+test('account service outages return a retryable error without exposing network details', async () => {
+  const auth = authModule(async () => { throw Error('private host or credential'); });
+  const response = await auth.apiAuth('/v1/billing/checkout', { method: 'POST' });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('Retry-After'), '5');
+  assert.match((await response.json()).detail, /temporarily unavailable/);
+});
+
+test('login, signup and reset reject successful responses without a usable session token', async () => {
+  for (const name of ['login', 'signup', 'reset']) {
+    for (const payload of [null, {}, { token: 123 }]) {
+      const auth = authModule(async () => Response.json(payload));
+      let sessionSet = false;
+      auth.withSession = () => { sessionSet = true; };
+      const route = moduleAt(`app/api/auth/${name}/route.ts`, {
+        '@/lib/serverAuth': auth,
+        'next/server': { NextResponse: { json: (...args) => Response.json(...args) } },
+      });
+      const response = await route.POST(new Request('https://example.test/api/auth/'+name, {
+        method: 'POST', body: 'null', headers: { 'Content-Type': 'application/json' },
+      }));
+      assert.equal(response.status, 502);
+      assert.equal(sessionSet, false);
+    }
+  }
+});
+
+test('billing and recovery routes reject missing success payloads', async () => {
+  for (const name of ['checkout', 'portal', 'confirm', 'forgot']) {
+    const auth = authModule(async () => Response.json(null));
+    const route = moduleAt(`app/api/auth/${name}/route.ts`, {
+      '@/lib/serverAuth': auth,
+      'next/server': { NextResponse: { json: (...args) => Response.json(...args) } },
+    });
+    const response = await route.POST(new Request('https://example.test/api/auth/'+name, {
+      method:'POST',body:'null',headers:{'Content-Type':'application/json'},
+    }));
+    assert.equal(response.status, 502);
+  }
+});
+
 test('personal board responses are never reused as another response', async () => {
   let calls = 0;
   const api = moduleAt('lib/browserApi.ts', {}, { fetch: async () => ({ ok: true, json: async () => ({ rows: [++calls] }) }) });
