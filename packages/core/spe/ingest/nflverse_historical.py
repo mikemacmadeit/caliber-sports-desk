@@ -17,7 +17,7 @@ from spe.db.base import as_utc
 
 from spe.adapters.nflverse import NflverseAdapter
 from spe.config import settings
-from spe.db.models import Game, InjuryEvent, Player, PlayerGameStat, Play, Roster, Team, WeatherSnapshot
+from spe.db.models import Game, InjuryEvent, Player, PlayerGameStat, Play, ProviderIdMap, Roster, Team, WeatherSnapshot
 from spe.ingest.canonical import (
     f_to_c,
     mph_to_mps,
@@ -47,6 +47,13 @@ from spe.ingest.values import as_float, as_int, as_str, is_missing
 DEFAULT_SEASONS = tuple(range(2016, 2027))
 PROVIDER = "nflverse"
 FTN_PREFIX = "ftn_"
+PLAYER_COLUMNS = ("gsis_id", "player_id", "display_name", "player_name", "position",
+                  "position_group", "birth_date", "espn_id")
+WEEKLY_COLUMNS = ("season", "week", "recent_team", "team", "player_id", "gsis_id",
+                  "player_display_name", "player_name", "position", "position_group",
+                  "attempts", "passing_attempts", "targets", "carries", "rushing_attempts",
+                  "receptions", "rushing_yards", "receiving_yards", "rushing_tds",
+                  "receiving_tds", "passing_tds")
 
 
 def cache_dir() -> Path:
@@ -55,17 +62,30 @@ def cache_dir() -> Path:
     return path
 
 
-def load_asset(key: str, season: int | None = None, *, refresh: bool = False, columns=None) -> pd.DataFrame:
+def load_asset(key: str, season: int | None = None, *, refresh: bool = False, columns=None, since=None) -> pd.DataFrame:
     adapter = NflverseAdapter()
     url = adapter.asset_url(key, season)
     filename = url.rsplit("/", 1)[-1]
     dest = cache_dir() / filename
     download_file(url, dest, refresh=refresh)
-    if columns is not None:
+    if columns is not None or since is not None:
         import pyarrow.parquet as pq
-        available = set(pq.ParquetFile(dest).schema_arrow.names)
-        columns = [c for c in columns if c in available]
-    return pd.read_parquet(dest, columns=columns)
+        source = pq.ParquetFile(dest)
+        available = set(source.schema_arrow.names)
+        if columns is not None:
+            columns = [c for c in columns if c in available]
+        if since is not None and "dt" in available:
+            # Dated depth files contain hundreds of thousands of old snapshots.
+            # Filter bounded batches before materializing a pandas season frame.
+            recent = []
+            for batch in source.iter_batches(batch_size=8192, columns=columns, use_threads=False):
+                frame = batch.to_pandas(use_threads=False)
+                keep = frame.loc[pd.to_datetime(frame["dt"], utc=True, errors="coerce") >= since]
+                if not keep.empty:
+                    recent.append(keep.copy())
+            return pd.concat(recent, ignore_index=True) if recent else pd.DataFrame(columns=columns or source.schema_arrow.names)
+    # Parallel column decoding retains large Arrow buffers on the 512 MB worker.
+    return pd.read_parquet(dest, columns=columns, use_threads=False)
 
 
 def ingest_nfl_history(
@@ -90,16 +110,20 @@ def ingest_nfl_history(
     g_up = g_skip = p_up = p_skip = weekly_up = weekly_skip = 0
     if not injuries_only:
         games_df = schedules if schedules is not None else load_asset("schedules", refresh=refresh)
-        players_df = players if players is not None else load_asset("players", refresh=refresh)
-
         g_up, g_skip = ingest_schedules(session, games_df, seasons=seasons, observed_at=observed)
+        del games_df
+        from spe.ops.memory import release_processing_memory
+        release_processing_memory()
+        players_df = players if players is not None else load_asset("players", refresh=refresh, columns=PLAYER_COLUMNS)
         p_up, p_skip = ingest_players(session, players_df, observed_at=observed)
+        del players_df
+        release_processing_memory()
 
         for year in seasons:
             df = (weekly or {}).get(year)
             if df is None:
                 try:
-                    df = load_asset("player_stats", year, refresh=refresh)
+                    df = load_asset("player_stats", year, refresh=refresh, columns=WEEKLY_COLUMNS)
                 except Exception as exc:  # noqa: BLE001
                     upsert_coverage(
                         session,
@@ -115,6 +139,8 @@ def ingest_nfl_history(
             u, s = ingest_weekly_stats(session, df, year, observed_at=observed)
             weekly_up += u
             weekly_skip += s
+            del df
+            release_processing_memory()
 
     inj_up = 0
     for year in seasons:
@@ -299,15 +325,18 @@ def ingest_schedules(
 
 def ingest_players(session: Session, df: pd.DataFrame, *, observed_at: datetime) -> tuple[int, int]:
     run = start_run(session, PROVIDER, "players", "nfl", None)
+    known = {pid for (pid,) in session.query(Player.player_id).filter(Player.player_id.like("nfl:%"))}
+    espn_ids = dict(session.query(ProviderIdMap.external_id, ProviderIdMap.canonical_id).filter_by(
+        provider="espn", entity_type="player"))
     upserted = skipped = 0
-    for _, raw in df.iterrows():
+    for index, (_, raw) in enumerate(df.iterrows(), 1):
         gsis = as_str(raw.get("gsis_id")) or as_str(raw.get("player_id"))
         name = as_str(raw.get("display_name")) or as_str(raw.get("player_name"))
         if not gsis or not name:
             skipped += 1
             continue
         pid = nfl_player_id(gsis)
-        if session.get(Player, pid) is None:
+        if pid not in known:
             pos = as_str(raw.get("position")) or "UNK"
             session.add(
                 Player(
@@ -320,6 +349,7 @@ def ingest_players(session: Session, df: pd.DataFrame, *, observed_at: datetime)
                 )
             )
             map_provider(session, PROVIDER, "player", gsis, pid)
+            known.add(pid)
             upserted += 1
         else:
             skipped += 1
@@ -328,8 +358,10 @@ def ingest_players(session: Session, df: pd.DataFrame, *, observed_at: datetime)
             espn_key = str(int(float(espn))) if str(espn).replace(".", "", 1).isdigit() else espn
             from spe.identity.games import remap_provider
 
-            remap_provider(session, "espn", "player", espn_key, pid, notes="nflverse_players_espn_id")
-        if upserted and upserted % 1000 == 0:
+            if espn_ids.get(espn_key) != pid:
+                remap_provider(session, "espn", "player", espn_key, pid, notes="nflverse_players_espn_id")
+                espn_ids[espn_key] = pid
+        if index % 1000 == 0:
             session.flush()
     finish_run(session, run, status="ok", upserted=upserted, skipped=skipped)
     upsert_coverage(
@@ -352,6 +384,8 @@ def ingest_weekly_stats(session: Session, df: pd.DataFrame, year: int, *, observ
     existing = {(row.game_id, row.player_id): row for row in session.query(PlayerGameStat)
                 .join(Game).filter(PlayerGameStat.provider == PROVIDER, Game.season_id == nfl_season_id(year))
                 .order_by(PlayerGameStat.revision)}
+    known = {pid for (pid,) in session.query(Player.player_id).filter(Player.player_id.like("nfl:%"))}
+    roster = set(session.query(Roster.team_id, Roster.player_id).filter(Roster.player_id.like("nfl:%")))
     upserted = skipped = 0
     for _, raw in df.iterrows():
         season = as_int(raw.get("season"), year) or year
@@ -366,7 +400,7 @@ def ingest_weekly_stats(session: Session, df: pd.DataFrame, year: int, *, observ
             skipped += 1
             continue
         pid = nfl_player_id(player_ext)
-        if session.get(Player, pid) is None:
+        if pid not in known:
             name = as_str(raw.get("player_display_name")) or as_str(raw.get("player_name")) or player_ext
             pos = as_str(raw.get("position")) or "UNK"
             session.add(
@@ -380,8 +414,11 @@ def ingest_weekly_stats(session: Session, df: pd.DataFrame, year: int, *, observ
             )
             map_provider(session, PROVIDER, "player", player_ext, pid)
             session.flush()
+            known.add(pid)
         team_id = nfl_team_id(team)
-        _ensure_roster(session, team_id, pid, year)
+        if (team_id, pid) not in roster:
+            _ensure_roster(session, team_id, pid, year)
+            roster.add((team_id, pid))
         rec_id = f"{game_id}:{pid}:{year}:{week}"
         values = dict(team_id=team_id, attempts=as_int(raw.get("attempts"), 0) or as_int(raw.get("passing_attempts"), 0) or 0,
                       targets=as_int(raw.get("targets"), 0) or 0,

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { LockedCall } from "@/components/LockedCall";
 import { ParlayBoard } from "@/components/ParlayBoard";
 import type { ParlayCard } from "@/lib/api";
+import { browserGet } from "@/lib/browserApi";
 
 export function TodayTickets({
   league,
@@ -16,45 +17,37 @@ export function TodayTickets({
 }) {
   const [card, setCard] = useState<ParlayCard | null>(initialCard);
   const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    if (initialCard) {
+    if (initialCard && retry === 0) {
       setCard(initialCard);
       setError(null);
       return;
     }
     const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), 20000);
     setCard(null);
     setError(null);
-    fetch(`/api/backend/v1/parlays/card?league=${encodeURIComponent(league)}&date=${encodeURIComponent(date)}`, {
-      signal: ctrl.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`card ${res.status}`);
-        return (await res.json()) as ParlayCard;
-      })
-      .then((data) => setCard(data))
+    browserGet<ParlayCard>(`/v1/parlays/card?league=${encodeURIComponent(league)}&date=${encodeURIComponent(date)}`, ctrl.signal)
+      .then((data) => { if (!ctrl.signal.aborted) setCard(data); })
       .catch((err: unknown) => {
         if (ctrl.signal.aborted) return;
         setError(err instanceof Error ? err.message : "unavailable");
-      })
-      .finally(() => window.clearTimeout(timer));
+      });
     return () => {
       ctrl.abort();
-      window.clearTimeout(timer);
     };
-  }, [league, date, initialCard]);
+  }, [league, date, initialCard, retry]);
 
   if (error) {
     return (
-      <p className="text-sm text-mute">
-        Nothing cleared for this day. A ticket needs two legs whose chance sits near a fresh price.
+      <p role="status" className="text-sm text-mute">
+        The saved tickets could not load. <button className="underline" onClick={() => setRetry(n => n + 1)}>Retry</button>
       </p>
     );
   }
   if (!card) {
-    return <p className="text-sm text-mute">Building the tickets for this day.</p>;
+    return <p className="text-sm text-mute">Loading the saved tickets for this day.</p>;
   }
   if (card.locked) {
     return (

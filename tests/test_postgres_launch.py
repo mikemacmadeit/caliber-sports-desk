@@ -89,6 +89,11 @@ def test_postgres_record_query_count(pgdb):
     test_history_uses_two_queries_for_a_hundred_picks(pgdb)
 
 
+def test_postgres_td_grades_are_batched(pgdb):
+    from test_optimization_review import test_td_card_grades_batch_sources_and_match_individual_grading
+    test_td_card_grades_batch_sources_and_match_individual_grading(pgdb)
+
+
 def test_postgres_published_corrections(pgdb):
     from test_launch_hardening import test_stat_correction_is_auditable_and_consistent_across_record_views
     test_stat_correction_is_auditable_and_consistent_across_record_views(pgdb)

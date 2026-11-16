@@ -24,10 +24,24 @@ def store_context(session, records, *, year, observed_at=None):
     games = {g.game_id: g for g in session.query(Game).filter(
         Game.league_id == "nfl", Game.season_id == f"nfl-{year}", Game.status == "final")}
     known = {p for (p,) in session.query(Player.player_id)}
+    grouped = {}
+    for rec in records:
+        if rec["game_id"] in games:
+            grouped.setdefault(rec["game_id"], []).append(rec)
+    count = 0
+    ids = list(grouped)
+    for start in range(0, len(ids), 16):
+        batch = {gid: games[gid] for gid in ids[start:start + 16]}
+        count += _store_context_batch(session, [r for gid in batch for r in grouped[gid]], batch, known, observed)
+    return count
+
+
+def _store_context_batch(session, records, games, known, observed):
+    # Only keep one small group of games' ORM rows alive at a time.
     existing = {(r.game_id, r.entity_id, r.dataset): r for r in session.query(NflverseGameContext)
-                .join(Game, Game.game_id == NflverseGameContext.game_id).filter(Game.season_id == f"nfl-{year}")}
-    stats = {(r.game_id, r.player_id): r for r in session.query(PlayerGameStat).join(Game)
-             .filter(Game.season_id == f"nfl-{year}", PlayerGameStat.provider == "nflverse")}
+                .filter(NflverseGameContext.game_id.in_(games))}
+    stats = {(r.game_id, r.player_id): r for r in session.query(PlayerGameStat)
+             .filter(PlayerGameStat.game_id.in_(games), PlayerGameStat.provider == "nflverse")}
     count = 0
     accepted = set()
     for rec in records:
@@ -97,26 +111,35 @@ def refresh_nflverse_desk(session, *, year=None, now=None, force=False):
             return {"status": "not_due" if recent.status == "ok" else "degraded", "next_refresh_at": retry.isoformat(), 'availability':availability}
     run = start_run(session, "nflverse", "desk_context", "nfl", year)
     run.started_at = now
+    session.commit()
     results = {'availability':availability}
 
     def attempt(name, operation):
+        from spe.ops.memory import release_processing_memory
         try:
-            with session.begin_nested():
-                result = operation()
-                if isinstance(result, dict) and result.get("rows") == 0:
-                    raise ValueError("No usable rows; retain previous source data")
-                results[name] = result
+            result = operation()
+            if isinstance(result, dict) and result.get("rows") == 0:
+                raise ValueError("No usable rows; retain previous source data")
+            session.commit()
+            results[name] = result
         except Exception as exc:
+            session.rollback()
             results[name] = {"status": "unavailable", "error": type(exc).__name__}
             upsert_coverage(session, provider="nflverse", dataset=name, league_id="nfl",
                 season_year=year, row_count=0, status="unavailable",
                 notes=f"Refresh failed ({type(exc).__name__}); previous good rows retained.")
+            session.commit()
+        finally:
+            # Each complete source is a checkpoint. A later feed failure or worker
+            # restart must not roll back the already refreshed box scores/context.
+            release_processing_memory()
+        print(f"NFL_INPUT {name} status={results[name].get('status', 'ok')}", flush=True)
 
     attempt("box_scores", lambda: ingest_nfl_history(session, seasons=[year], refresh=True))
 
     def pbp():
         frame = load_asset("pbp", year, refresh=True, columns=PBP_CONTEXT_COLUMNS)
-        positions = {p.player_id.removeprefix("nfl:"): p.position_group for p in session.query(Player).filter(Player.player_id.like("nfl:%"))}
+        positions = {pid.removeprefix("nfl:"): pos for pid, pos in session.query(Player.player_id, Player.position_group).filter(Player.player_id.like("nfl:%"))}
         records = pbp_context(frame, positions)
         if not records:
             raise ValueError("Empty PBP source")
@@ -127,7 +150,9 @@ def refresh_nflverse_desk(session, *, year=None, now=None, force=False):
         return {"rows": count}
 
     def snaps():
-        records, unresolved = snap_context(load_asset("snap_counts", year, refresh=True), load_asset("players"))
+        records, unresolved = snap_context(load_asset("snap_counts", year, refresh=True,
+            columns=("game_id", "pfr_player_id", "team", "offense_snaps", "offense_pct")),
+            load_asset("players", columns=("gsis_id", "pfr_id")))
         if not records:
             raise ValueError("Empty or unresolved snap source")
         count = store_context(session, records, year=year, observed_at=now)
@@ -144,7 +169,8 @@ def refresh_nflverse_desk(session, *, year=None, now=None, force=False):
     attempt("snap_counts", snaps)
     for dataset, ingest in (("roster_weekly", ingest_roster_frame), ("depth_charts", ingest_depth_frame)):
         def refresh_list(dataset=dataset, ingest=ingest):
-            frame = load_asset(dataset, year, refresh=True)
+            frame = load_asset(dataset, year, refresh=True,
+                **({"since": now - timedelta(days=7)} if dataset == "depth_charts" else {}))
             if dataset == "depth_charts" and "dt" in frame.columns:
                 import pandas as pd
                 frame = frame.loc[pd.to_datetime(frame["dt"], utc=True) >= now - timedelta(days=7)]

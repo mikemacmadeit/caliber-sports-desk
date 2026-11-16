@@ -33,6 +33,36 @@ test('failed refresh rejects instead of inventing an empty successful board', as
   await assert.rejects(api.browserGet('/v1/anytime-td/replay'), /temporarily unavailable/);
 });
 
+test('calendar filters reject impossible dates and repeated query values', () => {
+  const { validDay, validMonth, validLeague } = moduleAt('lib/days.ts');
+  assert.equal(validDay('2024-02-29'), '2024-02-29');
+  for (const value of ['2026-02-29', '2026-02-31', '2026-13-01', 'garbage', ['2026-11-16']]) {
+    assert.equal(validDay(value), undefined);
+  }
+  assert.equal(validMonth('2026-13'), undefined);
+  assert.equal(validMonth('2026-11'), '2026-11');
+  assert.equal(validLeague('nfl&date=garbage'), 'all');
+});
+
+test('ATS page reports a failed request and keeps its real filter values', async () => {
+  const requests = [];
+  const days = moduleAt('lib/days.ts');
+  const { default: Page } = moduleAt('app/ats/page.tsx', {
+    '@/components/AtsBoard': { AtsBoard: () => { throw Error('Failure rendered as a successful board'); } },
+    '@/components/DayStrip': { DayStrip: () => null },
+    '@/components/LeagueToggle': { LeagueToggle: () => null },
+    '@/components/PageHeader': { PageHeader: () => null },
+    '@/lib/days': days,
+    '@/lib/atsDay': { callsForDate: async rows => rows },
+    '@/lib/api': { apiGet: async path => { requests.push(path); throw Error('offline'); } },
+    'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
+  });
+  const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ date: '2026-11-16', league: 'nfl', sort: 'cover_prob', side: 'favorites' }) }));
+  assert.match(html, /Picks did not load/);
+  assert.match(html, /Try again/);
+  assert.ok(requests.some(path => path.includes('sort=cover_prob&side=favorites')));
+});
+
 test('rendered prop card preserves the actual saved wager and pending result', () => {
   let displayed;
   const { PropDeskPanel } = moduleAt('components/PropDeskPanel.tsx', {

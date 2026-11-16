@@ -15,13 +15,13 @@ COLUMNS = ['game_id','id','pos_team_id','homeTeamId','awayTeamId','status_type_c
 
 
 def summarize(frame, games, aliases):
-    f = frame.drop_duplicates(['game_id','id'],keep='last').copy()
+    f = frame.drop_duplicates(['game_id','id'],keep='last')
     valid = f['status_type_completed'].fillna(False).astype(bool)
     for k in ('penalty_no_play','penalty_negated_play','kneel_down'):
         valid &= ~f[k].fillna(False).astype(bool)
     valid &= ~f['type.text'].fillna('').str.contains('spike|two.point|extra.point|conversion',case=False,regex=True)
     valid &= f['rush'].fillna(False).astype(bool) | f['pass'].fillna(False).astype(bool)
-    f = f.loc[valid].copy()
+    f = f.loc[valid].copy()  # Own the filtered rows before adding derived columns.
     passing = f['pass'].fillna(False).astype(bool)
     score = f['start.pos_score_diff']
     field = f['start.yardsToEndzone'].between(0,100)
@@ -74,12 +74,15 @@ def refresh_college_situations(db, *, years=None):
         kickoff=as_utc(row['kickoff_utc'])
         return kickoff.year-int(kickoff.month<7)
     rows=[r for r in previous.get('teams',[]) if years is not None and season(r) not in years]
+    del previous
     for entry in source['sources']:
         name=entry['source'].rsplit('/',1)[-1]
         if years is not None and not any(name == f'play_by_play_{year}.parquet' for year in years):
             continue
-        frame=pd.read_parquet(settings.parquet_dir.parent/'cache/sportsdataverse'/name,columns=COLUMNS)
+        frame=pd.read_parquet(settings.parquet_dir.parent/'cache/sportsdataverse'/name,columns=COLUMNS,use_threads=False)
         rows.extend(summarize(frame,games,aliases))
+        del frame
+        release_processing_memory()
     body={'teams':rows,'sources':source['sources'],'note':'Historical score-state tendencies, not future play calls or individual line grades.'}
     tmp=output.with_suffix('.tmp');tmp.write_text(json.dumps(body,allow_nan=False));tmp.replace(output)
     return {'team_games':len(rows),'source':'cached SportsDataverse PBP','new_network_requests':0}

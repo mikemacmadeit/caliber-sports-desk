@@ -33,6 +33,7 @@ from spe.licensing import LICENSES
 from spe.market.odds import american_to_decimal, ev_per_dollar
 from spe.simulate.engine import PlayerRole, simulate_game
 
+from app.query_types import IsoDay, IsoMonth, League
 from app.auth_routes import router as auth_router
 from app.deps import db_session, disclaimer
 from app.gate import board_query_for, redact, should_redact, subscription_required
@@ -89,6 +90,9 @@ app.include_router(watchlist_router)
 
 
 def _viewer_is_subscribed(request: Request) -> bool:
+    cached = getattr(request.state, "subscription_verified", None)
+    if cached is not None:
+        return cached
     # The local desk is the operator's own board. Production still requires a subscription.
     if settings.app_env == "dev":
         return True
@@ -101,7 +105,11 @@ def _viewer_is_subscribed(request: Request) -> bool:
 
     db = session_factory()
     try:
-        return request_is_subscribed(request, db)
+        subscribed = request_is_subscribed(request, db)
+        request.state.subscription_verified = subscribed
+        return subscribed
+    except (OperationalError, DatabaseTimeout):
+        raise HTTPException(503, "Account access is temporarily unavailable. Please retry.", headers={"Retry-After": "5"}) from None
     except Exception:
         return False
     finally:
@@ -115,7 +123,10 @@ async def hide_calls_until_kickoff(request: Request, call_next):
     needs_sub = subscription_required(request.method, path)
     redact_body = request.method == "GET" and should_redact(path)
     from starlette.concurrency import run_in_threadpool
-    subscribed = await run_in_threadpool(_viewer_is_subscribed, request) if needs_sub or redact_body else False
+    try:
+        subscribed = await run_in_threadpool(_viewer_is_subscribed, request) if needs_sub or redact_body else False
+    except HTTPException as exc:
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
     if needs_sub and not subscribed:
         return JSONResponse({"detail": "subscription_required", "price_usd": "19.99"}, status_code=402)
     response = await call_next(request)
@@ -211,8 +222,8 @@ def health():
 
 @app.get("/v1/slate")
 def slate(
-    date: str | None = None,
-    league: str = Query(default="all"),
+    date: IsoDay | None = None,
+    league: League = Query(default="all"),
     include_historical: bool = Query(default=False),
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
@@ -262,7 +273,7 @@ def coverage(request: Request, session: Session = Depends(db_session)) -> dict[s
 
 @app.get("/v1/analytics/summary")
 def analytics_summary(
-    league: str = Query(default="nfl"),
+    league: League = Query(default="nfl"),
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     from spe.analytics.definitions import PLAYER_METRICS, TEAM_METRICS, UNAVAILABLE
@@ -389,7 +400,7 @@ def game_detail(game_id: str, session: Session = Depends(db_session)) -> dict[st
 
 @app.get("/v1/days")
 def days(
-    league: str = Query(default="all"),
+    league: League = Query(default="all"),
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     today = slate_today()
@@ -404,8 +415,8 @@ def props(
     market: str | None = None,
     min_odds: int | None = None,
     min_ev: float | None = None,
-    league: str | None = Query(default="all"),
-    date: str | None = None,
+    league: League | None = Query(default="all"),
+    date: IsoDay | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     # Serve the saved board when present. A stale file still returns while one
@@ -430,8 +441,8 @@ def props(
 
 @app.get("/v1/anytime-td/calls")
 def anytime_td_calls(
-    league: str | None = Query(default="all"),
-    date: str | None = None,
+    league: League | None = Query(default="all"),
+    date: IsoDay | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     """The one scorer the desk locked for each game. These rows are the win-loss column."""
@@ -441,7 +452,7 @@ def anytime_td_calls(
 
 
 @app.get("/v1/anytime-td/replay")
-def combined_replay(date: calendar_date, league: str = Query(default="all", pattern="^(all|nfl|fbs)$"),
+def combined_replay(date: calendar_date, league: League = Query(default="all", pattern="^(all|nfl|fbs)$"),
                     session: Session = Depends(db_session), detail: str = Query("card", pattern="^(card|full)$"), game_id: str | None = None):
     from spe.models.player_td.presentation import card_payload
     from spe.models.player_td.desk_replay import replay_day, saved_day_card
@@ -493,8 +504,8 @@ def combined_replay(date: calendar_date, league: str = Query(default="all", patt
 
 @app.get("/v1/anytime-td/called")
 def anytime_td_called(
-    league: str | None = Query(default="all"),
-    date: str | None = None,
+    league: League | None = Query(default="all"),
+    date: IsoDay | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     rows = list_called_scorers(session, league, date)
@@ -503,8 +514,8 @@ def anytime_td_called(
 
 @app.get("/v1/props/desk")
 def prop_desk(
-    league: str = Query(default="all"),
-    date: str | None = None,
+    league: League = Query(default="all"),
+    date: IsoDay | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     """One receptions, receiving, or rushing call per game. Touchdowns stay off."""
@@ -588,7 +599,7 @@ def _matchup_note(row: dict[str, Any]) -> str | None:
 
 
 @app.get("/v1/props/picks")
-def prop_picks(league: str = Query(default="all"), date: str | None = None,
+def prop_picks(league: League = Query(default="all"), date: IsoDay | None = None,
                session: Session = Depends(db_session)) -> dict[str, Any]:
     from spe.props.board_cache import load_slate_props, read_entry, WARM_MARKETS
     from spe.publishing.ledger import current_picks, day_picks, record_frozen_desk_picks, settle
@@ -604,7 +615,7 @@ def prop_picks(league: str = Query(default="all"), date: str | None = None,
 
 
 @app.get("/v1/published/history")
-def published_history(league: str | None = None, market: str | None = None,
+def published_history(league: League | None = None, market: str | None = None,
                       offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200),
                       session: Session = Depends(db_session)) -> dict[str, Any]:
     from spe.publishing.ledger import history, ats_history, record_frozen_desk_picks, settle
@@ -614,16 +625,16 @@ def published_history(league: str | None = None, market: str | None = None,
 
 
 @app.get("/v1/published/calendar")
-def published_calendar(month: str = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
-                       league: str = Query("all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
+def published_calendar(month: IsoMonth,
+                       league: League = Query("all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
     from spe.publishing.ledger import ledger_calendar
     return ledger_calendar(session, month, league)
 
 
 @app.get("/v1/published/day")
 def published_day(
-    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
-    league: str = Query(default="all"),
+    date: IsoDay,
+    league: League = Query(default="all"),
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     from spe.publishing.ledger import ledger_day, slate_dates
@@ -636,15 +647,15 @@ def published_day(
 
 @app.get("/v1/published/year")
 def published_year(year: int = Query(ge=2020, le=2100),
-                   league: str = Query("all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
+                   league: League = Query("all", pattern="^(all|nfl|fbs)$"), session: Session = Depends(db_session)):
     from spe.publishing.ledger import ledger_year
     return ledger_year(session, year, league)
 
 
 @app.get("/v1/desk")
 def today_desk(
-    league: str = Query("all", pattern="^(all|nfl|fbs)$"),
-    date: str | None = None,
+    league: League = Query("all", pattern="^(all|nfl|fbs)$"),
+    date: IsoDay | None = None,
     book: str | None = Query(None, max_length=100),
     market: str | None = Query(None, pattern="^(anytime_td|receptions|receiving_yards|rushing_yards)$"),
     search: str | None = Query(None, max_length=100),
@@ -722,7 +733,7 @@ def readiness(session: Session = Depends(db_session)):
 
 @app.get("/v1/anytime-td/research")
 def anytime_td_research(
-    league: str | None = Query(default="all"),
+    league: League | None = Query(default="all"),
     refresh: bool = Query(default=False),
 ) -> dict[str, Any]:
     """Research Anytime TD Finder payload with dual probs and reliability warnings.
@@ -967,8 +978,8 @@ _POSTED_PARLAY_NOTE = (
 
 @app.get("/v1/parlays/card")
 def parlay_card(
-    league: str = Query(default="all"),
-    date: str | None = None,
+    league: League = Query(default="all"),
+    date: IsoDay | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     """Tickets already built for the slate. The page only reads this."""
@@ -1340,8 +1351,8 @@ def atd_desk_status(session: Session = Depends(db_session)) -> dict[str, Any]:
 
 @app.get("/v1/best-bets")
 def best_bets(
-    league: str = Query("all"),
-    date: str | None = None,
+    league: League = Query("all"),
+    date: IsoDay | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     """Spread sides and the saved desk props for one day."""
@@ -1369,7 +1380,7 @@ def best_bets(
 def ats_finder(
     request: Request,
     date: calendar_date | None = None,
-    league: str = Query("all"),
+    league: League = Query("all"),
     sort: str = Query("kickoff"),
     side: str = Query("all"),
     session: Session = Depends(db_session),
@@ -1463,7 +1474,7 @@ def _spread_side_is(row: dict[str, Any], home_handicap: float, *, favorite: bool
 
 @app.get("/v1/ats/track-record")
 def ats_track_record_endpoint(
-    league: str | None = None,
+    league: League | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     from spe.shadow.ats import ats_track_record

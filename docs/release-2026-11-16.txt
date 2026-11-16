@@ -40,3 +40,30 @@ Full browser journey sign-off requires the project's IronBee tools, unavailable
 in the current agent session. No equivalent browser sign-off is claimed.
 The full selection/simulation policy still needs prospective NFL and college
 evaluation separately, using frozen pre-kickoff candidates, inputs and prices.
+
+Optimization and reliability follow-up (November 16)
+- A full NFL refresh reproduced a 512 MB OOM hidden by earlier warm/not_due checks.
+  Project only needed fields, decode without parallel column buffers, filter dated
+  depth charts in bounded batches and load game context in small groups. Reuse
+  player/roster identity lookups instead of querying once per historical row.
+- The input lane retains its advisory lock in a lean parent and runs each provider
+  stage in a separate child process. The existing supervisor deadline/termination
+  owns all descendants. Provider failures remain visible and other feeds still run.
+- Commit completed NFL source stages independently; share game-flow JSON without
+  materializing several full copies. College refreshes discard superseded/current
+  temporary frames and use narrow, streamed identity queries.
+- Grade saved TD primary/alternate cards using batched official and fallback stats.
+  A restored 12-game board required 2 queries instead of 37, with identical output.
+- Validate real calendar dates, months, leagues and parlay inputs. Reject duplicate
+  parlay players, unsupported markets/sides/lines, and invalid/non-finite prices.
+- ATS, schedule, ticket and prop failures are explicit. Tickets have a retry and
+  bounded timeout; canceled filter requests cannot replace a newer card. Scenario
+  inputs reset when changing dates, and copy accurately describes team-score edits.
+- Subscription checks are reused only within one request. Database failure during
+  access checks returns retryable 503 instead of telling a member to subscribe.
+Validation: full backend/PostgreSQL suite, frontend contracts, production build,
+zero high-severity dependency findings, restored-data memory/query benchmarks,
+and exact-commit deployment/job/HTTP checks are recorded in the accompanying
+optimization-review-20261116 output directory. Browser journey verification still
+requires the project's unavailable IronBee tools. This is not a prediction-accuracy
+claim or a large-concurrency capacity certification.

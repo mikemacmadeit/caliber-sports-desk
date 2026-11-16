@@ -4,6 +4,21 @@ export type SlateDays = {
   dates: string[];
 };
 
+/** Query strings are untrusted, including repeated keys returned as arrays. */
+export function validDay(value: unknown): string | undefined {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const date = new Date(`${value}T12:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.getUTCFullYear() > 0 && date.getUTCFullYear() < 9999 && date.toISOString().slice(0, 10) === value ? value : undefined;
+}
+
+export function validMonth(value: unknown): string | undefined {
+  return typeof value === "string" && validDay(`${value}-01`) ? value : undefined;
+}
+
+export function validLeague(value: unknown): "all" | "nfl" | "fbs" {
+  return value === "nfl" || value === "fbs" ? value : "all";
+}
+
 export function slateToday(now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",

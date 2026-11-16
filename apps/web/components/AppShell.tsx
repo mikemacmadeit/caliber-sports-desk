@@ -21,7 +21,7 @@ const GROUPS = [
   {
     label: "Run a number",
     items: [
-      { href: "/scenario", label: "Scenario", hint: "Change the weather, rerun" },
+      { href: "/scenario", label: "Scenario", hint: "Change team scores, rerun" },
     ],
   },
   {

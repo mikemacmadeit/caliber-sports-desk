@@ -41,6 +41,7 @@ def load_asset(year, *, refresh=False, client=None):
     path = root / f"play_by_play_{year}.parquet"
     meta = path.with_suffix(".source.json")
     now = datetime.now(UTC)
+    frame = None
     if path.exists() and refresh and now.timestamp()-path.stat().st_mtime < 21600:
         refresh = False
     if refresh or not path.exists():
@@ -49,21 +50,27 @@ def load_asset(year, *, refresh=False, client=None):
         response.raise_for_status()  # No automatic retry or paid fallback.
         tmp = path.with_suffix(".download")
         tmp.write_bytes(response.content)
-        # Verify schema before replacing the last good file.
-        pd.read_parquet(tmp, columns=PBP_COLUMNS)
+        checksum = hashlib.sha256(response.content).hexdigest()
+        del response
+        from spe.ops.memory import release_processing_memory
+        release_processing_memory()
+        # Decode once, without parallel Arrow buffers, before replacing good data.
+        frame = pd.read_parquet(tmp, columns=PBP_COLUMNS, use_threads=False)
         tmp.replace(path)
         meta.write_text(json.dumps({"source":url,"observed_at":now.isoformat(),
-            "sha256":hashlib.sha256(response.content).hexdigest()}))
+            "sha256":checksum}))
     if not meta.exists():
+        with path.open('rb') as source_file:
+            checksum = hashlib.file_digest(source_file, 'sha256').hexdigest()
         meta.write_text(json.dumps({"source":f"{BASE}/espn_cfb_pbp/{path.name}",
             "observed_at":datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat(),
-            "sha256":hashlib.sha256(path.read_bytes()).hexdigest()}))
-    return pd.read_parquet(path, columns=PBP_COLUMNS), json.loads(meta.read_text())
+            "sha256":checksum}))
+    return (frame if frame is not None else pd.read_parquet(path, columns=PBP_COLUMNS, use_threads=False)), json.loads(meta.read_text())
 
 
 def summarize(frame, games, members, player_ids, aliases, observed_at):
     """Pure normalization boundary, shared by tests and the actual importer."""
-    df = frame.drop_duplicates(["game_id", "id"], keep="last").copy()
+    df = frame.drop_duplicates(["game_id", "id"], keep="last")
     valid = df["status_type_completed"].fillna(False).astype(bool)
     for field in ("penalty_no_play", "penalty_negated_play", "kneel_down"):
         valid &= ~df[field].fillna(False).astype(bool)
@@ -152,7 +159,8 @@ def refresh_free_college(db, *, years=(2023,2024,2025,2026), refresh=False):
             PlayerGameStat.quality_status.notin_(("invalid","quarantined"))).yield_per(1000) if r.team_id}
     known={p.player_id for p in db.query(Player.player_id)}
     player_ids={p.removeprefix('fbs:'):p for p in known if p.startswith('fbs:')}
-    for r in db.query(ProviderIdMap).filter(ProviderIdMap.provider=='espn',ProviderIdMap.entity_type=='player'):
+    for r in db.query(ProviderIdMap.external_id, ProviderIdMap.canonical_id, ProviderIdMap.confidence).filter(
+            ProviderIdMap.provider=='espn',ProviderIdMap.entity_type=='player').yield_per(1000):
         if r.canonical_id in known and r.confidence>=.99:
             player_ids[r.external_id]=r.canonical_id
     path=settings.parquet_dir/'desk_evidence'/'fbs_free_opportunities.json'
@@ -164,6 +172,9 @@ def refresh_free_college(db, *, years=(2023,2024,2025,2026), refresh=False):
             "players":[r for r in prior.get('players',[]) if previous_season(r)],
             "sources":[r for r in prior.get('sources',[]) if not any(str(y) in str(r.get('source','')) for y in years)],
             "reports":{k:v for k,v in prior.get('reports',{}).items() if int(k) not in years}}
+    del prior
+    from spe.ops.memory import release_processing_memory
+    release_processing_memory()
     for year in years:
         current=datetime.now(UTC)
         season=current.year-int(current.month<7)
@@ -173,7 +184,12 @@ def refresh_free_college(db, *, years=(2023,2024,2025,2026), refresh=False):
             raise ValueError("No matched college opportunities; retain previous evidence")
         for key in ('opportunity_games','players'):result[key].extend(payload[key])
         result['sources'].append(source);result['reports'][str(year)]=report
+        del frame, payload
+        release_processing_memory()
     path=settings.parquet_dir/'desk_evidence'/'fbs_free_opportunities.json'
     path.parent.mkdir(parents=True,exist_ok=True)
-    tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(result,allow_nan=False));tmp.replace(path)
+    tmp=path.with_suffix('.tmp')
+    with tmp.open('w', encoding='utf-8') as stream:
+        json.dump(result, stream, allow_nan=False)
+    tmp.replace(path)
     return result['reports']

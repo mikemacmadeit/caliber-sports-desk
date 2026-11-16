@@ -6,7 +6,7 @@ import { PropBoard } from "@/components/PropBoard";
 import { PropDeskPanel } from "@/components/PropDeskPanel";
 import { TodayPropPicks } from "@/components/TodayPropPicks";
 import { apiGet } from "@/lib/api";
-import { dayParts, type SlateDays, withQuery } from "@/lib/days";
+import { validDay, validLeague, slateToday, dayParts, type SlateDays, withQuery } from "@/lib/days";
 
 const MARKETS = [
   { id: "receptions", label: "Receptions" },
@@ -20,7 +20,10 @@ export default async function PropsPage({
 }: {
   searchParams: Promise<{ league?: string; market?: string; date?: string }>;
 }) {
-  const { league = "all", market = "receptions", date: dateParam } = await searchParams;
+  const params = await searchParams;
+  const league = validLeague(params.league);
+  const dateParam = validDay(params.date);
+  const market = MARKETS.some(item => item.id === params.market) ? params.market! : "receptions";
 
   let days: SlateDays | null = null;
   let daysError: string | null = null;
@@ -30,7 +33,7 @@ export default async function PropsPage({
     daysError = e instanceof Error ? e.message : "days unavailable";
   }
 
-  const selected = dateParam || days?.today || new Date().toISOString().slice(0, 10);
+  const selected = dateParam || days?.today || slateToday();
   const next = days?.dates.find((d) => d > selected) ?? null;
   const onSlate = !days || days.dates.includes(selected);
 
@@ -70,7 +73,7 @@ export default async function PropsPage({
           <p>The day list is taking a moment. The picks below still load.</p>
         </div>
       ) : null}
-      <PropDeskPanel league={league} date={selected} />
+      <PropDeskPanel key={`${league}:${selected}`} league={league} date={selected} />
       <TodayPropPicks league={league} date={selected} market={market} hideWhenEmpty />
       <div className="flex flex-wrap gap-2">
         {MARKETS.map((m) => (
@@ -90,7 +93,7 @@ export default async function PropsPage({
         ))}
       </div>
       {onSlate ? (
-        <PropBoard league={league} date={selected} market={market} />
+        <PropBoard key={`${league}:${selected}:${market}`} league={league} date={selected} market={market} />
       ) : (
         <EmptyDay
           selected={selected}

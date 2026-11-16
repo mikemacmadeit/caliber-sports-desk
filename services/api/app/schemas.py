@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, FiniteFloat, field_validator
+from pydantic import BaseModel, Field, FiniteFloat, field_validator, model_validator
 
 
 class DisclaimerMixin(BaseModel):
@@ -108,14 +108,29 @@ class SimulationCreate(BaseModel):
 
 
 class ParlayLeg(BaseModel):
-    player_id: str
-    market_id: str
-    side: str = "yes"
-    line: float | None = None
+    player_id: str = Field(min_length=1, max_length=160)
+    market_id: Literal["anytime_td"]
+    side: Literal["yes"] = "yes"
+    line: None = None
 
 
 class ParlayEvaluate(BaseModel):
-    game_id: str
-    legs: list[ParlayLeg]
+    game_id: str = Field(min_length=1, max_length=160)
+    legs: list[ParlayLeg] = Field(min_length=2, max_length=10)
     book_american: int | None = None
-    book_decimal: float | None = None
+    book_decimal: FiniteFloat | None = Field(default=None, gt=1, le=10000)
+
+    @field_validator("book_american")
+    @classmethod
+    def valid_price(cls, value):
+        if value is not None and not 100 <= abs(value) <= 1_000_000:
+            raise ValueError("American odds must be at least +100 or at most -100")
+        return value
+
+    @model_validator(mode="after")
+    def unique_legs(self):
+        if len({leg.player_id for leg in self.legs}) != len(self.legs):
+            raise ValueError("Choose a different player for each leg")
+        if self.book_american is not None and self.book_decimal is not None:
+            raise ValueError("Supply one sportsbook price format")
+        return self

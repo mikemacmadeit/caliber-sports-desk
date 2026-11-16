@@ -46,6 +46,8 @@ def refresh_free_desk_inputs(db, now=None):
             db.rollback()
             result[name] = {"status": "unavailable", "reason": type(exc).__name__}
             return False
+        finally:
+            release_processing_memory()
 
     path = settings.parquet_dir / "desk_evidence" / "fbs.json"
     if path.name in versions and path.exists() and now.timestamp() - path.stat().st_mtime < 21600:

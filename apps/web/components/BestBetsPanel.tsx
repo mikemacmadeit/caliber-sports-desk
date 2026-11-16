@@ -16,29 +16,30 @@ export function BestBetsPanel({ league, date }: { league: string; date: string }
   const cached = peekBrowserCache<BestBets>(path);
   const [card, setCard] = useState<BestBets | null>(cached);
   const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     const hit = peekBrowserCache<BestBets>(path);
     setCard(hit);
     setError(false);
-    let cancel = false;
-    browserGet<BestBets>(path)
+    const ctrl = new AbortController();
+    browserGet<BestBets>(path, ctrl.signal)
       .then((data) => {
-        if (!cancel) {
+        if (!ctrl.signal.aborted) {
           setCard(data);
           setError(false);
         }
       })
       .catch(() => {
-        if (!cancel && !hit) setError(true);
+        if (!ctrl.signal.aborted && !hit) setError(true);
       });
     return () => {
-      cancel = true;
+      ctrl.abort();
     };
-  }, [path]);
+  }, [path, retry]);
 
   if (error && !card) {
-    return <p role="status" className="text-sm text-mute">Today's card is temporarily unavailable.</p>;
+    return <p role="status" className="text-sm text-mute">This day's card is temporarily unavailable. <button className="underline" onClick={() => setRetry(n => n + 1)}>Retry</button></p>;
   }
   if (!card) {
     return <p role="status" className="text-sm text-mute">Opening the saved card…</p>;

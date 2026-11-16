@@ -8,7 +8,7 @@ import { TodayPropPicks } from "@/components/TodayPropPicks";
 import { TodayTickets } from "@/components/TodayTickets";
 import type { AtsRow } from "@/components/AtsBoard";
 import { apiGet, type ParlayCard, type PropPickCard, type SlateGame, type SlateResponse } from "@/lib/api";
-import { dayParts, slateToday, type SlateDays, withQuery } from "@/lib/days";
+import { validDay, validLeague, dayParts, slateToday, type SlateDays, withQuery } from "@/lib/days";
 import { callsForDate } from "@/lib/atsDay";
 
 export default async function TodayPage({
@@ -16,7 +16,9 @@ export default async function TodayPage({
 }: {
   searchParams: Promise<{ league?: string; date?: string }>;
 }) {
-  const { league = "all", date: dateParam } = await searchParams;
+  const params = await searchParams;
+  const league = validLeague(params.league);
+  const dateParam = validDay(params.date);
   const selectedEarly = dateParam || slateToday();
   let data: SlateResponse | null = null;
   let days: SlateDays | null = null;
@@ -28,16 +30,14 @@ export default async function TodayPage({
     const [dayList, slate, board, picks, tickets] = await Promise.all([
       apiGet<SlateDays>(`/v1/days?league=${league}`, 8000).catch(() => null),
       apiGet<SlateResponse>(`/v1/slate?league=${league}&date=${selectedEarly}`, 8000).catch(() => null),
-      apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff&date=${selectedEarly}`, 8000).catch(() => ({
-        rows: [] as AtsRow[],
-      })),
+      apiGet<{ rows: AtsRow[] }>(`/v1/ats?league=${league}&sort=kickoff&date=${selectedEarly}`, 8000).catch(() => null),
       apiGet<PropPickCard>(`/v1/props/picks?league=${league}&date=${selectedEarly}`, 8000).catch(() => null),
       apiGet<ParlayCard>(`/v1/parlays/card?league=${league}&date=${selectedEarly}`, 8000).catch(() => null),
     ]);
     days = dayList;
-    if (!dayList && !slate) error = "The slate is unavailable right now.";
+    if (!slate || !board) error = "Some schedule or matchup information is temporarily unavailable.";
     data = slate;
-    calls = await callsForDate(board.rows, selectedEarly, league);
+    calls = await callsForDate(board?.rows ?? [], selectedEarly, league);
     propCard = picks;
     ticketCard = tickets;
   } catch (e) {
@@ -68,8 +68,7 @@ export default async function TodayPage({
 
       {error && (
         <div className="plate border-danger/40 bg-danger/10 p-4 text-sm text-paper">
-          Desk is dark — the live API didn’t answer in time (often a cold start). Refresh in a
-          few seconds. {error}
+          {error} <a className="underline" href={withQuery("/schedule", { league, date: selected })}>Try again</a>
         </div>
       )}
 

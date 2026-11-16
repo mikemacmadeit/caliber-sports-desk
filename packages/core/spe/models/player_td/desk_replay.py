@@ -64,11 +64,12 @@ def load_replay_model(date, league):
     return {**model, "user_requested_experiment": True}
 
 
-def grade(db, game, player):
+def grade(db, game, player, *, sources=None):
     """A touchdown already on the live box shows green. A miss waits until the final."""
     if str(game.status or "") in {"canceled", "cancelled"}:
         return "void"
-    official = db.get(PublishedStat, f"{game.game_id}|{player}|anytime_td")
+    key = (game.game_id, player)
+    official = sources[0].get(key) if sources is not None else db.get(PublishedStat, f"{game.game_id}|{player}|anytime_td")
     source = str(official.source or "") if official is not None else ""
     if source in {"espn.summary.participation_unconfirmed", "espn.summary.absent"}:
         return "awaiting_box" if str(game.status or "") in {"final", "post"} else "pending"
@@ -83,7 +84,7 @@ def grade(db, game, player):
         return "scored" if (official.actual or 0) > 0 else "blank"
     if scored_live:
         return "scored"
-    stats = db.scalars(select(PlayerGameStat).where(
+    stats = sources[1].get(key, []) if sources is not None else db.scalars(select(PlayerGameStat).where(
         PlayerGameStat.game_id == game.game_id, PlayerGameStat.player_id == player,
         PlayerGameStat.quality_status.notin_(("invalid", "quarantined")),
     )).all()
@@ -156,12 +157,38 @@ def _refresh_card_grades(db, card) -> None:
         game.game_id: game
         for game in db.scalars(select(Game).where(Game.game_id.in_(ids or ["__none__"])))
     }
+    # A slate can contain hundreds of primary/alternate references. Fetch the
+    # underlying results together and reuse them for both cards and lane records.
+    from sqlalchemy import tuple_
+    pairs = set()
+    for row in card["rows"]:
+        gid = row.get("game_id")
+        if gid not in games:
+            continue
+        players = [row.get("player_id")] + [((row.get("decision") or {}).get(lane) or {}).get("player_id")
+                                            for lane in ("most_likely", "value_candidate")]
+        pairs.update((gid, pid) for pid in players if pid)
+    official, fallback = {}, {}
+    pairs = list(pairs)
+    for start in range(0, len(pairs), 400):
+        batch = pairs[start:start + 400]
+        for stat in db.scalars(select(PublishedStat).where(
+                PublishedStat.key.in_([f"{gid}|{pid}|anytime_td" for gid, pid in batch]))):
+            official[(stat.game_id, stat.player_id)] = stat
+        needed = [key for key in batch if str(games[key[0]].status) in {"final", "post"}
+                  and not str(getattr(official.get(key), "source", "") or "").startswith("espn.summary")]
+        if needed:
+            for stat in db.scalars(select(PlayerGameStat).where(
+                    tuple_(PlayerGameStat.game_id, PlayerGameStat.player_id).in_(needed),
+                    PlayerGameStat.quality_status.notin_(("invalid", "quarantined")))):
+                fallback.setdefault((stat.game_id, stat.player_id), []).append(stat)
+    sources = (official, fallback)
     for row in card["rows"]:
         game = games.get(row.get("game_id"))
         if game is None or not row.get("player_id"):
             continue
         row["game_status"] = game.status
-        row["result"] = grade(db, game, row["player_id"])
+        row["result"] = grade(db, game, row["player_id"], sources=sources)
         row["final_score"] = (
             f"{game.away_score}–{game.home_score}"
             if str(game.status or "") == "final" and game.away_score is not None and game.home_score is not None
@@ -173,7 +200,7 @@ def _refresh_card_grades(db, card) -> None:
             entry = decision.get(lane) or {}
             if not entry.get("player_id"):
                 continue
-            results[lane] = _lane_result(db, game, lane, entry)
+            results[lane] = _lane_result(db, game, lane, entry, sources=sources)
         if results:
             row["decision_results"] = results
     card["wins"] = sum(row.get("result") == "scored" for row in card["rows"])
@@ -211,8 +238,8 @@ def _store_day_card(db, payload) -> None:
                 'losses':sum(r.get('result')=='blank' for r in rows)})
 
 
-def _lane_result(db, game, lane, entry):
-    result = grade(db, game, entry['player_id'])
+def _lane_result(db, game, lane, entry, *, sources=None):
+    result = grade(db, game, entry['player_id'], sources=sources)
     if game.status not in {'final', 'post', 'canceled', 'cancelled'} and result != 'void':
         result = 'pending'  # Live TD highlights are provisional, not settled wins.
     qualified = bool(lane == 'value_candidate' and entry.get('price_supported'))

@@ -4,7 +4,7 @@ import { LeagueToggle } from "@/components/LeagueToggle";
 import { PageHeader } from "@/components/PageHeader";
 import { ParlayBoard } from "@/components/ParlayBoard";
 import { apiGet, type ParlayCard } from "@/lib/api";
-import { dayParts, slateToday, type SlateDays, withQuery } from "@/lib/days";
+import { validDay, validLeague, dayParts, slateToday, type SlateDays, withQuery } from "@/lib/days";
 import { kickoffParts, pct } from "@/lib/format";
 
 export const metadata = {
@@ -17,7 +17,9 @@ export default async function ParlaysPage({
 }: {
   searchParams: Promise<{ league?: string; date?: string }>;
 }) {
-  const { league = "all", date: dateParam } = await searchParams;
+  const params = await searchParams;
+  const league = validLeague(params.league);
+  const dateParam = validDay(params.date);
   const selectedGuess = dateParam || slateToday();
   const [days, guessed] = await Promise.all([
     load<SlateDays>(`/v1/days?league=${league}`, 8000),

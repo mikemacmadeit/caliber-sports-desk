@@ -14,10 +14,10 @@ async function proxy(request: NextRequest, path: string[]) {
   if (contentType) headers.set("content-type", contentType);
   if (token) headers.set("authorization", `Bearer ${token}`);
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), 14000);
   try {
     const res = await fetch(url, {
-      method: request.method, headers, cache: "no-store", signal: ctrl.signal,
+      method: request.method, headers, cache: "no-store", signal: AbortSignal.any([request.signal, ctrl.signal]),
       body: request.method === "GET" ? undefined : await request.text(),
     });
     const body = await res.arrayBuffer();

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LedgerRecord, type LedgerCard, type YearRecord } from "@/components/LedgerRecord";
 import { PageHeader } from "@/components/PageHeader";
 import { apiGet } from "@/lib/api";
-import { dayParts, slateToday } from "@/lib/days";
+import { validDay, validLeague, validMonth, dayParts, slateToday } from "@/lib/days";
 
 export default async function TrackRecordPage({
   searchParams,
@@ -10,9 +10,9 @@ export default async function TrackRecordPage({
   searchParams: Promise<{ league?: string; date?: string; month?: string }>;
 }) {
   const params = await searchParams;
-  const league = ["all", "nfl", "fbs"].includes(params.league || "") ? params.league! : "all";
-  const selected = /^\d{4}-\d{2}-\d{2}$/.test(params.date || "") ? params.date! : previousDay(slateToday());
-  const month = /^\d{4}-\d{2}$/.test(params.month || "") ? params.month! : selected.slice(0, 7);
+  const league = validLeague(params.league);
+  const selected = validDay(params.date) || previousDay(slateToday());
+  const month = validMonth(params.month) || selected.slice(0, 7);
   const when = dayParts(selected);
   const [card, calendar, year] = await Promise.all([
     apiGet<LedgerCard>(`/v1/published/day?date=${selected}&league=${league}`, 12000).catch(() => null),

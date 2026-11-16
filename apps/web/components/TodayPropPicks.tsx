@@ -45,7 +45,6 @@ export function TodayPropPicks({ league, date, gameId, market, initialCard = nul
     return () => { disposed = true; controller?.abort(); clearInterval(poll); clearInterval(clock); };
   }, [league, date, initialCard]);
   if (error && !hasBoard(card)) {
-    if (hideWhenEmpty) return null;
     return <p role="status" className="text-sm text-mute">Published prices are not available right now.</p>;
   }
   if (!card) return <p className="text-sm text-mute">Checking published opportunities…</p>;

@@ -146,6 +146,8 @@ def run_step(name, fn):
     finally:
         stop.set()
         pulse.join(timeout=3)
+        from spe.ops.memory import release_processing_memory
+        release_processing_memory()
 
 
 def publish_slate(db, date):
@@ -341,19 +343,20 @@ def production_cycle(lane):
                 raise RuntimeError("; ".join(errors))
             return {"status": "ok", "steps": results}
         if lane == "inputs":
-            from spe.ingest.nws_live import ingest_nws_forecasts
-            from spe.ingest.nflverse_desk import refresh_nflverse_desk
-            from spe.ingest.free_desk_inputs import refresh_free_desk_inputs
-
+            from spe.config import settings
             errors = []
-            for name, fn in [
-                ("production_inputs", inputs),
-                ("production_weather", lambda db: ingest_nws_forecasts(db, horizon_hours=48)),
-                ("production_nflverse", refresh_nflverse_desk),
-                ("production_free_college", refresh_free_desk_inputs),
-            ]:
+            for name in names:
                 try:
-                    run_step(name, fn)
+                    if settings.app_env in {"prod", "production"}:
+                        # Keep the advisory lane lock in this lean parent. A fresh
+                        # child releases each provider's native parsing buffers and
+                        # imports before the next feed. The supervisor's process
+                        # group still owns and terminates every child on timeout.
+                        import subprocess
+                        import sys
+                        subprocess.run([sys.executable, "-m", "worker.input_step", name], check=True)
+                    else:
+                        run_step(name, input_operation(name))
                 except Exception as exc:
                     errors.append(f"{name}: {type(exc).__name__}")
             if errors:
@@ -362,6 +365,22 @@ def production_cycle(lane):
         if lane == "touchdowns":
             return run_step("production_touchdowns", refresh_touchdown_cards)
         return run_step("production_settlement", settlement)
+
+
+def input_operation(name):
+    """Import only the provider requested by an isolated production input step."""
+    if name == "production_inputs":
+        return inputs
+    if name == "production_weather":
+        from spe.ingest.nws_live import ingest_nws_forecasts
+        return lambda db: ingest_nws_forecasts(db, horizon_hours=48)
+    if name == "production_nflverse":
+        from spe.ingest.nflverse_desk import refresh_nflverse_desk
+        return refresh_nflverse_desk
+    if name == "production_free_college":
+        from spe.ingest.free_desk_inputs import refresh_free_desk_inputs
+        return refresh_free_desk_inputs
+    raise ValueError("Unknown input step")
 
 
 def health(db, now=None):

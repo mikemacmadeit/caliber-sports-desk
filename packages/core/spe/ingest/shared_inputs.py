@@ -21,22 +21,29 @@ def publish_gameflow(db, source, *, now=None):
     import pandas as pd
     from spe.simulate.desk_gameflow_inputs import COLUMNS
     observed = as_utc(now) or datetime.now(UTC)
-    frame = pd.read_parquet(source, columns=COLUMNS)
+    frame = pd.read_parquet(source, columns=COLUMNS, use_threads=False)
     if frame.empty:
         raise ValueError('No game-flow plays to publish')
     root = settings.parquet_dir / 'desk_evidence'
     root.mkdir(parents=True, exist_ok=True)
     path = root/'nfl_gameflow.json'
-    payload = {'observed_at':observed.isoformat(), 'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
-               'records':json.loads(frame.to_json(orient='records'))}
-    with tempfile.NamedTemporaryFile(dir=root, suffix='.tmp', delete=False) as output:
-        output.write(json.dumps(payload, allow_nan=False).encode())
-        temp = output.name
+    with source.open('rb') as source_file:
+        checksum = hashlib.file_digest(source_file, 'sha256').hexdigest()
+    temp = None
     try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=root, suffix='.tmp', delete=False) as output:
+            temp = output.name
+            output.write('{"observed_at":' + json.dumps(observed.isoformat()) +
+                         ',"source_sha256":' + json.dumps(checksum) + ',"records":')
+            frame.to_json(output, orient='records')
+            output.write('}')
+        del frame
+        from spe.ops.memory import release_processing_memory
+        release_processing_memory()
         os.replace(temp, path)
         return publish_inputs(db, ('nfl_gameflow.json',), now=observed)
     finally:
-        if os.path.exists(temp):
+        if temp and os.path.exists(temp):
             os.unlink(temp)
 
 

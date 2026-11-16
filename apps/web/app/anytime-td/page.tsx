@@ -7,7 +7,7 @@ import { LeagueToggle } from "@/components/LeagueToggle";
 import { AnytimeTdBoard, type BoardPayload } from "@/components/AnytimeTdBoard";
 import { PageHeader } from "@/components/PageHeader";
 import { apiGet } from "@/lib/api";
-import { dayParts, slateToday, type SlateDays, withQuery } from "@/lib/days";
+import { validDay, validLeague, dayParts, slateToday, type SlateDays, withQuery } from "@/lib/days";
 
 export default async function AnytimeTdPage({
   searchParams,
@@ -15,8 +15,8 @@ export default async function AnytimeTdPage({
   searchParams: Promise<{ league?: string; date?: string; view?: string }>;
 }) {
   const params = await searchParams;
-  const league = params.league || "all";
-  const dateParam = params.date;
+  const league = validLeague(params.league);
+  const dateParam = validDay(params.date);
   const researchView = params.view === "research";
 
   let days: SlateDays | null = null;
