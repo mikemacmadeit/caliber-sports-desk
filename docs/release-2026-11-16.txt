@@ -87,3 +87,17 @@ record outputs matched; a 35-day regression checks bounded queries and correctio
 visibility on SQLite/PostgreSQL. Authenticated API checks cover signup, reset/session
 revocation, private watchlists and logout. Account/web route contracts and the full
 suite/build also run in CI. No live billing charges or email sends are part of QA.
+
+Database contention follow-up
+- A live 40-request/concurrency-4 smoke check overlapped scheduled jobs and exposed
+  a database restart at 20:02 UTC, with 11 failed requests. PostgreSQL reported an
+  unclean shutdown/recovery. Sampled memory reached 218 MB of a 256 MiB plan with
+  17 connections; memory exhaustion is suspected, not confirmed by an OOM event.
+- Reduce the API pool from 6 to 3 (one overflow connection remains), and offset
+  settlement, inputs and TD jobs while retaining their existing 15/5-minute cadence.
+  No hosting plan, cost, model selection policy or historical picks were changed.
+- The reduced pool passed 120 authenticated isolated requests at concurrency 8,
+  zero errors, p95 1.96 seconds with production PostgreSQL memory settings.
+  This does not reproduce all production workers or certify launch capacity.
+- Live recovery and worker completion evidence is retained with the incident,
+  including failed tests. Capacity under realistic traffic remains a launch gate.

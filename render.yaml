@@ -33,7 +33,8 @@ services:
       - key: PARQUET_DIR
         value: /data/parquet
       - key: DB_POOL_SIZE
-        value: "6"
+        # Bound concurrent database work on the current 256 MiB database.
+        value: "3"
       - key: WEB_ORIGIN
         sync: false
       - key: AUTH_PROXY_SECRET
