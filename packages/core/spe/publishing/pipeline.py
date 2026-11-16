@@ -252,10 +252,10 @@ def refresh_saved_results(db):
     from spe.desk.day_results import apply_recorded_results
     from spe.ingest.espn_box import _fetch_summary
     now = datetime.now(UTC)
-    # Current scoreboard reads are bounded to three slate days, not the whole season.
+    # Recent grades and pregame market context share the bounded scoreboard feed.
     from zoneinfo import ZoneInfo
     today = now.astimezone(ZoneInfo("America/Chicago")).date()
-    dates = [(today-timedelta(days=n)).isoformat() for n in (2, 1, 0)]
+    dates = [(today-timedelta(days=n)).isoformat() for n in (2, 1, 0, -1, -2)]
     results = []
     for day in dates:
         try:
@@ -279,7 +279,7 @@ def settlement(db):
     from spe.shadow.settle import settle_shadow_predictions
 
     saved_results = refresh_saved_results(db)
-    scores = {"games": sum(r.get("scoreboard_games", 0) for r in saved_results), "scope": "last_three_slate_days"}
+    scores = {"games": sum(r.get("scoreboard_games", 0) for r in saved_results), "scope": "past_two_and_next_two_slate_days"}
     boxes = [ingest_final_box_scores(db, league_id=lg) for lg in ("nfl", "fbs")]
     db.flush()
     published_boxes = ingest_published_boxes(db)
