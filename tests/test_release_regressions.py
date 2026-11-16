@@ -171,3 +171,16 @@ def test_year_excludes_archives_and_unpriced_returns(db, monkeypatch):
     year = ledger.ledger_year(db, 2026)
     assert year['days'] == 1 and year['win'] == 1 and year['loss'] == 1
     assert year['units'] == -1 and year['priced'] == 1
+
+
+def test_deployed_artifacts_resolve_both_leagues(monkeypatch):
+    from pathlib import Path
+    from spe.models.player_td.desk_combined import load_combined_model
+    from spe.models.player_td.desk_replay import requested_retrain
+    monkeypatch.setattr(settings, 'parquet_dir', Path(__file__).resolve().parents[1]/'deploy/runtime-data/parquet')
+    for league in ('nfl', 'fbs'):
+        assert load_combined_model(league) is not None
+        requested = requested_retrain('2026-11-20', league)
+        if requested:
+            artifact = load_combined_model(league, research_candidate=not requested.get('use_validated_model'), version=requested['version'])
+            assert artifact and artifact['artifact_sha256'] == requested['artifact_sha256']

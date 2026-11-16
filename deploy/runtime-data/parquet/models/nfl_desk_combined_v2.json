@@ -1,0 +1,300 @@
+{
+  "version": "desk_combined_v2",
+  "league": "nfl",
+  "research_only": true,
+  "market_features": true,
+  "market_total_trained": true,
+  "player_model": {
+    "features": [
+      "carries",
+      "receptions",
+      "targets",
+      "gl_carries",
+      "rz_targets",
+      "rush_td",
+      "rec_td",
+      "carry_trend",
+      "receiving_trend",
+      "team_rush_td",
+      "team_rec_td",
+      "opp_rush_td",
+      "opp_rec_td",
+      "opp_position_td",
+      "carry_share",
+      "receiving_share",
+      "goal_line_share",
+      "red_zone_share",
+      "games",
+      "charting_known",
+      "is_home",
+      "pos_qb",
+      "pos_rb",
+      "pos_te",
+      "market_team_spread",
+      "market_game_total",
+      "market_spread_known",
+      "market_total_known"
+    ],
+    "center": [
+      2.596101569953418,
+      2.105136753211409,
+      3.079931663107411,
+      0.14219339016269628,
+      0.4142473353414255,
+      0.09020314302394757,
+      0.1418567841144721,
+      0.022574025284680745,
+      0.017062734222448514,
+      0.9129186675503362,
+      1.4406468029998192,
+      0.9004772670690596,
+      1.4225925665255477,
+      0.7199496917179795,
+      0.09643575326195077,
+      0.09794077657875673,
+      0.08581784116748684,
+      0.09782370473463546,
+      4.861142113095238,
+      1.0,
+      0.49702380952380953,
+      0.10546875,
+      0.2716703869047619,
+      0.19856770833333334,
+      -0.018415178571428572,
+      43.926292782738095,
+      1.0,
+      1.0
+    ],
+    "scale": [
+      4.696722813575262,
+      1.902449821211826,
+      2.749721123882369,
+      0.35080265853953496,
+      0.5019666798134764,
+      0.23109406693375534,
+      0.2325821636907859,
+      0.9844933085554227,
+      0.6368170575257459,
+      0.5307133826511348,
+      0.6090176209852254,
+      0.4736729409502558,
+      0.540747963347971,
+      0.4994208939304906,
+      0.17322820852815707,
+      0.08657721095378779,
+      0.19772087939106542,
+      0.11355956531937983,
+      1.4890999415935096,
+      1.0,
+      0.49999114221182284,
+      0.30715646301752714,
+      0.44482084908847436,
+      0.39892176368375554,
+      6.012344334209825,
+      4.272283112998458,
+      1.0,
+      1.0
+    ],
+    "intercept": -1.5474540829829202,
+    "coefficients": [
+      0.26179803819718717,
+      -0.15237261817279257,
+      0.44994507091542296,
+      -0.03238059134017233,
+      0.005126554022161029,
+      0.20484747388057023,
+      0.10361189573055157,
+      0.018000450387671004,
+      0.002196684999626413,
+      -0.02576563448013832,
+      -0.011567000015191623,
+      -0.019877546073185117,
+      -0.08392281225976207,
+      0.043661329843823024,
+      0.196266089833933,
+      0.2019178814751706,
+      -0.006748557508890199,
+      0.0427680524628505,
+      0.037388734002727596,
+      0.0,
+      0.06767908602994523,
+      0.08193623244268212,
+      -0.08096220703216717,
+      0.045721132251996185,
+      -0.19752446638400653,
+      0.16884600184075593,
+      0.0,
+      0.0
+    ]
+  },
+  "team_coefficients": {
+    "rush": [
+      -0.7456449687007699,
+      0.3846599005645193,
+      -0.03701897438806606,
+      0.01325869194232143,
+      -0.15304886471444268,
+      0.09890573114903618,
+      -0.4276120167509785,
+      0.5549649985371077,
+      1.0658141570393789e-15,
+      1.0658141570392953e-15
+    ],
+    "rec": [
+      -0.5938342986417046,
+      0.03196782369782401,
+      0.21262088284121938,
+      0.022997888512719424,
+      -0.053949727612772905,
+      0.07581251074793478,
+      -0.3282118993539645,
+      0.8630659934695166,
+      7.457137032389258e-16,
+      7.457135652051237e-16
+    ]
+  },
+  "allocation_rates": {
+    "rush": [
+      0.03060560306903915,
+      0.1010457611352368,
+      0.0
+    ],
+    "rec": [
+      0.03848127336723911,
+      0.10670225766948713,
+      0.0
+    ]
+  },
+  "residual_share": {
+    "rush": 0.05418250950570342,
+    "rec": 0.04063604240282685
+  },
+  "allocation_weight": 0.32,
+  "calibration_intercept": -0.17199330022026263,
+  "calibration_slope": 0.9086393272329456,
+  "component_end": "2025-10-15",
+  "blend_end": "2025-11-15",
+  "calibration_end": "2025-12-15",
+  "validation_end": "2026-02-15",
+  "source_sha256": "76a0a1dd449759eb6a3eaae403322ea1fea7aca6771fa6f353dff9373a75dc54",
+  "live_enabled": true,
+  "validation": {
+    "sample_counts": {
+      "fit": 10752,
+      "blend": 1121,
+      "calibrate": 1425,
+      "validation": 1267,
+      "evaluation_2026": 1944
+    },
+    "allocation_weight": 0.32,
+    "limitations": [
+      "Revised historical stats and historical market archives retrieved after games; not archived pregame source snapshots.",
+      "Labels include observed participants with two prior same-team games; inactive/DNP outcomes not reconstructed.",
+      "Historical injury reports and executable prices unavailable; pick metrics are highest-probability scorers, not priced Desk ROI.",
+      "Current team pool uses recent appearances; rookies, transfers and new replacements need role history.",
+      "NFL and FBS fitted independently. Spreads enter both models; NFL totals also enter probability models. College historical totals are insufficient, so current college totals are used only for selection screening.",
+      "No complete routes, weather or schedule-strength adjustment. Archived odds timing is not independently verified.",
+      "2026 is an examined retrospective replay, not an untouched prospective test."
+    ],
+    "promotion_rule": "Positive allocation weight and calibration slope; validation Brier and log loss no worse than independently calibrated player-only component. Research Desk only.",
+    "validation": {
+      "combined": {
+        "player_games": 1267,
+        "brier": 0.13421783888503488,
+        "log_loss": 0.42625685731719687,
+        "predicted_rate": 0.17890773334782187,
+        "actual_rate": 0.18153117600631413,
+        "picks": 63,
+        "hits": 26,
+        "hit_rate": 0.4126984126984127
+      },
+      "player_only": {
+        "player_games": 1267,
+        "brier": 0.13474900161051412,
+        "log_loss": 0.4294911162339156,
+        "predicted_rate": 0.1786611512646651,
+        "actual_rate": 0.18153117600631413,
+        "picks": 62,
+        "hits": 27,
+        "hit_rate": 0.43548387096774194
+      },
+      "paired_brier_vs_player_only": {
+        "difference": -0.000531162725479232,
+        "game_bootstrap_95_percent": [
+          -0.001410208676901684,
+          0.0002769136479470049
+        ],
+        "games": 63
+      },
+      "allocation_uncalibrated": {
+        "player_games": 1267,
+        "brier": 0.13546069347004042,
+        "log_loss": 0.43111192976722745,
+        "predicted_rate": 0.1658644080580084,
+        "actual_rate": 0.18153117600631413,
+        "picks": 63,
+        "hits": 27,
+        "hit_rate": 0.42857142857142855
+      }
+    },
+    "evaluation_2026": {
+      "combined": {
+        "player_games": 1944,
+        "brier": 0.1444453387905441,
+        "log_loss": 0.454301994660027,
+        "predicted_rate": 0.18056931966824447,
+        "actual_rate": 0.20421810699588477,
+        "picks": 104,
+        "hits": 55,
+        "hit_rate": 0.5288461538461539
+      },
+      "player_only": {
+        "player_games": 1944,
+        "brier": 0.14542655199801952,
+        "log_loss": 0.4561254304140752,
+        "predicted_rate": 0.18217876352980475,
+        "actual_rate": 0.20421810699588477,
+        "picks": 104,
+        "hits": 53,
+        "hit_rate": 0.5096153846153846
+      },
+      "paired_brier_vs_player_only": {
+        "difference": -0.000981213207475426,
+        "game_bootstrap_95_percent": [
+          -0.0016854640952227709,
+          -0.0002627357498787443
+        ],
+        "games": 104
+      },
+      "allocation_uncalibrated": {
+        "player_games": 1944,
+        "brier": 0.14525506499987856,
+        "log_loss": 0.5162181622018969,
+        "predicted_rate": 0.17060200506107304,
+        "actual_rate": 0.20421810699588477,
+        "picks": 104,
+        "hits": 54,
+        "hit_rate": 0.5192307692307693
+      },
+      "previous_v2": {
+        "player_games": 1944,
+        "brier": 0.14832859742193688,
+        "log_loss": 0.4636033876880468,
+        "predicted_rate": 0.1918749623568934,
+        "actual_rate": 0.20421810699588477,
+        "picks": 104,
+        "hits": 50,
+        "hit_rate": 0.4807692307692308
+      },
+      "paired_brier_vs_previous_v2": {
+        "difference": -0.003883258631392779,
+        "game_bootstrap_95_percent": [
+          -0.005644573323297589,
+          -0.0022394127578052917
+        ],
+        "games": 104
+      }
+    },
+    "live_enabled": true
+  }
+}
