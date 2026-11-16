@@ -211,3 +211,19 @@ def test_gameflow_source_reaches_other_worker(db, tmp_path, monkeypatch):
     frame, checksum = _source(str(path), path.stat().st_mtime_ns)
     assert list(frame.game_id) == ['g'] and frame.iloc[0].rush_attempt == 1
     assert path.stat().st_mtime == pytest.approx(NOW.timestamp())
+
+
+def test_input_providers_can_checkpoint_without_invalidating_each_other(db, monkeypatch):
+    from spe.publishing.pipeline import inputs
+    def provider(name):
+        def run(db):
+            db.add(BoardSnapshot(key=name, payload={}, updated_at=NOW))
+            db.commit()
+            assert db.get(BoardSnapshot, name) is not None
+            return {'status':'ok'}
+        return run
+    monkeypatch.setattr('spe.ingest.nfl_availability.refresh_nfl_availability', provider('nfl'))
+    monkeypatch.setattr('spe.ingest.espn_availability.ingest_espn_availability', provider('espn'))
+    monkeypatch.setattr('spe.ingest.api_sports_injuries.ingest_api_sports_injuries', lambda *a, **k:{'status':'needs_key'})
+    assert inputs(db)['status'] == 'ok'
+    assert db.get(BoardSnapshot,'nfl') is not None and db.get(BoardSnapshot,'espn') is not None

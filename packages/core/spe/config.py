@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     web_origin: str = "http://localhost:3000"
     auth_proxy_secret: str = ""
     database_url: str = "sqlite:///./data/caliber.db"
+    db_pool_size: int = Field(default=2, ge=1, le=20)
     parquet_dir: Path = Path("./data/parquet")
 
     cfbd_api_key: str = ""

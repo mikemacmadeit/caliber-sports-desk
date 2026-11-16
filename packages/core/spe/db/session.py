@@ -42,7 +42,7 @@ def get_engine() -> Engine:
             _enable_sqlite_fk(_engine)
         else:
             _engine = create_engine(url, future=True, echo=False, pool_pre_ping=True,
-                                    pool_size=2, max_overflow=1, pool_timeout=2,
+                                    pool_size=settings.db_pool_size, max_overflow=1, pool_timeout=2,
                                     connect_args={"connect_timeout": 2})
         _SessionLocal = sessionmaker(bind=_engine, autoflush=False, expire_on_commit=False)
     return _engine

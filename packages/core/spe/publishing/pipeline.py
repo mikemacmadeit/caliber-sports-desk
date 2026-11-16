@@ -196,9 +196,13 @@ def inputs(db):
     year = moment.year - (1 if moment.month <= 2 else 0)
     def attempt(fn):
         try:
-            with db.begin_nested():
-                return fn()
+            # These ingesters checkpoint internally. An enclosing savepoint is
+            # invalid after their first commit and used to fail ESPN availability.
+            result = fn()
+            db.commit()
+            return result
         except Exception as exc:
+            db.rollback()
             return {"status": "unavailable", "error": type(exc).__name__}
 
     nfl = attempt(lambda: refresh_nfl_availability(db))
