@@ -62,6 +62,7 @@ def publish_inputs(db, names=FILES, now=None):
         if row.checksum != checksum:
             row.content = gzip.compress(body, compresslevel=6, mtime=0)
         row.checksum, row.byte_count, row.updated_at = checksum, len(body), now
+        del body
         written.append(name)
     db.flush()
     return {"published": written}

@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from spe.config import settings
 from spe.db.base import as_utc
 from spe.ingest.shared_inputs import hydrate_inputs, publish_inputs
+from spe.ops.memory import release_processing_memory
 
 BAD = {"error", "failed", "unavailable", "degraded", "requires_export_job", "needs_key", "plan_blocked"}
 
@@ -24,6 +25,7 @@ def refresh_free_desk_inputs(db, now=None):
 
     now = as_utc(now) or datetime.now(UTC)
     versions = hydrate_inputs(db)
+    release_processing_memory()
     result = {}
 
     def attempt(name, operation, artifacts=()):
@@ -33,6 +35,7 @@ def refresh_free_desk_inputs(db, now=None):
                 if failed(body):
                     result[name] = {**body, "status": "degraded"}
                     return False
+                release_processing_memory()
                 published = publish_inputs(db, artifacts, now=now)
                 if set(published['published']) != set(artifacts):
                     raise ValueError('Required input artifact was not produced')
@@ -51,8 +54,11 @@ def refresh_free_desk_inputs(db, now=None):
         year = now.year - int(now.month < 7)
         def college():
             sources = refresh_free_college(db, years=(year,), refresh=True)
+            release_processing_memory()
             situations = refresh_college_situations(db, years=(year,))
+            release_processing_memory()
             derived = refresh_local_evidence(force=True, db=db)
+            release_processing_memory()
             return {"sources": sources, "situations": situations, "derived": derived}
         attempt("college", college, ("fbs_free_opportunities.json", "fbs_situations.json", "fbs.json", "nfl.json"))
     attempt("rosters", lambda: refresh_college_rosters(db, now=now), ("fbs_rosters.json",))

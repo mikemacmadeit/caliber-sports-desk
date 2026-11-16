@@ -52,7 +52,7 @@ def refresh_college_rosters(db, now=None):
     with ThreadPoolExecutor(max_workers=4) as pool:
         responses=list(pool.map(fetch,teams))
     all_players=[];errors={};sources=[]
-    known={p.player_id for p in db.query(Player)}
+    known={p.player_id for p in db.query(Player.player_id)}
     added=0
     for team,body,error in responses:
         if error:

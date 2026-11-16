@@ -140,7 +140,9 @@ def export(db, output):
         if league == "fbs" and situation_path.exists():
             payload["situations"] = json.loads(situation_path.read_text())["teams"]
         tmp=path.with_suffix('.tmp')
-        tmp.write_text(json.dumps(payload,allow_nan=False),encoding='utf-8')
+        # Stream encoding rather than keeping two additional full JSON copies.
+        with tmp.open('w', encoding='utf-8') as stream:
+            json.dump(payload, stream, allow_nan=False)
         tmp.replace(path)
         report[league]={"team_games":len(payload['teams']),"player_games":len(payload['players']),
                         "latest_game":max((r['kickoff_utc'] for r in payload['teams']),default=None)}
