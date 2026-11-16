@@ -43,7 +43,7 @@ export default async function PropsPage({
   }
 
   const next = days?.dates.find((d) => d > selected) ?? null;
-  const rows = data?.rows ?? [];
+  const rows = (data?.rows ?? []).map(boardRow);
 
   return (
     <div className="space-y-8">
@@ -55,7 +55,7 @@ export default async function PropsPage({
             : dayParts(selected).monthDay
         }
         title="Props"
-        lede="The best receptions, receiving, or rushing prop in each game. The strongest chance under 90%. The board under it is every priced line."
+        lede="One receptions, receiving, or rushing prop for every game. The strongest chance under 90%. The board under it is every priced line."
         action={
           <LeagueToggle
             value={league}
@@ -88,7 +88,7 @@ export default async function PropsPage({
       <TodayPropPicks league={league} date={selected} market={market} hideWhenEmpty />
       <div className="flex flex-wrap gap-2">
         {MARKETS.map((m) => (
-          <a
+          <Link
             key={m.id}
             href={withQuery("/props", {
               league,
@@ -100,7 +100,7 @@ export default async function PropsPage({
             }`}
           >
             {m.label}
-          </a>
+          </Link>
         ))}
       </div>
       {rows.length === 0 ? (
@@ -142,6 +142,62 @@ export default async function PropsPage({
       )}
     </div>
   );
+}
+
+/** The table only reads these fields. The rest of each research row stays off the page. */
+function boardRow(row: PropRow): PropRow {
+  const forecast = row.forecast;
+  return {
+    outcome_id: row.outcome_id,
+    game_id: row.game_id,
+    league_id: row.league_id,
+    market_id: row.market_id,
+    player_id: row.player_id,
+    player_name: row.player_name,
+    position: row.position,
+    team: row.team,
+    team_mark: row.team_mark,
+    opponent: row.opponent,
+    away_abbr: row.away_abbr,
+    home_abbr: row.home_abbr,
+    away_mark: row.away_mark,
+    home_mark: row.home_mark,
+    kickoff_utc: row.kickoff_utc,
+    side: row.side,
+    line: row.line,
+    pick: row.pick,
+    model_lean: row.model_lean,
+    bookmaker: row.bookmaker,
+    book_price: row.book_price,
+    source_timestamp: row.source_timestamp,
+    price_freshness: row.price_freshness,
+    result: row.result,
+    actual: row.actual,
+    projection: row.projection,
+    projection_games: row.projection_games,
+    projection_unit: row.projection_unit,
+    data_tier: row.data_tier,
+    research_signal: row.research_signal,
+    forecast: {
+      prediction_as_of: forecast.prediction_as_of,
+      model_version: forecast.model_version,
+      data_cutoff: forecast.data_cutoff,
+      markets: forecast.markets,
+      p_estimate: forecast.p_estimate,
+      confidence_interval: forecast.confidence_interval,
+      book_price: forecast.book_price,
+      source_timestamp: forecast.source_timestamp,
+      price_freshness: forecast.price_freshness,
+      availability_status: forecast.availability_status,
+      reason_codes: forecast.reason_codes,
+      disclaimer: forecast.disclaimer,
+      ev: forecast.ev,
+      ev_after_haircut: forecast.ev_after_haircut,
+      recommendation_status: forecast.recommendation_status,
+      data_tier: forecast.data_tier,
+      research_only: forecast.research_only,
+    },
+  };
 }
 
 function DayTally({ rows }: { rows: PropRow[] }) {

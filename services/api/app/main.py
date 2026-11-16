@@ -151,7 +151,11 @@ async def sqlite_operational_error_handler(request, exc: OperationalError):  # t
                 "path": str(request.url.path),
             },
         )
-    return JSONResponse(status_code=500, content={"detail": "database_error", "message": str(exc)})
+    # The driver text includes the database host. Callers only need to retry.
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "database_error", "message": "The database is unavailable. Retry shortly."},
+    )
 
 
 def _research_detail(session: Session, game_id: str):
@@ -457,14 +461,13 @@ def prop_desk(
 
     selected = date or slate_today()
     chosen = saved_desk_props(session, league, selected)
-    already_saved = chosen is not None
     if chosen is None:
         chosen = load_desk_props(session, league, selected)
         store_desk_props(session, league, selected, chosen)
     index = {row.get("game_id"): session.get(Game, row.get("game_id")) for row in chosen if row.get("game_id")}
     try:
-        # A saved card is graded from stats already on file. The first build may still read the box.
-        apply_recorded_results(session, [], chosen, fetch=(lambda *_args, **_kwargs: None) if already_saved else None)
+        # A saved card still replaces a live number once the game is final.
+        apply_recorded_results(session, [], chosen)
         session.commit()
     except Exception:
         session.rollback()
@@ -1361,11 +1364,19 @@ def best_bets(
     date: str | None = None,
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
-    """Spread sides and price picks for one day. The named rows are the shortlist."""
+    """Spread sides and the saved desk props for one day."""
     from app.queries import attach_team_marks
-    from spe.desk.best_bets import build_best_bets
+    from spe.desk.best_bets import _price_card, build_best_bets
+    from spe.props.game_picks import saved_desk_props
 
-    payload = build_best_bets(league=league, date=date or slate_today())
+    selected = date or slate_today()
+    payload = build_best_bets(league=league, date=selected, with_prices=False)
+    saved = saved_desk_props(session, league, selected)
+    if not saved and league in {"", "all"}:
+        nfl = saved_desk_props(session, "nfl", selected) or []
+        fbs = saved_desk_props(session, "fbs", selected) or []
+        saved = [*nfl, *fbs] or None
+    payload["prices"] = [_price_card(row) for row in (saved or [])]
     from spe.desk.day_results import apply_recorded_results
 
     apply_recorded_results(session, payload["spreads"], payload["prices"])

@@ -67,17 +67,19 @@ def parse(payload):
 
 
 def box_actual(markets: dict | None, market: str, *, final: bool) -> float | None:
-    """Use the listed number. A finished box that omits the player or the stat recorded zero.
+    """Use the listed number.
 
-    A box that never loaded stays unknown. A listed player with no touchdown column
-    stays unknown rather than a made-up zero.
+    A box that never loaded stays unknown. A player who never appears is not a
+    counting zero — he may not have played. A listed player who has no line for
+    that counting stat recorded zero. A missing touchdown column stays unknown,
+    because that box is incomplete. A player missing entirely did not score.
     """
     if markets is not None and market in markets:
         return float(markets[market])
     if not final:
         return None
     if markets is None:
-        return 0.0
+        return 0.0 if market == "anytime_td" else None
     if market == "anytime_td":
         return None
     return 0.0

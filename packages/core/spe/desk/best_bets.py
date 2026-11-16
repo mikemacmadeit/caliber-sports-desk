@@ -127,7 +127,7 @@ def prop_desk_picks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return picks
 
 
-def build_best_bets(*, league: str, date: str) -> dict[str, Any]:
+def build_best_bets(*, league: str, date: str, with_prices: bool = True) -> dict[str, Any]:
     from spe.models.ats.board_cache import read_board
     from spe.props.board_cache import read_entry
 
@@ -137,18 +137,21 @@ def build_best_bets(*, league: str, date: str) -> dict[str, Any]:
         ats_rows = [row for row in ats_rows if row.get("league_id") == league]
     spreads = spread_shortlist(ats_rows, league=league, date=date)
 
-    league_key = league if league not in {"", "all"} else "all"
-    prop_rows: list[dict[str, Any]] = []
-    for market in PROP_MARKETS:
-        entry = read_entry(market, league_key, date) or {}
-        prop_rows.extend(row for row in (entry.get("rows") or []) if isinstance(row, dict))
-    if league not in {"", "all"}:
-        prop_rows = [row for row in prop_rows if row.get("league_id") == league]
+    prices: list[dict[str, Any]] = []
+    if with_prices:
+        league_key = league if league not in {"", "all"} else "all"
+        prop_rows: list[dict[str, Any]] = []
+        for market in PROP_MARKETS:
+            entry = read_entry(market, league_key, date) or {}
+            prop_rows.extend(row for row in (entry.get("rows") or []) if isinstance(row, dict))
+        if league not in {"", "all"}:
+            prop_rows = [row for row in prop_rows if row.get("league_id") == league]
+        prices = desk_price_cards(prop_rows)
     return {
         "date": date,
         "league": league or "all",
         "spreads": spreads,
-        "prices": desk_price_cards(prop_rows),
+        "prices": prices,
         "scorers": [],
     }
 
