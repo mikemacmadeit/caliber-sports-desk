@@ -175,7 +175,8 @@ def settle_ats_predictions(session: Session, now: datetime | None = None) -> dic
     settled_clean = 0
     open_rows = (
         session.query(AtsPrediction)
-        .filter(~AtsPrediction.ats_id.in_(session.query(AtsSettlement.ats_id)))
+        .filter(~session.query(AtsSettlement.ats_id).filter(
+            AtsSettlement.ats_id == AtsPrediction.ats_id).exists())
         .all()
     )
     for pred in open_rows:

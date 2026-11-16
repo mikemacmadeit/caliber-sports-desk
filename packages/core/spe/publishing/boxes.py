@@ -126,7 +126,8 @@ def _put_stat(db, game_id: str, player_id: str, market: str, actual: float, sour
 def ingest(db, fetch=_fetch_summary):
     pending = (
         db.query(PublishedPick)
-        .filter(or_(~PublishedPick.pick_id.in_(db.query(PublishedResult.pick_id)),
+        .filter(or_(~db.query(PublishedResult.pick_id).filter(
+                        PublishedResult.pick_id == PublishedPick.pick_id).exists(),
                     PublishedPick.kickoff_utc >= datetime.now(UTC) - timedelta(days=7)))
         .all()
     )

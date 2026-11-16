@@ -547,7 +547,8 @@ def settle(db, now=None):
     now = as_utc(now) or datetime.now(UTC)
     rows = (
         db.query(PublishedPick)
-        .filter((~PublishedPick.pick_id.in_(db.query(PublishedResult.pick_id))) |
+        .filter((~db.query(PublishedResult.pick_id).filter(
+                    PublishedResult.pick_id == PublishedPick.pick_id).exists()) |
                 (PublishedPick.kickoff_utc >= now - timedelta(days=7)))
         .all()
     )

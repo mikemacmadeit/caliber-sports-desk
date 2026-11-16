@@ -43,7 +43,10 @@ def settle_shadow_predictions(
         ShadowPrediction.shadow_id, ShadowPrediction.game_id, ShadowPrediction.player_id,
         ShadowPrediction.market_id, ShadowPrediction.outcome_id, ShadowPrediction.side,
         ShadowPrediction.line, ShadowPrediction.price_american, raiseload=True,
-    )).filter(~ShadowPrediction.shadow_id.in_(terminal_ids))
+    )).filter(~session.query(ShadowSettlement.shadow_id).filter(
+        ShadowSettlement.shadow_id == ShadowPrediction.shadow_id,
+        ShadowSettlement.result.in_(("win", "loss", "void", "push")),
+    ).exists())
     if shadow_ids is not None:
         query = query.filter(ShadowPrediction.shadow_id.in_(shadow_ids or ["__none__"]))
     open_rows = query.all()
