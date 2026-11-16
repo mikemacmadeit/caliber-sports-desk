@@ -49,4 +49,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if not 1 <= args.timeout <= 3600:
         parser.error("timeout must be between 1 and 3600 seconds")
-    sys.exit(run([sys.executable, "-m", "worker.main", "production-cycle", "--lane", args.lane], args.timeout))
+    sys.exit(run([sys.executable, "-m", "worker.production", "--lane", args.lane], args.timeout))

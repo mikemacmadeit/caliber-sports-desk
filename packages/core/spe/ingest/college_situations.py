@@ -61,6 +61,10 @@ def summarize(frame, games, aliases):
 def refresh_college_situations(db, *, years=None):
     path=settings.parquet_dir/'desk_evidence/fbs_free_opportunities.json'
     source=json.loads(path.read_text())
+    # Only team-game identities and source metadata are used here.
+    source.pop('players', None)
+    from spe.ops.memory import release_processing_memory
+    release_processing_memory()
     games={(r['game_id'].split(':')[-1],r['team_id']):r for r in source['opportunity_games']}
     aliases=canonical_team_map(db.query(Team).all())
     output=settings.parquet_dir/'desk_evidence/fbs_situations.json'

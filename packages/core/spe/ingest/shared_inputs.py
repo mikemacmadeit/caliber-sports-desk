@@ -54,6 +54,8 @@ def publish_inputs(db, names=FILES, now=None):
         body = path.read_bytes()
         if not isinstance(json.loads(body), dict):
             raise ValueError("Shared input must be an object")
+        from spe.ops.memory import release_processing_memory
+        release_processing_memory()
         checksum = hashlib.sha256(body).hexdigest()
         row = db.get(InputArtifact, name)
         if row is None:
@@ -63,6 +65,7 @@ def publish_inputs(db, names=FILES, now=None):
             row.content = gzip.compress(body, compresslevel=6, mtime=0)
         row.checksum, row.byte_count, row.updated_at = checksum, len(body), now
         del body
+        release_processing_memory()
         written.append(name)
     db.flush()
     return {"published": written}
