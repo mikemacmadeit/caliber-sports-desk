@@ -233,12 +233,16 @@ def _board_game_ids(games, now, *, upcoming_only=False):
     dead = {"final", "in_progress", "canceled", "cancelled", "postponed"}
     future, rest = [], []
     for game in games:
+        if getattr(game, "status", None) in dead:
+            continue
         kick = as_utc(getattr(game, "kickoff_utc", None))
-        if kick and kick > now and getattr(game, "status", None) not in dead:
-            future.append(game.game_id)
+        if kick and kick > now:
+            future.append(game)
         elif not upcoming_only:
-            rest.append(game.game_id)
-    return future if upcoming_only else [*future, *rest]
+            rest.append(game)
+    future.sort(key=lambda game: as_utc(game.kickoff_utc))
+    ordered = future if upcoming_only else [*future, *rest]
+    return [game.game_id for game in ordered]
 
 
 def _save_batch(market, date, chunk, prior, signature):
