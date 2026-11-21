@@ -28,6 +28,10 @@ def match_result(people, player_id, name, ids, team=None):
         matches = [p for p in people if p.get("espn_id") in expected]
         return matches[0] if len(matches) == 1 else None
     matches = [p for p in people if normalize_name(p.get("name", "")) == normalize_name(name or "")]
-    if team:
-        matches = [p for p in matches if not p.get("team") or p["team"].upper() == team.upper()]
+    # Team only breaks a tie. BUF and BUFF are the same school, so an exact
+    # abbreviation check was leaving the only player in the box ungraded.
+    if team and len(matches) > 1:
+        same = [p for p in matches if not p.get("team") or p["team"].upper() == str(team).upper()]
+        if same:
+            matches = same
     return matches[0] if len(matches) == 1 else None

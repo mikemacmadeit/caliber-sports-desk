@@ -162,6 +162,7 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary, *, cards_
             written += 1
         db.commit()
     db.flush()
+    print(f"refresh_results {date} graded={written} missing={len(missing)}", flush=True)
     return {"status": "degraded" if failures or missing else "ok", "failures": failures, "date": date, "scoreboard_games": sum(map(len, boards.values())), "graded_players": written, "missing_boxes": missing}
 
 
