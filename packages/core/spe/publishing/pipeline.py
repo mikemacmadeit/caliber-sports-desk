@@ -245,6 +245,198 @@ def _board_game_ids(games, now, *, upcoming_only=False):
     return [game.game_id for game in ordered]
 
 
+# Counting props. Touchdowns stay on the anytime card.
+COUNTING_MARKETS = ("receptions", "rushing_yards", "receiving_yards")
+STARTED_KEY = "props-started-v1:"
+
+
+def started_games(games, now):
+    """Games that have kicked off, finals first. Canceled games stay off."""
+    skip = {"canceled", "cancelled", "postponed"}
+    started = []
+    for game in games:
+        if getattr(game, "status", None) in skip:
+            continue
+        kick = as_utc(getattr(game, "kickoff_utc", None))
+        if kick is None or kick > now:
+            continue
+        started.append(game)
+    started.sort(key=lambda game: (
+        0 if getattr(game, "status", None) in {"final", "post"} else 1,
+        as_utc(game.kickoff_utc),
+    ))
+    return started
+
+
+def merge_prop_rows(existing, fresh, game_ids):
+    """Keep every other game. Replace rows for the games just scored."""
+    ids = {str(game_id) for game_id in game_ids}
+    kept = [row for row in existing if isinstance(row, dict) and str(row.get("game_id") or "") not in ids]
+    return [*kept, *[row for row in fresh if isinstance(row, dict)]]
+
+
+def merge_desk_calls(existing, fresh):
+    """Add the started games' calls without dropping the ones still to come."""
+    ids = {str(row.get("game_id") or "") for row in fresh if isinstance(row, dict) and row.get("game_id")}
+    kept = [row for row in existing if isinstance(row, dict) and str(row.get("game_id") or "") not in ids]
+    return [*kept, *fresh]
+
+
+def publish_started_props(db, date=None):
+    """Score and grade props for games that have already kicked off.
+
+    The live publish pass leaves those games off so a timeout cannot erase the
+    upcoming card. This pass adds them beside that card and grades finals.
+    """
+    import time
+    from app.queries import games_for_slate, kickoff_day
+    from spe.publishing.store import read
+
+    day = date or kickoff_day(datetime.now(UTC))
+    now = datetime.now(UTC)
+    games = started_games(games_for_slate(db, day, "all", keep_finished=True), now)
+    attempted = set((read(STARTED_KEY + day, db=db) or {}).get("game_ids") or [])
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+    missing = [game.game_id for game in games if game.game_id not in attempted]
+    print(f"publish_started_props {day} started={len(games)} missing={len(missing)}", flush=True)
+    # Leave time in the settlement window to grade what this pass just saved.
+    deadline = time.monotonic() + 480
+    scored = []
+    failed = 0
+    for index in range(0, len(missing), 4):
+        if time.monotonic() > deadline:
+            print(f"publish_started_props {day} scoring paused remaining={len(missing) - len(scored)}", flush=True)
+            break
+        chunk = missing[index:index + 4]
+        if not _score_started_chunk(day, chunk):
+            failed += 1
+            continue
+        scored.extend(chunk)
+        _remember_started(day, chunk)
+        print(f"publish_started_props {day} scored {len(scored)}/{len(missing)}", flush=True)
+    graded = _grade_started_props(day, [game.game_id for game in games])
+    status = "degraded" if failed and not scored and not graded else "ok"
+    return {
+        "status": status,
+        "date": day,
+        "started": len(games),
+        "scored_games": len(scored),
+        "failed_batches": failed,
+        "graded": graded,
+    }
+
+
+def _score_started_chunk(date, chunk):
+    """Write one handful of started games onto the existing board. Never replace it."""
+    import time
+    from sqlalchemy.exc import OperationalError
+    from app.queries import list_props
+    from spe.props.board_cache import read_entry, write_entry
+    from spe.publishing.local_board import scoring_signature
+
+    signature = None
+    for market in COUNTING_MARKETS:
+        saved = False
+        for attempt in (1, 2):
+            try:
+                with session_factory() as batch:
+                    if signature is None:
+                        signature = scoring_signature()
+                    rows = list_props(batch, market, None, None, "all", date, game_ids=chunk)
+                    for league in ("all", "nfl", "fbs"):
+                        entry = read_entry(market, league, date, session=batch) or {}
+                        fresh = rows if league == "all" else [row for row in rows if row.get("league_id") == league]
+                        write_entry(
+                            market,
+                            league,
+                            date,
+                            merge_prop_rows(entry.get("rows") or [], fresh, chunk),
+                            session=batch,
+                            scoring_signature=signature or entry.get("scoring_signature"),
+                        )
+                    batch.commit()
+                    saved = True
+                    break
+            except OperationalError:
+                print(f"publish_started_props {date} {market} attempt {attempt}", flush=True)
+                time.sleep(2)
+            except Exception as exc:
+                print(f"publish_started_props {date} {market} {type(exc).__name__}", flush=True)
+                return False
+        if not saved:
+            return False
+    return True
+
+
+def _remember_started(date, game_ids):
+    from spe.publishing.store import read, write
+
+    with session_factory() as db:
+        prior = set((read(STARTED_KEY + date, db=db) or {}).get("game_ids") or [])
+        write(STARTED_KEY + date, {"game_ids": sorted(prior | set(game_ids))}, db=db)
+        db.commit()
+
+
+def _grade_started_props(date, game_ids):
+    """Fill box scores for the started props and save the win or loss on the card."""
+    from spe.props.board_cache import read_entry, write_entry
+    from spe.props.game_picks import saved_desk_props, select_desk_props, store_desk_props
+    from spe.desk.day_results import apply_recorded_results
+    from spe.ingest.espn_box import _fetch_summary
+    from spe.models.player_td.desk_replay_results import fetch_day
+    from spe.ingest.espn_scoreboard import upsert_scoreboard_events
+
+    ids = {str(game_id) for game_id in game_ids}
+    if not ids:
+        return 0
+    with session_factory() as db:
+        for league in ("nfl", "fbs"):
+            try:
+                upsert_scoreboard_events(db, league, fetch_day(league, date))
+            except Exception as exc:
+                print(f"publish_started_props {date} scoreboard {league} {type(exc).__name__}", flush=True)
+        db.flush()
+        rows = []
+        saved_entries = {}
+        for market in COUNTING_MARKETS:
+            entry = read_entry(market, "all", date, session=db) or {}
+            saved_entries[market] = entry
+            for row in entry.get("rows") or []:
+                if isinstance(row, dict) and str(row.get("game_id") or "") in ids:
+                    rows.append(row)
+        if rows:
+            apply_recorded_results(db, [], rows, fetch=_fetch_summary)
+        by_market = {}
+        for row in rows:
+            by_market.setdefault(row.get("market_id"), []).append(row)
+        for market, fresh in by_market.items():
+            for league in ("all", "nfl", "fbs"):
+                entry = saved_entries[market] if league == "all" else (read_entry(market, league, date, session=db) or {})
+                league_fresh = fresh if league == "all" else [row for row in fresh if row.get("league_id") == league]
+                write_entry(
+                    market,
+                    league,
+                    date,
+                    merge_prop_rows(entry.get("rows") or [], league_fresh, {row.get("game_id") for row in league_fresh}),
+                    session=db,
+                    scoring_signature=entry.get("scoring_signature"),
+                )
+        desk_rows = select_desk_props(rows)
+        for league in ("all", "nfl", "fbs"):
+            chosen = desk_rows if league == "all" else [row for row in desk_rows if row.get("league_id") == league]
+            existing = saved_desk_props(db, league, date) or []
+            merged = merge_desk_calls(existing, chosen)
+            if merged:
+                store_desk_props(db, league, date, merged)
+        db.commit()
+        graded = sum(1 for row in rows if row.get("result") in {"win", "loss", "push", "void"})
+        print(f"publish_started_props {date} graded_rows={graded} desk={len(desk_rows)}", flush=True)
+        return graded
+
+
 def _save_batch(market, date, chunk, prior, signature):
     """Score one handful of games on a new connection. Retry once if that socket dies."""
     from sqlalchemy.exc import OperationalError
@@ -437,6 +629,16 @@ def settlement(db):
     from spe.shadow.ats import settle_ats_predictions
     from spe.shadow.settle import settle_shadow_predictions
 
+    # Today's finished games are graded before the older-day sweep. A timeout
+    # later in this lane must not leave the early props unscored.
+    try:
+        started_props = publish_started_props(db)
+    except Exception as exc:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        started_props = {"status": "degraded", "error": type(exc).__name__}
     saved_results = refresh_saved_results(db)
     scores = {"games": sum(r.get("scoreboard_games", 0) for r in saved_results), "scope": "recent_slate_days"}
     boxes = [ingest_final_box_scores(db, league_id=lg) for lg in ("nfl", "fbs")]
@@ -444,7 +646,7 @@ def settlement(db):
     published_boxes = ingest_published_boxes(db)
     record_frozen_desk_picks(db)
     result = settle(db)
-    if published_boxes["status"] == "degraded" or any(r.get("status") == "degraded" for r in [*saved_results, *boxes]):
+    if published_boxes["status"] == "degraded" or started_props.get("status") == "degraded" or any(r.get("status") == "degraded" for r in [*saved_results, *boxes]):
         result["status"] = "degraded"
     return {
         **result,
@@ -452,6 +654,7 @@ def settlement(db):
         "boxes": boxes,
         "published_boxes": published_boxes,
         "saved_results": saved_results,
+        "started_props": started_props,
         "ats": settle_ats_predictions(db),
         "shadow": settle_shadow_predictions(db),
     }

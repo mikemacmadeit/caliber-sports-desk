@@ -606,6 +606,32 @@ def test_odds_lane_saves_the_board_before_downloading_prices():
     assert _board_game_ids(games, now, upcoming_only=True) == ["next", "later"]
 
 
+def test_started_props_keep_the_upcoming_card_and_come_after_finals():
+    from types import SimpleNamespace
+    from spe.publishing.pipeline import merge_desk_calls, merge_prop_rows, started_games
+
+    now = NOW
+    games = [
+        SimpleNamespace(game_id="noon", kickoff_utc=now - timedelta(hours=4), status="final"),
+        SimpleNamespace(game_id="later", kickoff_utc=now + timedelta(hours=3), status="scheduled"),
+        SimpleNamespace(game_id="live", kickoff_utc=now - timedelta(hours=1), status="in_progress"),
+        SimpleNamespace(game_id="called", kickoff_utc=now - timedelta(hours=5), status="cancelled"),
+    ]
+    assert [game.game_id for game in started_games(games, now)] == ["noon", "live"]
+    existing = [
+        {"game_id": "later", "player_name": "Upcoming", "market_id": "receptions"},
+        {"game_id": "noon", "player_name": "Old", "market_id": "receptions"},
+    ]
+    fresh = [{"game_id": "noon", "player_name": "Fresh", "market_id": "receptions", "result": "win"}]
+    merged = merge_prop_rows(existing, fresh, ["noon"])
+    assert [row["player_name"] for row in merged] == ["Upcoming", "Fresh"]
+    calls = merge_desk_calls(
+        [{"game_id": "later", "player_name": "Upcoming"}],
+        [{"game_id": "noon", "player_name": "Fresh", "result": "win"}],
+    )
+    assert [row["game_id"] for row in calls] == ["later", "noon"]
+
+
 def test_a_pass_before_kickoff_stays_off_the_public_record(db):
     game = seed(db)
     game.kickoff_utc = NOW
