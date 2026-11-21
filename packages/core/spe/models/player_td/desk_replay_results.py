@@ -30,30 +30,57 @@ def fetch_day(league, date):
         return json.load(response).get("events", [])
 
 
-def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
-    from spe.models.player_td.desk_replay import CACHE_PREFIX
-    from sqlalchemy import or_
-    # Filter JSON dates in SQL; do not deserialize every historical card.
-    from zoneinfo import ZoneInfo
-    start = datetime.fromisoformat(date).replace(tzinfo=ZoneInfo("America/Chicago"))
-    end = start + timedelta(days=1)
-    kickoff = BoardSnapshot.payload["row"]["kickoff_utc"].as_string()
-    snapshots = db.scalars(select(BoardSnapshot).where(kickoff >= start.astimezone(UTC).isoformat(), kickoff < end.astimezone(UTC).isoformat(), or_(BoardSnapshot.key.like(CACHE_PREFIX + "%"), BoardSnapshot.key.like("guarded-desk-v1:%"), BoardSnapshot.key.like("revised-policy-v1:%"), BoardSnapshot.key.like("scorer-replay-v1:%"), BoardSnapshot.key.like("scorer-desk-v1:%"), BoardSnapshot.key.like("retrained-desk-v1:%"), BoardSnapshot.key.like("corrected-inputs-v1:%")))).all()
+def _remember_pick(selected, row):
+    if not isinstance(row, dict) or not row.get("game_id"):
+        return
+    if row.get("player_id"):
+        selected[(row["game_id"], row["player_id"])] = row
+    # Both saved choices need observed results. Comparison-table players
+    # are not picks, and missing box-score rows must remain unresolved.
+    for lane in ("most_likely", "value_candidate"):
+        choice = (row.get("decision") or {}).get(lane) or {}
+        if choice.get("player_id") and choice.get("name"):
+            selected[(row["game_id"], choice["player_id"])] = {
+                **row, "player_id": choice["player_id"], "player_name": choice["name"]}
+
+
+def _named_picks(db, date):
+    """Picks on the saved day card. One key lookup, not a scan of every old card."""
+    from spe.models.player_td.desk_replay import day_card_key
     selected = {}
+    found = False
+    for league in ("all", "nfl", "fbs"):
+        saved = db.get(BoardSnapshot, day_card_key(date, league))
+        payload = saved.payload if saved is not None else None
+        rows = payload.get("rows") if isinstance(payload, dict) else None
+        if not rows:
+            continue
+        found = True
+        for row in rows:
+            _remember_pick(selected, row)
+    return selected if found else None
+
+
+def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary, *, cards_only=False):
     from spe.db.base import as_utc
     from spe.models.player_td.desk_replay import ZONE
-    for snapshot in snapshots:
-        row = (snapshot.payload or {}).get("row")
-        if row and as_utc(row["kickoff_utc"]).astimezone(ZONE).date().isoformat() == date:
-            selected[(row["game_id"], row["player_id"])] = row
-            # Both saved choices need observed results. Comparison-table players
-            # are not picks, and missing box-score rows must remain unresolved.
-            for lane in ("most_likely", "value_candidate"):
-                choice = (row.get("decision") or {}).get(lane)
-                if not choice or not choice.get("player_id") or not choice.get("name"):
-                    continue
-                selected[(row["game_id"], choice["player_id"])] = {
-                    **row, "player_id": choice["player_id"], "player_name": choice["name"]}
+    selected = _named_picks(db, date)
+    if selected is None and cards_only:
+        return {"status": "ok", "failures": [], "date": date, "scoreboard_games": 0,
+                "graded_players": 0, "missing_boxes": []}
+    if selected is None:
+        from spe.models.player_td.desk_replay import CACHE_PREFIX
+        from sqlalchemy import or_
+        # Filter JSON dates in SQL; do not deserialize every historical card.
+        start = datetime.fromisoformat(date).replace(tzinfo=ZONE)
+        end = start + timedelta(days=1)
+        kickoff = BoardSnapshot.payload["row"]["kickoff_utc"].as_string()
+        snapshots = db.scalars(select(BoardSnapshot).where(kickoff >= start.astimezone(UTC).isoformat(), kickoff < end.astimezone(UTC).isoformat(), or_(BoardSnapshot.key.like(CACHE_PREFIX + "%"), BoardSnapshot.key.like("guarded-desk-v1:%"), BoardSnapshot.key.like("revised-policy-v1:%"), BoardSnapshot.key.like("scorer-replay-v1:%"), BoardSnapshot.key.like("scorer-desk-v1:%"), BoardSnapshot.key.like("retrained-desk-v1:%"), BoardSnapshot.key.like("corrected-inputs-v1:%")))).all()
+        selected = {}
+        for snapshot in snapshots:
+            row = (snapshot.payload or {}).get("row")
+            if row and as_utc(row["kickoff_utc"]).astimezone(ZONE).date().isoformat() == date:
+                _remember_pick(selected, row)
     from spe.ingest.espn_box import _espn_event_id
     from spe.models.player_td.desk_market import store_archive, store_pregame_quote, summary_market, PREGAME_MARKET_ENDPOINT
     now = datetime.now(UTC)
@@ -90,6 +117,9 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
             return task, summary(task[0], task[1])
         except Exception:
             return task, None
+    # Release the database connection before the score reads. A dropped
+    # connection used to erase every grade from this pass.
+    db.commit()
     with ThreadPoolExecutor(max_workers=4) as pool:
         boxes = list(pool.map(get_box, tasks))
     # Finish network reads before taking SQLite's writer lock.
@@ -130,6 +160,7 @@ def refresh_results(db, date, fetch=fetch_day, summary=_fetch_summary):
             stat.observed_at = datetime.now(UTC)
             stat.source = f"espn.summary:{event_id}"
             written += 1
+        db.commit()
     db.flush()
     return {"status": "degraded" if failures or missing else "ok", "failures": failures, "date": date, "scoreboard_games": sum(map(len, boards.values())), "graded_players": written, "missing_boxes": missing}
 
