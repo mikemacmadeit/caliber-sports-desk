@@ -163,33 +163,41 @@ def run_step(name, fn):
 
 
 def publish_slate(db, date):
-    """Save one market at a time. A timeout then keeps the markets already written."""
-    from app.queries import list_props
+    """Score a few games at a time and save. A dropped database connection cannot erase them."""
+    from app.queries import games_for_slate, list_props
     from spe.props.board_cache import write_entry, WARM_MARKETS
     from spe.publishing.ledger import publish
     from spe.shadow.desk_ledger import freeze_desk_rows
     from spe.publishing.local_board import scoring_signature
 
     signature = scoring_signature()
+    game_ids = [g.game_id for g in games_for_slate(db, date, "all")]
     saved = 0
     published = 0
+    batch = 6
     for market in WARM_MARKETS:
-        print(f"publish_slate {date} {market} start", flush=True)
-        rows = list_props(db, market, None, None, "all", date)
-        freeze_desk_rows(db, rows)
-        for league in ("all", "nfl", "fbs"):
-            write_entry(
-                market,
-                league,
-                date,
-                [r for r in rows if league == "all" or r["league_id"] == league],
-                session=db,
-                scoring_signature=signature,
-            )
-        published += publish(db, rows)["published"]
-        saved += len(rows)
-        db.commit()
-        print(f"publish_slate {date} {market} saved {len(rows)}", flush=True)
+        collected: list = []
+        print(f"publish_slate {date} {market} start games={len(game_ids)}", flush=True)
+        chunks = [game_ids[i:i + batch] for i in range(0, len(game_ids), batch)] or [[]]
+        for index, chunk in enumerate(chunks, start=1):
+            if chunk == [] and game_ids:
+                continue
+            rows = list_props(db, market, None, None, "all", date, game_ids=chunk or None)
+            collected.extend(rows)
+            freeze_desk_rows(db, rows)
+            published += publish(db, rows)["published"]
+            for league in ("all", "nfl", "fbs"):
+                write_entry(
+                    market,
+                    league,
+                    date,
+                    [r for r in collected if league == "all" or r["league_id"] == league],
+                    session=db,
+                    scoring_signature=signature,
+                )
+            db.commit()
+            print(f"publish_slate {date} {market} batch {index}/{len(chunks)} saved {len(rows)}", flush=True)
+        saved += len(collected)
     return {"rows": saved, "published": published}
 
 

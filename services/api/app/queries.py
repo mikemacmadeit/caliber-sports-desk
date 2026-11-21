@@ -862,6 +862,7 @@ def list_props(
     min_ev: float | None,
     league: str | None,
     date: str | None = None,
+    game_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     from datetime import timedelta
 
@@ -890,6 +891,8 @@ def list_props(
             Game.kickoff_utc >= start.astimezone(UTC).replace(tzinfo=None),
             Game.kickoff_utc < end.astimezone(UTC).replace(tzinfo=None),
         )
+    if game_ids is not None:
+        stmt = stmt.where(Outcome.game_id.in_(game_ids))
     outcomes = list(session.scalars(stmt))
     from spe.models.prop_projection import COUNTING_MARKETS, logs_for_players
 
