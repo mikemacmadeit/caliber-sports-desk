@@ -163,18 +163,20 @@ def run_step(name, fn):
 
 
 def publish_slate(db, date):
-    """Save probabilities and pregame decisions in one transaction, on one connection."""
+    """Save one market at a time. A timeout then keeps the markets already written."""
     from app.queries import list_props
     from spe.props.board_cache import write_entry, WARM_MARKETS
     from spe.publishing.ledger import publish
     from spe.shadow.desk_ledger import freeze_desk_rows
     from spe.publishing.local_board import scoring_signature
 
-    all_rows = list_props(db, None, None, None, "all", date)
-    freeze_desk_rows(db, all_rows)
     signature = scoring_signature()
+    saved = 0
+    published = 0
     for market in WARM_MARKETS:
-        rows = [r for r in all_rows if r["market_id"] == market]
+        print(f"publish_slate {date} {market} start", flush=True)
+        rows = list_props(db, market, None, None, "all", date)
+        freeze_desk_rows(db, rows)
         for league in ("all", "nfl", "fbs"):
             write_entry(
                 market,
@@ -184,7 +186,11 @@ def publish_slate(db, date):
                 session=db,
                 scoring_signature=signature,
             )
-    return {"rows": len(all_rows), "published": publish(db, all_rows)["published"]}
+        published += publish(db, rows)["published"]
+        saved += len(rows)
+        db.commit()
+        print(f"publish_slate {date} {market} saved {len(rows)}", flush=True)
+    return {"rows": saved, "published": published}
 
 
 def warm_and_publish(db, only_dates=None):
