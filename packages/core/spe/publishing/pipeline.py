@@ -9,6 +9,18 @@ from spe.db.base import as_utc, new_id
 from spe.db.models import JobRun
 from spe.db.session import session_factory, get_engine, init_db
 
+# Publish before the download. The homepage reads the saved board, and the
+# cron used to die while still fetching prices, so that board never got written.
+ODDS_LANE = (
+    "production_publish",
+    "production_pregame_availability",
+    "production_odds",
+    "production_spreads",
+    "production_publish",
+    "production_ats",
+)
+
+
 JOBS = {
     "production_odds": 900,
     "production_pregame_availability": 900,
@@ -175,17 +187,31 @@ def publish_slate(db, date):
     return {"rows": len(all_rows), "published": publish(db, all_rows)["published"]}
 
 
-def warm_and_publish(db):
+def warm_and_publish(db, only_dates=None):
     from app.queries import games_for_slate, kickoff_day
 
     games = games_for_slate(db, None, "all")
     horizon = datetime.now(UTC) + timedelta(hours=48)
     dates = sorted({kickoff_day(g.kickoff_utc) for g in games if as_utc(g.kickoff_utc) <= horizon})
+    if only_dates is not None:
+        wanted = set(only_dates)
+        dates = [day for day in dates if day in wanted]
+    # The page opens on today. Save that slate before later days or a timeout.
+    today = kickoff_day(datetime.now(UTC))
+    if today in dates:
+        dates = [today, *[day for day in dates if day != today]]
     published = 0
     for date in dates:
         published += publish_slate(db, date)["published"]
         db.commit()
     return {"status": "ok", "dates": dates, "published": published}
+
+
+def publish_today(db):
+    """Write the slate the homepage is showing before any slow download starts."""
+    from app.queries import kickoff_day
+
+    return warm_and_publish(db, only_dates=[kickoff_day(datetime.now(UTC))])
 
 
 def inputs(db):
@@ -308,7 +334,7 @@ def production_cycle(lane):
         if not acquired:
             return {"status": "already_running", "lane": lane}
         names = {
-            "odds": ["production_pregame_availability", "production_odds", "production_spreads", "production_publish", "production_ats"],
+            "odds": ["production_publish", "production_pregame_availability", "production_odds", "production_spreads", "production_ats"],
             "inputs": ["production_inputs", "production_weather", "production_nflverse", "production_free_college"],
             "settlement": ["production_settlement"],
             "touchdowns": ["production_touchdowns"],
@@ -324,17 +350,24 @@ def production_cycle(lane):
             from spe.models.ats.board_cache import refresh_board
             from spe.shadow.ats import capture_ats_predictions
 
-            # Shared credit ceiling is retained. Each committed stage is independently retryable.
+            # Save the board from prices already stored before downloading more.
+            # The cron kills this lane at its time limit. A download used to run
+            # first, so the publish step was killed and the homepage stayed empty.
             results = []
             errors = []
             from spe.ingest.public_availability import refresh_public_availability
-            for name, fn in [
-                ("production_pregame_availability", refresh_public_availability),
-                ("production_odds", ingest_odds_live),
-                ("production_spreads", lambda db: ingest_odds_spreads(db, max_events=12)),
-                ("production_publish", warm_and_publish),
-                ("production_ats", lambda db: (refresh_board(db), capture_ats_predictions(db))[1]),
-            ]:
+            steps = {
+                "production_publish": publish_today,
+                "production_pregame_availability": refresh_public_availability,
+                "production_odds": ingest_odds_live,
+                "production_spreads": lambda db: ingest_odds_spreads(db, max_events=12),
+                "production_ats": lambda db: (refresh_board(db), capture_ats_predictions(db))[1],
+            }
+            publish_passes = 0
+            for name in ODDS_LANE:
+                fn = warm_and_publish if name == "production_publish" and publish_passes else steps[name]
+                if name == "production_publish":
+                    publish_passes += 1
                 try:
                     results.append(run_step(name, fn))
                 except Exception as exc:

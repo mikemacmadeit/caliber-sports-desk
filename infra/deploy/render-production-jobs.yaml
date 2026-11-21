@@ -13,7 +13,7 @@ services:
   dockerContext: .
   name: caliber-hourly
   schedule: '*/5 * * * *'
-  dockerCommand: python -m worker.supervise --lane odds --timeout 240
+  dockerCommand: python -m worker.supervise --lane odds --timeout 840
   envVars:
   - key: APP_ENV
     value: prod

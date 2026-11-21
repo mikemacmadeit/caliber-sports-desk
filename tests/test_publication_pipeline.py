@@ -581,6 +581,16 @@ def test_a_desk_touchdown_does_not_stack_on_a_published_prop(db):
     assert db.query(PublishedPick).one().market_id == "rushing_yards"
 
 
+def test_odds_lane_saves_the_board_before_downloading_prices():
+    from spe.publishing.pipeline import ODDS_LANE
+
+    assert ODDS_LANE[0] == "production_publish"
+    assert ODDS_LANE.index("production_odds") > 0
+    assert ODDS_LANE.index("production_spreads") > ODDS_LANE.index("production_odds")
+    assert ODDS_LANE[-1] == "production_ats"
+    assert ODDS_LANE.count("production_publish") == 2
+
+
 def test_a_pass_before_kickoff_stays_off_the_public_record(db):
     game = seed(db)
     game.kickoff_utc = NOW
