@@ -147,6 +147,44 @@ def test_ats_day_archive_keeps_started_selection(db):
     assert card["rows"][0]["record_status"] == "saved_pregame"
 
 
+def test_the_average_score_card_is_rebuilt_after_kickoff(db):
+    from spe.models.ats.board_cache import archive_days, keep_finished_spreads, load_board
+    from app.queries import kickoff_day
+
+    now = datetime.now(UTC)
+    kickoff = now - timedelta(hours=3)
+    old = {
+        "game_id": "g",
+        "kickoff_utc": kickoff.isoformat(),
+        "game_status": "final",
+        "model_version_id": "ats-slate-fbs",
+        "ats_side": "home",
+        "ats_team": "Florida",
+        "ats_line": -49.5,
+        "ats_pick_label": "Florida -49.5",
+        "ats_basis": "number",
+        "home_score": 34,
+        "away_score": 17,
+    }
+    fresh = {
+        **old,
+        "model_version_id": "ats-slate-sos-fbs",
+        "ats_side": "home",
+        "ats_line": -14.0,
+        "ats_pick_label": "Florida -14",
+        "ats_basis": "score",
+    }
+    archive_days(db, {"as_of": (now - timedelta(hours=4)).isoformat(), "rows": [old]}, now=now - timedelta(hours=4))
+    db.commit()
+    rebuilt = keep_finished_spreads({"rows": [old]}, {"rows": [fresh]})
+    assert rebuilt["rows"][0]["ats_pick_label"] == "Florida -14"
+    archive_days(db, {"as_of": now.isoformat(), "rows": [fresh]}, now=now)
+    db.commit()
+    card = load_board(db, date=kickoff_day(kickoff))
+    assert card["rows"][0]["ats_pick_label"] == "Florida -14"
+    assert card["rows"][0]["model_version_id"] == "ats-slate-sos-fbs"
+
+
 def test_compact_td_card_preserves_explanation_but_omits_feature_matrix():
     from spe.models.player_td.presentation import card_payload
     candidate = {"player_id": "p", "name": "Player", "probability": .5, "customer": {"why": "Recent goal-line work."},

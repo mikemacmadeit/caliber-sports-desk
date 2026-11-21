@@ -74,6 +74,15 @@ def is_fresh(payload: dict[str, Any], *, ttl_sec: int = TTL_SEC, now: datetime |
     return age is not None and age <= ttl_sec
 
 
+# The average-score card. A started game saved from it is rebuilt once, with the
+# current model, then the side locks again.
+_AVERAGE_SCORE_MODELS = {"ats-slate-fbs", "ats-slate-nfl"}
+
+
+def _average_score_pick(row: dict[str, Any]) -> bool:
+    return row.get("model_version_id") in _AVERAGE_SCORE_MODELS
+
+
 _LOCKED_SPREAD_KEYS = (
     "ats_side",
     "ats_team",
@@ -109,6 +118,8 @@ def keep_finished_spreads(previous: dict[str, Any] | None, payload: dict[str, An
             continue
         previous_status, kept, previous_row = prior
         if not (_started(previous_status) or _started(row.get("game_status"))):
+            continue
+        if _average_score_pick(previous_row):
             continue
         if (
             previous_row.get("ats_basis") == "number"
@@ -196,7 +207,9 @@ def archive_days(session, payload, now=None):
         previous = {r["game_id"]: r for r in saved.get("rows", [])}
         for row in rows:
             old = previous.get(row["game_id"])
-            if old and as_utc(old["kickoff_utc"]) <= now:
+            started = bool(old) and as_utc(old["kickoff_utc"]) <= now
+            rebuilt = started and _average_score_pick(old) and old.get("model_version_id") != row.get("model_version_id")
+            if started and not rebuilt:
                 continue
             stamp = as_utc(payload.get("board_cached_at") or payload.get("as_of"))
             previous[row["game_id"]] = {**row, "saved_at": stamp.isoformat() if stamp else None,
