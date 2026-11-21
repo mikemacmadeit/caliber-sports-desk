@@ -878,26 +878,45 @@ def _add_open_slate(
     now: datetime,
     summaries: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Put a scheduled game on the card when the play model has no row for it.
+    """Put today's games on the card when the play model has no row for them.
 
     The strength frame is empty when play-by-play is missing, and it drops a
-    club whose history is stored under a different id. The scoreboard game and
-    its spread still have to be published.
+    club whose history is stored under a different id. Finished games from
+    today stay on the card so the close can be graded.
     """
+    from zoneinfo import ZoneInfo
+
     from spe.db.base import as_utc
     from spe.db.models import Game
 
     seen = {row.get("game_id") for row in rows}
     horizon = now + timedelta(hours=36)
+    day_start = now.astimezone(ZoneInfo("America/Chicago")).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
+    day_end = day_start + timedelta(days=1)
+    window_end = horizon if horizon > day_end else day_end
     open_status = {"scheduled", "pre", "upcoming", "preview", "pregame"}
+    started_status = {"final", "in_progress"}
     for league_id in leagues:
-        games = session.query(Game).filter(Game.league_id == league_id, Game.data_tier == "upcoming").all()
+        games = (
+            session.query(Game)
+            .filter(
+                Game.league_id == league_id,
+                Game.data_tier.in_(["upcoming", "historical"]),
+                Game.kickoff_utc >= day_start,
+                Game.kickoff_utc < window_end,
+            )
+            .all()
+        )
         pending = []
         for game in games:
             kick = as_utc(game.kickoff_utc)
-            if game.game_id in seen or kick is None or kick <= now or kick > horizon:
+            status = str(game.status or "").lower()
+            if game.game_id in seen or kick is None:
                 continue
-            if str(game.status or "").lower() not in open_status:
+            if status in started_status and day_start <= kick < day_end:
+                pending.append(game)
+                continue
+            if kick <= now or kick > horizon or status not in open_status:
                 continue
             pending.append(game)
         if not pending:
@@ -907,8 +926,7 @@ def _add_open_slate(
         if not lines.empty:
             by_game = {str(row.game_id): row for row in lines.itertuples(index=False)}
         names = _team_names(session, league_id)
-        records = _live_records(session, league_id, now)
-        margins = _season_point_margin(session, league_id, now)
+        finals = _final_scores(session, league_id, now.year)
         added = 0
         for game in pending:
             quote = by_game.get(game.game_id)
@@ -919,6 +937,7 @@ def _add_open_slate(
             kick = as_utc(game.kickoff_utc)
             if kick is None:
                 continue
+            records, margins = _form_before(finals, kick)
             home_margin = margins.get(game.home_team_id, 0.0)
             away_margin = margins.get(game.away_team_id, 0.0)
             margin = home_margin - away_margin + (0.0 if game.neutral_site else 2.5)
@@ -944,8 +963,8 @@ def _add_open_slate(
                 "league_id": league_id,
                 "kickoff_utc": kick.isoformat(),
                 "game_status": str(game.status or "scheduled").lower(),
-                "home_score": game.home_score,
-                "away_score": game.away_score,
+                "home_score": _score_int(game.home_score),
+                "away_score": _score_int(game.away_score),
                 "pick_result": None,
                 "home_team_id": game.home_team_id,
                 "away_team_id": game.away_team_id,
@@ -997,6 +1016,14 @@ def _add_open_slate(
                 "data_tier": "research",
                 "factors": {},
             }
+            row["pick_result"] = grade_displayed_pick(
+                status=row["game_status"],
+                home_score=row["home_score"],
+                away_score=row["away_score"],
+                pick_market="straight_up",
+                favored_side=row["favored_side"],
+                home_handicap=row["home_handicap"],
+            )
             attach_spread_pick(row)
             rows.append(row)
             seen.add(game.game_id)
@@ -1011,33 +1038,54 @@ def _add_open_slate(
     return rows
 
 
-def _season_point_margin(session: Session, league_id: str, now: datetime) -> dict[str, float]:
+def _final_scores(session: Session, league_id: str, year: int) -> list[tuple[Any, ...]]:
     from sqlalchemy import text
 
-    found = session.execute(
-        text(
-            """
-            SELECT home_team_id, away_team_id, home_score, away_score
-            FROM games
-            WHERE league_id = :lg
-              AND status = 'final'
-              AND home_score IS NOT NULL
-              AND away_score IS NOT NULL
-              AND kickoff_utc < :now
-              AND season_id LIKE :season
-            """
-        ),
-        {"lg": league_id, "now": now.isoformat(), "season": f"{league_id}-{now.year}%"},
-    ).fetchall()
+    return list(
+        session.execute(
+            text(
+                """
+                SELECT game_id, kickoff_utc, home_team_id, away_team_id, home_score, away_score
+                FROM games
+                WHERE league_id = :lg
+                  AND status = 'final'
+                  AND home_score IS NOT NULL
+                  AND away_score IS NOT NULL
+                  AND season_id LIKE :season
+                """
+            ),
+            {"lg": league_id, "season": f"{league_id}-{year}%"},
+        ).fetchall()
+    )
+
+
+def _form_before(finals: list[tuple[Any, ...]], kick: datetime) -> tuple[dict[str, str], dict[str, float]]:
+    """Wins and average margin from games that had already ended before this kickoff."""
+    from spe.db.base import as_utc
+
+    wins: dict[str, int] = {}
+    losses: dict[str, int] = {}
     total: dict[str, float] = {}
     count: dict[str, int] = {}
-    for home, away, home_score, away_score in found:
+    for _game_id, when, home, away, home_score, away_score in finals:
+        played = as_utc(when)
+        if played is None or played >= kick:
+            continue
         margin = float(home_score) - float(away_score)
         total[home] = total.get(home, 0.0) + margin
         total[away] = total.get(away, 0.0) - margin
         count[home] = count.get(home, 0) + 1
         count[away] = count.get(away, 0) + 1
-    return {team_id: total[team_id] / count[team_id] for team_id in count}
+        if home_score > away_score:
+            wins[home] = wins.get(home, 0) + 1
+            losses[away] = losses.get(away, 0) + 1
+        elif away_score > home_score:
+            wins[away] = wins.get(away, 0) + 1
+            losses[home] = losses.get(home, 0) + 1
+    teams = set(wins) | set(losses)
+    records = {team_id: f"{wins.get(team_id, 0)}-{losses.get(team_id, 0)}" for team_id in teams}
+    margins = {team_id: total[team_id] / count[team_id] for team_id in count}
+    return records, margins
 
 
 def _live_spread_lines(session: Session, league_id: str) -> pd.DataFrame:

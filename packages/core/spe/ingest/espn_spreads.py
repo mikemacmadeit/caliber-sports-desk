@@ -24,8 +24,10 @@ from spe.ingest.ats_scores import ensure_point_spread_market
 log = logging.getLogger(__name__)
 
 SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/football/{league}/scoreboard"
+SUMMARY = "https://site.api.espn.com/apis/site/v2/sports/football/{league}/summary?event={event}"
 _PATHS = {"nfl": "nfl", "fbs": "college-football"}
 _CHICAGO = ZoneInfo("America/Chicago")
+_STARTED = {"final", "in_progress"}
 
 
 def quotes_from_scoreboard(payload: dict[str, Any], league_id: str) -> list[dict[str, Any]]:
@@ -46,6 +48,17 @@ def quotes_from_scoreboard(payload: dict[str, Any], league_id: str) -> list[dict
     return quotes
 
 
+def quotes_from_summary(payload: dict[str, Any], league_id: str, event_id: str) -> list[dict[str, Any]]:
+    """The closing number stays on the game summary after the scoreboard drops it."""
+    for quote in payload.get("pickcenter") or []:
+        if not isinstance(quote, dict):
+            continue
+        parsed = _parse_odds(quote)
+        if parsed is not None and event_id:
+            return [{"game_id": f"espn:{league_id}:{event_id}", **parsed}]
+    return []
+
+
 def store_public_spreads(
     session: Session,
     *,
@@ -56,8 +69,18 @@ def store_public_spreads(
     """Save scoreboard spreads onto games we already have. Returns ticks written."""
     now = now or datetime.now(UTC)
     ensure_point_spread_market(session)
+    fetch_closes = quotes is None
     if quotes is None:
         quotes = _fetch_quotes(now, leagues)
+    written = _write_quotes(session, quotes, now)
+    if fetch_closes:
+        written += _fill_started_closes(session, now, leagues)
+    return written
+
+
+def _write_quotes(session: Session, quotes: list[dict[str, Any]], now: datetime) -> int:
+    from spe.db.base import as_utc
+
     if not quotes:
         return 0
     games = {
@@ -73,13 +96,53 @@ def store_public_spreads(
         if session.get(Bookmaker, book) is None:
             session.add(Bookmaker(bookmaker_id=book, name=book))
             session.flush()
+        kick = as_utc(game.kickoff_utc)
+        # A game that already started keeps the close, not a number taken after kickoff.
+        stamp = kick - timedelta(minutes=1) if kick is not None and now >= kick else now
         for side, line, price in (
             ("home", quote["home_line"], quote["home_price"]),
             ("away", quote["away_line"], quote["away_price"]),
         ):
-            written += _save_side(session, game, side, float(line), int(price), book, now)
+            written += _save_side(session, game, side, float(line), int(price), book, stamp)
     session.flush()
     return written
+
+
+def _fill_started_closes(session: Session, now: datetime, leagues: tuple[str, ...]) -> int:
+    """Finished games lose the scoreboard price. The summary still has the close."""
+    start = now.astimezone(_CHICAGO).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
+    end = start + timedelta(days=1)
+    games = (
+        session.query(Game)
+        .filter(
+            Game.league_id.in_(list(leagues)),
+            Game.kickoff_utc >= start,
+            Game.kickoff_utc < end,
+            Game.status.in_(list(_STARTED)),
+        )
+        .all()
+    )
+    if not games:
+        return 0
+    priced = {
+        row[0]
+        for row in session.query(Outcome.game_id)
+        .filter(Outcome.market_id == "point_spread", Outcome.game_id.in_([game.game_id for game in games]))
+        .all()
+    }
+    quotes: list[dict[str, Any]] = []
+    for game in games:
+        if game.game_id in priced:
+            continue
+        parts = str(game.game_id).split(":")
+        path = _PATHS.get(game.league_id)
+        if path is None or len(parts) < 3 or not parts[-1].isdigit():
+            continue
+        payload = _get_json(SUMMARY.format(league=path, event=parts[-1]))
+        if payload is None:
+            continue
+        quotes.extend(quotes_from_summary(payload, game.league_id, parts[-1]))
+    return _write_quotes(session, quotes, now)
 
 
 def _fetch_quotes(now: datetime, leagues: tuple[str, ...]) -> list[dict[str, Any]]:
@@ -196,9 +259,15 @@ def _save_side(
         .first()
     )
     if latest is not None and latest.price_american == price:
-        latest.observed_at = now
-        latest.captured_at = now
-        latest.effective_at = now
+        from spe.db.base import as_utc
+
+        stored = as_utc(latest.captured_at)
+        # Keep the earliest pregame stamp. Moving it forward can push a close past kickoff.
+        if stored is None or stored > now:
+            latest.observed_at = now
+            latest.captured_at = now
+            latest.source_at = now
+            latest.effective_at = now
         latest.quality_status = "ok"
         return 1
     session.add(
