@@ -66,6 +66,13 @@ FBS_GRADED_COVER_RATE = 0.524
 SPREAD_MIN_DISAGREEMENT = 7.0
 CLOSE_MIN_DISAGREEMENT = 1.0
 FBS_CLOSE_MAX = 3.0
+# The scoreboard fallback has no play-by-play, so its opinion is an
+# opponent-adjusted margin. A club with fewer than three prior games is an
+# unknown (an FCS opponent counts as average otherwise). A gap of a field
+# goal or more is the band this prior has not earned, so those stay off the card.
+SLATE_MIN_GAMES = 3
+SLATE_HOME_FIELD = 2.5
+SLATE_RIDGE = 10.0
 FBS_GRADED_COVER_LABEL = "Covered 52% of recent college games"
 # NFL holdout from 2024-09-01 with pre-kickoff Out/Doubtful counts: 53.7% of 681 games.
 # The same window without injuries covered 51.8%.
@@ -397,6 +404,21 @@ def _game_has_started(row: dict[str, Any]) -> bool:
 
 def _named_spread(row: dict[str, Any]) -> bool:
     return row.get("ats_side") in {"home", "away"} and bool(row.get("ats_pick_label"))
+
+
+def _clear_spread_pick(row: dict[str, Any]) -> None:
+    for key in (
+        "ats_side",
+        "ats_team",
+        "ats_line",
+        "ats_pick_label",
+        "ats_cover_margin",
+        "ats_probability",
+        "ats_basis",
+        "ats_pick_result",
+        "ats_locked",
+    ):
+        row[key] = None
 
 
 def attach_spread_pick(row: dict[str, Any]) -> dict[str, Any]:
@@ -927,6 +949,7 @@ def _add_open_slate(
             by_game = {str(row.game_id): row for row in lines.itertuples(index=False)}
         names = _team_names(session, league_id)
         finals = _final_scores(session, league_id, now.year)
+        strength_cache: dict[str, tuple[dict[str, str], dict[str, float], dict[str, int]]] = {}
         added = 0
         for game in pending:
             quote = by_game.get(game.game_id)
@@ -937,10 +960,15 @@ def _add_open_slate(
             kick = as_utc(game.kickoff_utc)
             if kick is None:
                 continue
-            records, margins = _form_before(finals, kick)
-            home_margin = margins.get(game.home_team_id, 0.0)
-            away_margin = margins.get(game.away_team_id, 0.0)
-            margin = home_margin - away_margin + (0.0 if game.neutral_site else 2.5)
+            cached = strength_cache.get(kick.isoformat())
+            if cached is None:
+                cached = _strength_before(finals, kick)
+                strength_cache[kick.isoformat()] = cached
+            records, ratings, counts = cached
+            home_games = counts.get(game.home_team_id, 0)
+            away_games = counts.get(game.away_team_id, 0)
+            margin = ratings.get(game.home_team_id, 0.0) - ratings.get(game.away_team_id, 0.0)
+            margin += 0.0 if game.neutral_site else SLATE_HOME_FIELD
             market_margin = None if handicap is None else -handicap
             home_name = names.get(game.home_team_id, game.home_team_id)
             away_name = names.get(game.away_team_id, game.away_team_id)
@@ -1003,10 +1031,10 @@ def _add_open_slate(
                 "break_even": None,
                 "expected_value": None,
                 "confidence": 0.35,
-                "sample_size": 0.0,
+                "sample_size": float(min(home_games, away_games)),
                 "projection_withheld": False,
-                "warnings": ["slate_without_play_model", "research_unvalidated"],
-                "model_version_id": f"ats-slate-{league_id}",
+                "warnings": ["slate_without_play_model", "opponent_adjusted", "research_unvalidated"],
+                "model_version_id": f"ats-slate-sos-{league_id}",
                 "pipeline_version": PIPELINE_VERSION,
                 "cohort_version": CLEAN_PROSPECTIVE_COHORT,
                 "eligibility": "ineligible",
@@ -1024,7 +1052,10 @@ def _add_open_slate(
                 favored_side=row["favored_side"],
                 home_handicap=row["home_handicap"],
             )
-            attach_spread_pick(row)
+            if home_games >= SLATE_MIN_GAMES and away_games >= SLATE_MIN_GAMES:
+                attach_spread_pick(row)
+            if row.get("ats_basis") != "score":
+                _clear_spread_pick(row)
             rows.append(row)
             seen.add(game.game_id)
             added += 1
@@ -1045,7 +1076,8 @@ def _final_scores(session: Session, league_id: str, year: int) -> list[tuple[Any
         session.execute(
             text(
                 """
-                SELECT game_id, kickoff_utc, home_team_id, away_team_id, home_score, away_score
+                SELECT game_id, kickoff_utc, home_team_id, away_team_id,
+                       home_score, away_score, neutral_site
                 FROM games
                 WHERE league_id = :lg
                   AND status = 'final'
@@ -1059,33 +1091,56 @@ def _final_scores(session: Session, league_id: str, year: int) -> list[tuple[Any
     )
 
 
-def _form_before(finals: list[tuple[Any, ...]], kick: datetime) -> tuple[dict[str, str], dict[str, float]]:
-    """Wins and average margin from games that had already ended before this kickoff."""
+def _adjusted_ratings(played: list[tuple[str, str, float, bool]]) -> dict[str, float]:
+    """Team strength from pre-kickoff margins, shrunk toward the league average.
+
+    Beating a team that itself loses to everyone counts for less than beating
+    a team that wins. One blowout cannot produce a 50-point rating.
+    """
+    teams = sorted({team for home, away, _margin, _neutral in played for team in (home, away)})
+    if not teams:
+        return {}
+    index = {team: i for i, team in enumerate(teams)}
+    design = np.zeros((len(played), len(teams)))
+    target = np.zeros(len(played))
+    for i, (home, away, margin, neutral) in enumerate(played):
+        design[i, index[home]] = 1.0
+        design[i, index[away]] = -1.0
+        target[i] = margin - (0.0 if neutral else SLATE_HOME_FIELD)
+    normal = design.T @ design
+    normal.flat[:: len(teams) + 1] += SLATE_RIDGE
+    coef = np.linalg.solve(normal, design.T @ target)
+    return {team: float(coef[index[team]]) for team in teams}
+
+
+def _strength_before(
+    finals: list[tuple[Any, ...]], kick: datetime
+) -> tuple[dict[str, str], dict[str, float], dict[str, int]]:
+    """Records, opponent-adjusted ratings, and game counts from before this kickoff."""
     from spe.db.base import as_utc
 
     wins: dict[str, int] = {}
     losses: dict[str, int] = {}
-    total: dict[str, float] = {}
     count: dict[str, int] = {}
-    for _game_id, when, home, away, home_score, away_score in finals:
-        played = as_utc(when)
-        if played is None or played >= kick:
+    played: list[tuple[str, str, float, bool]] = []
+    for _game_id, when, home, away, home_score, away_score, neutral in finals:
+        started = as_utc(when)
+        if started is None or started >= kick:
             continue
+        home_id, away_id = str(home), str(away)
         margin = float(home_score) - float(away_score)
-        total[home] = total.get(home, 0.0) + margin
-        total[away] = total.get(away, 0.0) - margin
-        count[home] = count.get(home, 0) + 1
-        count[away] = count.get(away, 0) + 1
+        played.append((home_id, away_id, margin, bool(neutral)))
+        count[home_id] = count.get(home_id, 0) + 1
+        count[away_id] = count.get(away_id, 0) + 1
         if home_score > away_score:
-            wins[home] = wins.get(home, 0) + 1
-            losses[away] = losses.get(away, 0) + 1
+            wins[home_id] = wins.get(home_id, 0) + 1
+            losses[away_id] = losses.get(away_id, 0) + 1
         elif away_score > home_score:
-            wins[away] = wins.get(away, 0) + 1
-            losses[home] = losses.get(home, 0) + 1
-    teams = set(wins) | set(losses)
+            wins[away_id] = wins.get(away_id, 0) + 1
+            losses[home_id] = losses.get(home_id, 0) + 1
+    teams = set(wins) | set(losses) | set(count)
     records = {team_id: f"{wins.get(team_id, 0)}-{losses.get(team_id, 0)}" for team_id in teams}
-    margins = {team_id: total[team_id] / count[team_id] for team_id in count}
-    return records, margins
+    return records, _adjusted_ratings(played), count
 
 
 def _live_spread_lines(session: Session, league_id: str) -> pd.DataFrame:
