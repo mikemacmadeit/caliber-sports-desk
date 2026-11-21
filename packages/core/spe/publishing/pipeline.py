@@ -9,9 +9,13 @@ from spe.db.base import as_utc, new_id
 from spe.db.models import JobRun
 from spe.db.session import session_factory, get_engine, init_db
 
-# Publish before the download. The homepage reads the saved board, and the
-# cron used to die while still fetching prices, so that board never got written.
+# The homepage and the ATS board have to be written before the price download.
+# That download, and a long score of games that already kicked off, used to run
+# until the database dropped the connection. ATS never started, and the live
+# card stayed empty. Score today's still-upcoming games first, refresh ATS from
+# lines already stored, then download and publish again.
 ODDS_LANE = (
+    "production_ats",
     "production_publish",
     "production_pregame_availability",
     "production_odds",
@@ -39,18 +43,69 @@ JOBS = {
 @contextmanager
 def lane_lock(lane):
     # Session-level advisory locks remain held across commits and release on crash.
+    # The database drops a socket after several minutes. Hold the lock on a
+    # connection that is renewed before that, and never fail the lane because
+    # the unlock itself finds a dead socket.
     if get_engine().dialect.name == "postgresql":
-        with get_engine().connect() as conn:
-            key = {"odds": 81301, "inputs": 81302, "settlement": 81303, "touchdowns": 81304}[lane]
-            locked = conn.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": key}).scalar()
-            try:
-                yield bool(locked)
-            finally:
-                if locked:
-                    try:
-                        conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
-                    except Exception:
-                        pass
+        import threading
+        import time
+
+        key = {"odds": 81301, "inputs": 81302, "settlement": 81303, "touchdowns": 81304}[lane]
+        state = {"held": False}
+        stop = threading.Event()
+        ready = threading.Event()
+
+        def _keep():
+            failures = 0
+            while not stop.is_set():
+                conn = None
+                try:
+                    conn = get_engine().connect()
+                    locked = bool(conn.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": key}).scalar())
+                    conn.commit()
+                    state["held"] = locked
+                    ready.set()
+                    if not locked:
+                        return
+                    failures = 0
+                    opened = time.monotonic()
+                    while not stop.is_set() and time.monotonic() - opened < 150:
+                        if stop.wait(20):
+                            break
+                        conn.execute(text("SELECT 1"))
+                        conn.commit()
+                except Exception:
+                    state["held"] = False
+                    failures += 1
+                    if not ready.is_set() and failures >= 3:
+                        ready.set()
+                        return
+                    if stop.is_set():
+                        return
+                    time.sleep(1)
+                    continue
+                finally:
+                    if conn is not None:
+                        try:
+                            if state["held"]:
+                                conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
+                                conn.commit()
+                        except Exception:
+                            pass
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+            state["held"] = False
+
+        keeper = threading.Thread(target=_keep, name=f"lane-lock-{lane}", daemon=True)
+        keeper.start()
+        ready.wait(15)
+        try:
+            yield bool(state["held"])
+        finally:
+            stop.set()
+            keeper.join(timeout=5)
     else:
         import os
         from spe.config import settings
@@ -120,7 +175,15 @@ def run_step(name, fn):
     try:
         with session_factory() as db:
             summary = fn(db) or {}
-            db.commit()
+            # Publish commits each batch on its own connection. This session
+            # then sits idle until the server closes it. Losing that idle
+            # socket must not throw away batches that are already saved.
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+                if not summary.get("persisted"):
+                    raise
         stop.set()
         pulse.join(timeout=3)
         summary = {**summary, "duration_seconds": round((datetime.now(UTC)-started).total_seconds(), 3), "heartbeat_at": datetime.now(UTC).isoformat()}
@@ -165,18 +228,65 @@ def run_step(name, fn):
         release_processing_memory()
 
 
-def publish_slate(db, date):
-    """Score a few games at a time and save. A dropped database connection cannot erase them."""
-    from app.queries import games_for_slate, list_props
-    from spe.props.board_cache import write_entry, WARM_MARKETS
+def _board_game_ids(games, now, *, upcoming_only=False):
+    """Games still on the homepage come first. A dropped run must leave those, not only games that already kicked off."""
+    dead = {"final", "in_progress", "canceled", "cancelled", "postponed"}
+    future, rest = [], []
+    for game in games:
+        kick = as_utc(getattr(game, "kickoff_utc", None))
+        if kick and kick > now and getattr(game, "status", None) not in dead:
+            future.append(game.game_id)
+        elif not upcoming_only:
+            rest.append(game.game_id)
+    return future if upcoming_only else [*future, *rest]
+
+
+def _save_batch(market, date, chunk, prior, signature):
+    """Score one handful of games on a new connection. Retry once if that socket dies."""
+    from sqlalchemy.exc import OperationalError
+    from app.queries import list_props
+    from spe.props.board_cache import write_entry
     from spe.publishing.ledger import publish
     from spe.shadow.desk_ledger import freeze_desk_rows
+    import time
+
+    for attempt in (1, 2):
+        try:
+            with session_factory() as batch:
+                rows = list_props(batch, market, None, None, "all", date, game_ids=chunk or None)
+                freeze_desk_rows(batch, rows)
+                published = publish(batch, rows)["published"]
+                collected = [*prior, *rows]
+                for league in ("all", "nfl", "fbs"):
+                    write_entry(
+                        market,
+                        league,
+                        date,
+                        [r for r in collected if league == "all" or r["league_id"] == league],
+                        session=batch,
+                        scoring_signature=signature,
+                    )
+                batch.commit()
+                return rows, published
+        except OperationalError as exc:
+            print(f"publish_slate {date} {market} batch attempt {attempt} {type(exc).__name__}", flush=True)
+            time.sleep(2)
+    return None, 0
+
+
+def publish_slate(db, date, *, upcoming_only=False):
+    """Score a few games at a time and save. A dropped database connection cannot erase them."""
+    from app.queries import games_for_slate
+    from spe.props.board_cache import WARM_MARKETS
     from spe.publishing.local_board import scoring_signature
 
     signature = scoring_signature()
-    game_ids = [g.game_id for g in games_for_slate(db, date, "all")]
+    now = datetime.now(UTC)
+    game_ids = _board_game_ids(games_for_slate(db, date, "all"), now, upcoming_only=upcoming_only)
+    db.commit()
     saved = 0
     published = 0
+    failed = 0
     batch = 6
     for market in WARM_MARKETS:
         collected: list = []
@@ -185,23 +295,16 @@ def publish_slate(db, date):
         for index, chunk in enumerate(chunks, start=1):
             if chunk == [] and game_ids:
                 continue
-            rows = list_props(db, market, None, None, "all", date, game_ids=chunk or None)
+            rows, count = _save_batch(market, date, chunk, collected, signature)
+            if rows is None:
+                failed += 1
+                print(f"publish_slate {date} {market} batch {index}/{len(chunks)} skipped", flush=True)
+                continue
             collected.extend(rows)
-            freeze_desk_rows(db, rows)
-            published += publish(db, rows)["published"]
-            for league in ("all", "nfl", "fbs"):
-                write_entry(
-                    market,
-                    league,
-                    date,
-                    [r for r in collected if league == "all" or r["league_id"] == league],
-                    session=db,
-                    scoring_signature=signature,
-                )
-            db.commit()
+            published += count
             print(f"publish_slate {date} {market} batch {index}/{len(chunks)} saved {len(rows)}", flush=True)
         saved += len(collected)
-    return {"rows": saved, "published": published}
+    return {"rows": saved, "published": published, "failed_batches": failed}
 
 
 def warm_and_publish(db, only_dates=None):
@@ -220,15 +323,21 @@ def warm_and_publish(db, only_dates=None):
     published = 0
     for date in dates:
         published += publish_slate(db, date)["published"]
-        db.commit()
-    return {"status": "ok", "dates": dates, "published": published}
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+    return {"status": "ok", "dates": dates, "published": published, "persisted": True}
 
 
 def publish_today(db):
-    """Write the slate the homepage is showing before any slow download starts."""
+    """Write the games still on the homepage before any slow download starts."""
     from app.queries import kickoff_day
 
-    return warm_and_publish(db, only_dates=[kickoff_day(datetime.now(UTC))])
+    day = kickoff_day(datetime.now(UTC))
+    result = publish_slate(db, day, upcoming_only=True)
+    status = "degraded" if result["failed_batches"] and not result["rows"] else "ok"
+    return {"status": status, "dates": [day], "persisted": True, **result}
 
 
 def inputs(db):

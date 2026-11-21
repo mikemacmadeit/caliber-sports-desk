@@ -582,13 +582,28 @@ def test_a_desk_touchdown_does_not_stack_on_a_published_prop(db):
 
 
 def test_odds_lane_saves_the_board_before_downloading_prices():
-    from spe.publishing.pipeline import ODDS_LANE
+    from types import SimpleNamespace
+    from spe.publishing.pipeline import ODDS_LANE, _board_game_ids
 
-    assert ODDS_LANE[0] == "production_publish"
-    assert ODDS_LANE.index("production_odds") > 0
+    # ATS and the live card are saved before the price download. A second ATS
+    # pass runs after new spreads land. Games that already kicked off must not
+    # stand in front of the ones the homepage is still showing.
+    assert ODDS_LANE[0] == "production_ats"
+    assert ODDS_LANE[1] == "production_publish"
+    assert ODDS_LANE.index("production_odds") > ODDS_LANE.index("production_publish")
     assert ODDS_LANE.index("production_spreads") > ODDS_LANE.index("production_odds")
     assert ODDS_LANE[-1] == "production_ats"
     assert ODDS_LANE.count("production_publish") == 2
+    assert ODDS_LANE.count("production_ats") == 2
+    now = NOW
+    games = [
+        SimpleNamespace(game_id="started", kickoff_utc=now - timedelta(hours=2), status="scheduled"),
+        SimpleNamespace(game_id="later", kickoff_utc=now + timedelta(hours=4), status="scheduled"),
+        SimpleNamespace(game_id="next", kickoff_utc=now + timedelta(hours=1), status="scheduled"),
+        SimpleNamespace(game_id="live", kickoff_utc=now + timedelta(minutes=30), status="in_progress"),
+    ]
+    assert _board_game_ids(games, now) == ["next", "later", "started"]
+    assert _board_game_ids(games, now, upcoming_only=True) == ["next", "later"]
 
 
 def test_a_pass_before_kickoff_stays_off_the_public_record(db):
