@@ -177,6 +177,11 @@ def slate_dates(db, month=None) -> list[str]:
             day = _slate_day(row.get("kickoff_utc"))
             if day:
                 found.add(day)
+    frozen = Path(__file__).resolve().parent / "frozen"
+    if frozen.is_dir():
+        for path in frozen.glob("????-??-??.json"):
+            if month is None or path.stem.startswith(month + "-"):
+                found.add(path.stem)
     return sorted(found)
 
 
@@ -200,11 +205,24 @@ def _packaged_day(date: str, league: str | None) -> dict[str, Any] | None:
     }
 
 
+def _saved_card(date: str, league: str | None) -> dict[str, Any] | None:
+    """The card written down for that slate day. A missing file is not a saved card."""
+    path = Path(__file__).resolve().parent / "frozen" / f"{date}.json"
+    if not path.is_file():
+        return None
+    return _packaged_day(date, league)
+
+
 def ledger_day(db, date: str, league: str | None = None) -> dict[str, Any]:
-    """Verified pregame records; historical display archives are explicitly separate."""
+    """Verified pregame records. A saved card fills picks the database no longer has."""
     props = [r for r in day_picks(db, league, date) if r.get("market_id") != "anytime_td"]
     ats = ats_history(db, league, limit=100000, date=date)["rows"]
     rows = _ledger_rows([], [], props + ats + _replay_scorers(db, date, league))
+    saved = _saved_card(date, league)
+    if saved:
+        rows = _merge_saved(rows, saved["rows"])
+        return {"date": date, "timezone": "America/Chicago", "league": league or "all",
+                "rows": rows, "summary": _ledger_summary(rows), "record_status": "saved_pregame"}
     if not rows:
         archive = _packaged_day(date, league)
         if archive:
@@ -249,10 +267,45 @@ def ledger_year(db, year: int, league: str | None = None) -> dict[str, Any]:
     return {"year": str(year), "days": days, **summary, "priced": summary["priced_bets"], "markets": markets}
 
 
+def _merge_saved(live: list[dict[str, Any]], saved: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep a database pick, fill a missing price from the saved card, and add a pick the database dropped."""
+    merged = [dict(row) for row in live]
+    index: dict[tuple[str, str], int] = {}
+    for i, row in enumerate(merged):
+        index.setdefault(_pick_key(row), i)
+    for row in saved:
+        key = _pick_key(row)
+        slot = index.get(key)
+        if slot is None:
+            index[key] = len(merged)
+            merged.append(dict(row))
+            continue
+        current = merged[slot]
+        if current.get("units") is None and row.get("units") is not None:
+            current["units"] = row["units"]
+        if not _has_price(current.get("detail")) and _has_price(row.get("detail")):
+            current["detail"] = row["detail"]
+        if current.get("result") in {None, "", "pending"} and row.get("result") not in {None, "", "pending"}:
+            current["result"] = row["result"]
+    merged.sort(key=lambda row: (str(row.get("kickoff_utc") or ""), _MARKET_ORDER.get(str(row.get("market_id")), 9), str(row.get("sentence") or "")))
+    return merged
+
+
+def _pick_key(row: dict[str, Any]) -> tuple[str, str]:
+    sentence = " ".join(str(row.get("sentence") or "").casefold().split())
+    if sentence:
+        return (str(row.get("market_id") or ""), sentence)
+    return ("id", str(row.get("pick_id") or ""))
+
+
+def _has_price(detail: Any) -> bool:
+    return any(ch.isdigit() for ch in str(detail or ""))
+
+
 def _ledger_days(db, dates, league):
     """Same verified records as ledger_day, with bounded intermediate card memory.
 
-    Display-only packaged archives are deliberately absent from performance totals.
+    Saved cards are part of the record. A display-only archive with no file is not.
     There is no cross-request cache: official corrections apply on the next read.
     """
     dates = sorted(set(dates))
@@ -295,7 +348,9 @@ def _ledger_range(db, dates, league):
     result = {}
     for day in dates:
         card = _withhold_current_absences(db, cards[day], now) if day in cards else {}
-        result[day] = _ledger_rows([], [], published[day] + spreads[day] + _scorer_rows(card))
+        rows = _ledger_rows([], [], published[day] + spreads[day] + _scorer_rows(card))
+        saved = _saved_card(day, league)
+        result[day] = _merge_saved(rows, saved["rows"]) if saved else rows
     return result
 
 
