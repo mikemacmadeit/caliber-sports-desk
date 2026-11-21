@@ -481,6 +481,18 @@ def production_cycle(lane):
             from spe.models.ats.board_cache import refresh_board
             from spe.shadow.ats import capture_ats_predictions
 
+            # Save the scoreboard number before the first ATS pass. The paid
+            # feed can refuse a near-kickoff game, and that pass still needs a line.
+            try:
+                from spe.ingest.espn_spreads import store_public_spreads
+
+                with session_factory() as spread_db:
+                    store_public_spreads(spread_db)
+                    spread_db.commit()
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).warning("Public scoreboard spreads were not saved", exc_info=True)
             # Save the board from prices already stored before downloading more.
             # The cron kills this lane at its time limit. A download used to run
             # first, so the publish step was killed and the homepage stayed empty.

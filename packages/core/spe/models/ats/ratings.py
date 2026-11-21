@@ -382,7 +382,12 @@ def build_team_strength_frame(session: Session, league_id: str) -> pd.DataFrame:
         home_state = teams[home_key].snapshot(k, means)
         away_state = teams[away_key].snapshot(k, means)
         if home_state["n"] < 1 or away_state["n"] < 1:
-            continue
+            # A club whose prior games are stored under a different id still
+            # plays today. League-average features keep that game on the card.
+            # Finished games stay out so an unmatched first week is not a prior.
+            status = str(rec.status or "").lower()
+            if status not in {"scheduled", "pre", "upcoming", "preview", "pregame"} or as_of <= pd.Timestamp.now(tz="UTC"):
+                continue
 
         home_rest = _rest_days(teams[home_key].kickoffs, as_of)
         away_rest = _rest_days(teams[away_key].kickoffs, as_of)

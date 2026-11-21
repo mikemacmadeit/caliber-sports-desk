@@ -852,6 +852,7 @@ def predict_upcoming_ats(
             "calibrator_status": bundle.calibrator_status,
             "research_bundle": bundle.to_dict(),
         }
+    rows = _add_open_slate(session, rows, leagues, now, summaries)
     rows.sort(key=lambda r: r["kickoff_utc"])
     return {
         "as_of": now.isoformat(),
@@ -868,6 +869,175 @@ def predict_upcoming_ats(
         "summaries": summaries,
         "rows": rows,
     }
+
+
+def _add_open_slate(
+    session: Session,
+    rows: list[dict[str, Any]],
+    leagues: list[str],
+    now: datetime,
+    summaries: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Put a scheduled game on the card when the play model has no row for it.
+
+    The strength frame is empty when play-by-play is missing, and it drops a
+    club whose history is stored under a different id. The scoreboard game and
+    its spread still have to be published.
+    """
+    from spe.db.base import as_utc
+    from spe.db.models import Game
+
+    seen = {row.get("game_id") for row in rows}
+    horizon = now + timedelta(hours=36)
+    open_status = {"scheduled", "pre", "upcoming", "preview", "pregame"}
+    for league_id in leagues:
+        games = session.query(Game).filter(Game.league_id == league_id, Game.data_tier == "upcoming").all()
+        pending = []
+        for game in games:
+            kick = as_utc(game.kickoff_utc)
+            if game.game_id in seen or kick is None or kick <= now or kick > horizon:
+                continue
+            if str(game.status or "").lower() not in open_status:
+                continue
+            pending.append(game)
+        if not pending:
+            continue
+        lines = _live_spread_lines(session, league_id)
+        by_game = {}
+        if not lines.empty:
+            by_game = {str(row.game_id): row for row in lines.itertuples(index=False)}
+        names = _team_names(session, league_id)
+        records = _live_records(session, league_id, now)
+        margins = _season_point_margin(session, league_id, now)
+        added = 0
+        for game in pending:
+            quote = by_game.get(game.game_id)
+            handicap = None if quote is None else _finite(getattr(quote, "spread_line", None))
+            home_price = None if quote is None else _score_int(getattr(quote, "home_spread_price", None))
+            away_price = None if quote is None else _score_int(getattr(quote, "away_spread_price", None))
+            book = None if quote is None else str(getattr(quote, "bookmaker_id", "") or "") or None
+            kick = as_utc(game.kickoff_utc)
+            if kick is None:
+                continue
+            home_margin = margins.get(game.home_team_id, 0.0)
+            away_margin = margins.get(game.away_team_id, 0.0)
+            margin = home_margin - away_margin + (0.0 if game.neutral_site else 2.5)
+            market_margin = None if handicap is None else -handicap
+            home_name = names.get(game.home_team_id, game.home_team_id)
+            away_name = names.get(game.away_team_id, game.away_team_id)
+            total = 52.0 if league_id == "fbs" else 44.0
+            win = normal_cover_probs(margin, 0.0, 14.0)
+            pick = choose_ats_pick(
+                predicted_margin=margin,
+                home_handicap=handicap,
+                p_home_cover=float(win["p_home_cover"]),
+                p_away_cover=float(win["p_away_cover"]),
+                home_team=home_name,
+                away_team=away_name,
+                raw_margin=margin,
+                market_margin=market_margin,
+                home_record=records.get(game.home_team_id),
+                away_record=records.get(game.away_team_id),
+            )
+            row = {
+                "game_id": game.game_id,
+                "league_id": league_id,
+                "kickoff_utc": kick.isoformat(),
+                "game_status": str(game.status or "scheduled").lower(),
+                "home_score": game.home_score,
+                "away_score": game.away_score,
+                "pick_result": None,
+                "home_team_id": game.home_team_id,
+                "away_team_id": game.away_team_id,
+                "home_team": home_name,
+                "away_team": away_name,
+                "home_record": records.get(game.home_team_id),
+                "away_record": records.get(game.away_team_id),
+                "sportsbook": book,
+                "quote_source_class": "live_book" if book else "none",
+                "spread_line": handicap,
+                "home_handicap": handicap,
+                "market_home_margin": market_margin,
+                "spread_source_kind": "sportsbook_handicap" if handicap is not None else None,
+                "home_spread_price": home_price,
+                "away_spread_price": away_price,
+                "predicted_margin": margin,
+                "predicted_home_score": (total + margin) / 2.0,
+                "predicted_away_score": (total - margin) / 2.0,
+                "p_home_cover": float(win["p_home_cover"]),
+                "p_away_cover": float(win["p_away_cover"]),
+                "p_push": float(win["p_push"]),
+                "margin_sigma": 14.0,
+                "model_vs_market": None if handicap is None else margin + handicap,
+                "favored_side": pick["favored_side"],
+                "favored_side_line": pick["pick_line"],
+                "pick_label": pick["pick_label"],
+                "pick_team": pick["pick_team"],
+                "pick_line": pick["pick_line"],
+                "pick_market": pick["pick_market"],
+                "pick_probability": pick["p_cover"],
+                "pick_chance_label": None,
+                "pick_edge_points": None if handicap is None else margin + handicap,
+                "cover_prob_kind": "straight_up",
+                "p_cover": pick["p_cover"],
+                "price_american": None,
+                "break_even": None,
+                "expected_value": None,
+                "confidence": 0.35,
+                "sample_size": 0.0,
+                "projection_withheld": False,
+                "warnings": ["slate_without_play_model", "research_unvalidated"],
+                "model_version_id": f"ats-slate-{league_id}",
+                "pipeline_version": PIPELINE_VERSION,
+                "cohort_version": CLEAN_PROSPECTIVE_COHORT,
+                "eligibility": "ineligible",
+                "cover_probs_enabled": False,
+                "research_only": True,
+                "play_enabled": False,
+                "data_tier": "research",
+                "factors": {},
+            }
+            attach_spread_pick(row)
+            rows.append(row)
+            seen.add(game.game_id)
+            added += 1
+        if added:
+            summaries[league_id] = {
+                **summaries.get(league_id, {}),
+                "status": "ok",
+                "slate_rows": added,
+                "n": int(summaries.get(league_id, {}).get("n") or 0) + added,
+            }
+    return rows
+
+
+def _season_point_margin(session: Session, league_id: str, now: datetime) -> dict[str, float]:
+    from sqlalchemy import text
+
+    found = session.execute(
+        text(
+            """
+            SELECT home_team_id, away_team_id, home_score, away_score
+            FROM games
+            WHERE league_id = :lg
+              AND status = 'final'
+              AND home_score IS NOT NULL
+              AND away_score IS NOT NULL
+              AND kickoff_utc < :now
+              AND season_id LIKE :season
+            """
+        ),
+        {"lg": league_id, "now": now.isoformat(), "season": f"{league_id}-{now.year}%"},
+    ).fetchall()
+    total: dict[str, float] = {}
+    count: dict[str, int] = {}
+    for home, away, home_score, away_score in found:
+        margin = float(home_score) - float(away_score)
+        total[home] = total.get(home, 0.0) + margin
+        total[away] = total.get(away, 0.0) - margin
+        count[home] = count.get(home, 0) + 1
+        count[away] = count.get(away, 0) + 1
+    return {team_id: total[team_id] / count[team_id] for team_id in count}
 
 
 def _live_spread_lines(session: Session, league_id: str) -> pd.DataFrame:

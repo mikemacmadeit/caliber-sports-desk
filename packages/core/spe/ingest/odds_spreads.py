@@ -75,6 +75,15 @@ def ingest_odds_spreads(
     now = now or datetime.now(UTC)
     adapter = adapter or OddsApiAdapter()
     ensure_point_spread_market(session)
+    # The public scoreboard still has today's number when the credit reserve is empty.
+    try:
+        from spe.ingest.espn_spreads import store_public_spreads
+
+        store_public_spreads(session, now=now, leagues=leagues)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning("Public scoreboard spreads were not saved", exc_info=True)
     # Older ticks matched "Michigan" inside "Michigan State" and stored the dog number on the favorite.
     reassign_spread_sides(session)
     if not adapter.api_key and not fixture_events:
